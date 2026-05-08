@@ -243,3 +243,5 @@ User constraint recorded:
   - Used UTF-8 when writing the temporary JSON because imported configs may contain non-ASCII company names.
   - Marked `GithubRun` as `success` when GitHub Actions uploads a finished client to `/save_custom_client`.
   - Normalized status comparisons in `/check_for_file` so both workflow conclusions and upload callbacks can advance the waiting page.
+- During redeploy from the GitHub branch archive, Docker failed to execute `/opt/rdgen/entrypoint.sh` because tarball checkout did not preserve the executable bit.
+- Added `chmod +x /opt/rdgen/entrypoint.sh` inside the Docker build so archive-based deployments start reliably.
