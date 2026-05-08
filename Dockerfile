@@ -6,7 +6,6 @@ ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
 RUN adduser -D user
-USER user
 
 WORKDIR /opt/rdgen
 
@@ -20,4 +19,5 @@ EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --spider 0.0.0.0:8000
 
+ENTRYPOINT ["/opt/rdgen/entrypoint.sh"]
 CMD ["/home/user/.local/bin/gunicorn", "-c", "gunicorn.conf.py", "rdgen.wsgi:application"]

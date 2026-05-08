@@ -227,3 +227,8 @@ User constraint recorded:
   - Save the `GithubRun` record and render the waiting page on `204` success.
   - Fall back to the repository Actions page when no workflow run URL is available.
   - Avoid polling a `/runs/None` GitHub API URL when the dispatch response does not include a run id.
+- Reproduced another 500 root cause inside the deployed container:
+  - Host bind-mounted directories `exe/`, `png/`, and `temp_zips/` were created as root-owned.
+  - The container application runs as Unix user `user` (`uid=1000`) and could not write `temp_zips/secrets_*.zip`.
+  - Fixed the live server by changing those host directory owners to uid/gid `1000:1000`.
+  - Added `entrypoint.sh` so future container starts create and chown runtime artifact directories before dropping to the app user.
