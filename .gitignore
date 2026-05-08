@@ -4,3 +4,4 @@ gunicorn.conf
 .venv
 output/
 .tools/
+.env

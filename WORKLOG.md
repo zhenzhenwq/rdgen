@@ -169,3 +169,26 @@ User constraint recorded:
 - Still pending:
   - Public server URL/domain for GitHub Actions secret `GENURL`
   - Server deployment environment values
+
+### Server Deployment Preparation
+
+- Received deployment server details:
+  - Host: `120.55.0.199`
+  - SSH user: `root`
+  - SSH port: `22`
+- Verified SSH port 22 is reachable.
+- Verified the server OS and runtime state:
+  - OS: CentOS Linux 8
+  - Docker is installed.
+  - Docker Compose v2 is installed.
+  - `git` is not installed.
+  - Port 80 is already used by nginx.
+  - Port 8000 was not occupied during the initial check.
+- Added GitHub Actions secret `GENURL` with the initial direct-IP URL:
+  `http://120.55.0.199:8000`
+- Updated `docker-compose.yml` to read deployment settings from `.env` instead of storing placeholder values directly in the compose file.
+- Added `.env.example` for non-secret deployment configuration reference.
+- Planned deployment path:
+  `/opt/rdgen`
+- Planned public test URL:
+  `http://120.55.0.199:8000`
