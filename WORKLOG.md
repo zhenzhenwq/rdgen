@@ -245,3 +245,13 @@ User constraint recorded:
   - Normalized status comparisons in `/check_for_file` so both workflow conclusions and upload callbacks can advance the waiting page.
 - During redeploy from the GitHub branch archive, Docker failed to execute `/opt/rdgen/entrypoint.sh` because tarball checkout did not preserve the executable bit.
 - Added `chmod +x /opt/rdgen/entrypoint.sh` inside the Docker build so archive-based deployments start reliably.
+- After that fix, the imported config successfully reached GitHub dispatch and GitHub returned a workflow run id, but the view still returned:
+  `Connection error: attempt to write a readonly database`
+- Root cause:
+  - Docker image build created `db.sqlite3` as root.
+  - Runtime Gunicorn now runs as the unprivileged `user`, so it could not insert the generated `GithubRun` record.
+- Fixed database persistence and permissions:
+  - Moved SQLite to `/opt/rdgen/data/db.sqlite3` by default through `SQLITE_PATH`.
+  - Added a `./data:/opt/rdgen/data` Compose mount.
+  - Updated `entrypoint.sh` to create/chown `data`, run migrations as the app user, then start Gunicorn.
+  - Removed build-time migration so the runtime database owns its files correctly.

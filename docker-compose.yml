@@ -16,6 +16,7 @@ services:
       PROTOCOL: "${PROTOCOL:-https}"
       REPONAME: "${REPONAME:-rdgen}"
       SH_SECRET: "${SH_SECRET:-}"
+      SQLITE_PATH: "${SQLITE_PATH:-/opt/rdgen/data/db.sqlite3}"
     ports:
       - "8000:8000"
     dns:
@@ -24,3 +25,4 @@ services:
       - ./exe:/opt/rdgen/exe
       - ./png:/opt/rdgen/png
       - ./temp_zips:/opt/rdgen/temp_zips
+      - ./data:/opt/rdgen/data

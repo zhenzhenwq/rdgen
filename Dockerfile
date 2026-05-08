@@ -12,8 +12,7 @@ WORKDIR /opt/rdgen
 
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt \
- && chmod +x /opt/rdgen/entrypoint.sh \
- && python manage.py migrate
+ && chmod +x /opt/rdgen/entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1
 

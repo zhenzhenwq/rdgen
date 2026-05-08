@@ -5,3 +5,7 @@ gunicorn.conf
 output/
 .tools/
 .env
+data/
+exe/
+png/
+temp_zips/

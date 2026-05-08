@@ -17,6 +17,7 @@ db.sqlite3
 .env
 output/
 .tools/
+data/
 exe/
 png/
 temp_zips/
