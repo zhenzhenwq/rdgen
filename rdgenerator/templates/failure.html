@@ -1,10 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title id="pageTitle">Build Failure</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">客户端生成失败</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --surface: #ffffff;
+            --line: #d8e7fb;
+            --text: #10223d;
+            --muted: #5e7190;
+            --blue: #1769e0;
+            --blue-strong: #0b4fb8;
+            --danger: #c0392b;
+            --warning-bg: #fff7e6;
+            --warning-line: #ffe1a6;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            font-family: 'Noto Sans SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -12,7 +27,12 @@
             height: 100vh;
             margin: 0;
             text-align: center;
-            background: linear-gradient(135deg, #ffcfcf 0%, #e2c3c3 100%);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 249, 255, 0.96)),
+                linear-gradient(90deg, rgba(23, 105, 224, 0.08) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(23, 105, 224, 0.08) 1px, transparent 1px);
+            background-size: auto, 42px 42px, 42px 42px;
+            color: var(--text);
         }
         .platform-logo {
             width: 150px;
@@ -23,22 +43,23 @@
             transition: transform 0.3s ease;
         }
         .error-container {
-            background: white;
-            border-radius: 12px;
+            background: var(--surface);
+            border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 1px solid var(--line);
+            box-shadow: 0 18px 45px rgba(22, 81, 152, 0.10);
             max-width: 500px;
             width: 90%;
         }
         .error-header {
-            color: #c0392b;
+            color: var(--danger);
             font-weight: 700;
             margin-bottom: 10px;
             font-size: 1.5em;
         }
         .warning-box {
-            background-color: #fff3cd;
-            border: 1px solid #ffeeba;
+            background-color: var(--warning-bg);
+            border: 1px solid var(--warning-line);
             color: #856404;
             padding: 15px;
             border-radius: 8px;
@@ -47,7 +68,7 @@
             text-align: left;
         }
         .download-section {
-            background: #f8f9fa;
+            background: #f8fbff;
             padding: 15px;
             border-radius: 10px;
             border: 1px dashed #ccc;
@@ -56,7 +77,7 @@
             display: block;
             margin: 10px 0;
             padding: 12px;
-            background-color: #34495e;
+            background: linear-gradient(180deg, var(--blue), var(--blue-strong));
             color: white;
             text-decoration: none;
             border-radius: 5px;
@@ -68,12 +89,12 @@
         .log-link {
             display: inline-block;
             margin-top: 15px;
-            color: #3498db;
+            color: var(--blue-strong);
             text-decoration: none;
             font-size: 0.85em;
         }
         .platform-note {
-            color: #666;
+            color: var(--muted);
             font-size: 0.85em;
             margin-top: 15px;
         }
@@ -85,27 +106,27 @@
         <text x="128" y="160" font-family="Arial" font-size="50" font-weight="bold" text-anchor="middle" fill="white">Win</text>
     </svg>
     <div class="error-container">
-        <h2 class="error-header">Workflow Interrupted</h2>
+        <h2 class="error-header">构建未完成</h2>
         
         <div class="warning-box">
-            <strong>Warning:</strong> The build process did not complete successfully. Some files may be missing. You can attempt to download the available files below.
+            <strong>提示：</strong>构建流程没有成功完成，部分文件可能缺失。下方会显示当前已经可用的文件。
         </div>
 
         <div class="download-section">
             {% if files %}
                 {% for file in files %}
-                    <a href='/download?filename={{file}}&uuid={{uuid}}' class="download-link">Download {{file}}</a>
+                    <a href='/download?filename={{file}}&uuid={{uuid}}' class="download-link">下载 {{file}}</a>
                 {% endfor %}
             {% else %}
-                <p>No generated files are available.</p>
+                <p>暂无可下载的生成文件。</p>
             {% endif %}
         </div>
 
-        <a href="{{ log_url }}" target="_blank" class="log-link">Check GitHub Logs for error details ↗</a>
+        <a href="{{ log_url }}" target="_blank" class="log-link">查看 GitHub 日志获取错误详情 ↗</a>
         
         <div id="platformNote" class="platform-note"></div>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <a href="/" style="font-size: 0.9em; color: #666; text-decoration: none;">← Return to Form</a>
+        <a href="/" style="font-size: 0.9em; color: #5e7190; text-decoration: none;">← 返回生成器</a>
     </div>
 
     <script>
@@ -121,7 +142,7 @@
             Object.values(platformLogos).forEach(logo => { if(logo) logo.style.display = 'none'; });
 
             if (platform.includes('windows')) {
-                document.getElementById('pageTitle').textContent = 'Windows Build Failed';
+                document.getElementById('pageTitle').textContent = 'Windows 客户端生成失败';
                 if(platformLogos.windows) platformLogos.windows.style.display = 'block';
             } else if (platform === 'macos') {
                 if(platformLogos.macos) platformLogos.macos.style.display = 'block';

@@ -2,28 +2,33 @@
 
 ## Immediate Optimization Candidates
 
-1. Localize the UI for Chinese users while keeping field names and backend behavior stable.
-2. Improve the main generator UI layout:
+1. Improve the main generator UI layout:
    - clearer grouping
    - better spacing
    - more scannable controls
    - mobile responsive layout
-3. Hide or de-emphasize platform-specific fields when they do not apply.
-4. Add stronger client-side validation for:
+2. Hide or de-emphasize platform-specific fields when they do not apply.
+3. Add stronger client-side validation for:
    - configuration name
    - host/API URL format
    - Android App ID
    - PNG upload dimensions and size
    - manual settings syntax
-5. Improve save/load configuration:
+4. Improve save/load configuration:
    - avoid repeatedly registering `change` handlers
    - restore platform icon active state after loading
    - restore permission preset state after loading
-6. Improve generated/waiting/failure pages:
+5. Improve generated/waiting/failure pages:
    - clearer build progress
    - GitHub log links
    - retry guidance
    - better file availability checks
+
+## Completed UI Direction
+
+1. The main generator and generation flow pages now use Chinese visible text.
+2. The main generator page now uses a blue-white theme.
+3. The bottom source-code and sponsor links were removed from the generator page.
 
 ## Backend Hardening Candidates
 

@@ -272,3 +272,21 @@ User constraint recorded:
   - `generated.html` always showed platform-specific hardcoded download links, including `Desk.msi`, even when only `Desk.exe` was uploaded.
   - Clicking a missing artifact would raise a backend 500.
 - Fixed generated/failure pages to list only files actually present under the run's output directory, and changed `/download` to return 404 for missing generated files.
+
+### Generator UI Chinese / Blue-White Theme
+
+- User requested `$frontend-design` changes for a blue-white generator page with Chinese display.
+- Updated `rdgenerator/templates/generator.html`:
+  - Reworked the main generator page from the original dark theme to a blue-white theme.
+  - Translated visible form section names, labels, buttons, help text, and client-side save/load errors into Chinese.
+  - Removed the bottom GitHub source-code and sponsor links so they are no longer displayed or clickable.
+- Updated `rdgenerator/forms.py`:
+  - Translated form choice labels and validation messages into Chinese while keeping submitted values unchanged.
+- Updated flow templates for a consistent Chinese display:
+  - `rdgenerator/templates/waiting.html`
+  - `rdgenerator/templates/generated.html`
+  - `rdgenerator/templates/failure.html`
+  - `rdgenerator/templates/maintenance.html`
+- Verification:
+  - `python -m py_compile rdgenerator\forms.py rdgenerator\views.py` passed.
+  - `git diff --check` passed.
