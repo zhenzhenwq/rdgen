@@ -148,3 +148,24 @@ User constraint recorded:
   - Fine-grained GitHub token for the fork
   - Public server URL for `GENURL`
   - Matching `ZIP_PASSWORD` in GitHub Actions secret and server environment
+
+### GitHub Fork Setup
+
+- Created and prepared the user's GitHub fork:
+  `https://github.com/zhenzhenwq/rdgen`
+- Added `origin` remote pointing to the fork and kept the author's repository as `upstream`.
+- Pushed the local fixed branch to `origin/master`.
+- Enabled GitHub Actions on the fork through the GitHub web UI.
+- Added repository Actions secret `ZIP_PASSWORD` through the GitHub web UI.
+- Created fine-grained personal access token `rdgen-build-dispatch` through the GitHub web UI:
+  - Resource owner: `zhenzhenwq`
+  - Repository access: only `zhenzhenwq/rdgen`
+  - Expiration: no expiration
+  - Repository permissions:
+    - `Actions`: read and write
+    - `Workflows`: read and write
+    - `Metadata`: read-only, required by GitHub
+- The token value was copied in the browser and must be stored by the user for the server `GHBEARER` environment variable. Do not commit or log the token value.
+- Still pending:
+  - Public server URL/domain for GitHub Actions secret `GENURL`
+  - Server deployment environment values
