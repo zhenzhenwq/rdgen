@@ -319,18 +319,24 @@ def generator_view(request):
             )
             try:
                 response = requests.post(url, json=data, headers=headers)
-                #print(response)
+                print(response)
                 if response.status_code == 204 or response.status_code == 200:
-                    github_data = response.json()
-                    print(github_data)
+                    github_data = {}
+                    if response.content:
+                        try:
+                            github_data = response.json()
+                            print(github_data)
+                        except ValueError as e:
+                            print(f"GitHub dispatch returned non-JSON success body: {e}")
                     new_github_run.github_run_id = github_data.get('workflow_run_id')
                     new_github_run.status = "in_progress"
                     new_github_run.save()
 
-                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': github_data.get('html_url')})
+                    log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
+                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': log_url})
                 else:
                     #new_github_run.delete()
-                    return JsonResponse({"error": "GitHub rejected the start request"}, status=500)
+                    return JsonResponse({"error": "GitHub rejected the start request", "details": response.text}, status=500)
             except Exception as e:
                 #new_github_run.delete()
                 return JsonResponse({"error": f"Connection error: {str(e)}"}, status=500)
@@ -348,9 +354,12 @@ def check_for_file(request):
     uuid = request.GET.get('uuid')
     platform = request.GET.get('platform')
     gh_run = get_object_or_404(GithubRun, uuid=uuid)
-    github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
+    if gh_run.github_run_id:
+        github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
+    else:
+        github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
 
-    if gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
+    if gh_run.github_run_id and gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
         headers = {
             "Authorization": f"Bearer {_settings.GHBEARER}",
             "Accept": "application/vnd.github+json"

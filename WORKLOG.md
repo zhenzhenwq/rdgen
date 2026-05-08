@@ -211,3 +211,19 @@ User constraint recorded:
   `http://120.55.0.199:8000/`
 - Browser check confirmed the deployed page loads and contains:
   `Allow hiding the connection window from remote screen.`
+
+### 500 During Generation Investigation
+
+- User reported a 500 error when testing with:
+  `C:\Users\32590\Downloads\Desk (1).json`
+- Read the JSON locally and confirmed the configuration loads as a dictionary and has required form-like fields such as `platform`, `version`, `exename`, `passApproveMode`, and `hidecm`.
+- The config enables `hidecm`, so it exercises the fixed hide-connection-window path.
+- Identified a backend bug in `rdgenerator/views.py`:
+  - GitHub workflow dispatch normally succeeds with HTTP `204 No Content`.
+  - The current code treated `204` as success but still called `response.json()`.
+  - Parsing an empty `204` response raises an exception and returns a 500 even when GitHub accepted the dispatch.
+- Applied a compatibility fix:
+  - Only parse JSON when the response body is non-empty.
+  - Save the `GithubRun` record and render the waiting page on `204` success.
+  - Fall back to the repository Actions page when no workflow run URL is available.
+  - Avoid polling a `/runs/None` GitHub API URL when the dispatch response does not include a run id.
