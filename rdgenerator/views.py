@@ -44,6 +44,7 @@ def generator_view(request):
             xOffline = form.cleaned_data['xOffline']
             hidecm = form.cleaned_data['hidecm']
             removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif']
+            hideSettingsMenu = form.cleaned_data['hideSettingsMenu']
             server = form.cleaned_data['serverIP']
             key = form.cleaned_data['key']
             apiServer = form.cleaned_data['apiServer']
@@ -235,6 +236,7 @@ def generator_view(request):
             # extras['cycleMonitor'] = 'true' if cycleMonitor else 'false'
             # extras['xOffline'] = 'true' if xOffline else 'false'
             # extras['removeNewVersionNotif'] = 'true' if removeNewVersionNotif else 'false'
+            # extras['hideSettingsMenu'] = 'true' if hideSettingsMenu else 'false'
             # extras['compname'] = compname
             # extras['androidappid'] = androidappid
             # extra_input = json.dumps(extras)
@@ -282,6 +284,7 @@ def generator_view(request):
                 "cycleMonitor": 'true' if cycleMonitor else 'false',
                 "xOffline": 'true' if xOffline else 'false',
                 "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',
+                "hideSettingsMenu": 'true' if hideSettingsMenu else 'false',
                 "compname": compname,
                 "androidappid":androidappid,
                 "filename":filename

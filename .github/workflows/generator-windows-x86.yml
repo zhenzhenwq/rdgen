@@ -325,6 +325,14 @@ jobs:
           curl -L https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff -o hidecm.diff
           git apply hidecm.diff
 
+      - name: hide settings menu
+        continue-on-error: true
+        if: env.hideSettingsMenu == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff -o hide_settings_menu.diff
+          git apply hide_settings_menu.diff
+
       - name: Build rustdesk
         id: build
         shell: bash

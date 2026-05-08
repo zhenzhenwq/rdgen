@@ -300,3 +300,25 @@ User constraint recorded:
   - Browser import test with `C:\Users\32590\Downloads\Desk (1).json` populated the form without triggering a new build.
   - Confirmed source-code and sponsor links are absent from the generator page.
   - Saved browser screenshot to `output/playwright/rdgen-blue-chinese-home.png`.
+
+### Hide Desktop Three-Dot Settings Menu
+
+- User requested hiding the RustDesk desktop client main-page three-dot menu shown beside the local ID.
+- Analyzed RustDesk client source directly, without reading the old project:
+  - The visible three-dot button is in `flutter/lib/desktop/pages/desktop_home_page.dart`.
+  - It is rendered from `buildPopupMenu(context)` in the ID row and opens settings via `DesktopTabPage.onAddSetting`.
+- Added generator option:
+  - `hideSettingsMenu` / `隐藏主界面右上角三点菜单`.
+- Added `.github/patches/hide_settings_menu.diff`:
+  - Replaces the desktop home-page `buildPopupMenu(context)` call with a fixed-size empty `SizedBox`.
+  - This hides the three-dot widget and removes its click target while preserving row spacing.
+- Wired the option through `rdgenerator/views.py` into the encrypted Actions payload.
+- Added workflow patch steps for:
+  - Windows x64
+  - Windows x86
+  - Self-hosted Windows
+  - Linux
+  - Android
+  - macOS
+- Compatibility check:
+  - `git apply --check` passed against RustDesk tags `1.3.3` through `1.4.6` and current `master`.
