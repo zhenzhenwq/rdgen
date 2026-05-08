@@ -322,3 +322,21 @@ User constraint recorded:
   - macOS
 - Compatibility check:
   - `git apply --check` passed against RustDesk tags `1.3.3` through `1.4.6` and current `master`.
+
+### Bridge Workflow Pub Cache Failure
+
+- Investigated failed generation URL:
+  - `/check_for_file?filename=Jssvag&uuid=074406d3-2a5e-420b-a779-004c905be33f&platform=windows`
+  - GitHub Actions run: `25543182149`
+- Result:
+  - The waiting page correctly moved to the failure page.
+  - No generated files existed under `exe/074406d3-2a5e-420b-a779-004c905be33f`.
+- Root cause:
+  - The workflow failed before Windows compilation.
+  - `generate-bridge / Install flutter rust bridge deps` failed during `flutter pub get`.
+  - Dart pub crashed with `Null check operator used on a null value` inside `HostedSource._getAdvisories.readAdvisoriesFromCache`.
+  - This appears tied to restored pub advisory cache data, not the RustDesk three-dot menu patch.
+- Fix:
+  - Disabled Flutter pub-cache restore in `.github/workflows/bridge.yml`.
+  - Removed `${PUB_CACHE}/hosted/pub.dev/.cache` before bridge `flutter pub get`.
+  - Kept cargo/tool caches intact.
