@@ -679,6 +679,9 @@
             const formDataObj = new FormData(form);  // Create a FormData object
 
             formDataObj.forEach((value, key) => {
+                if (value instanceof File) {
+                    return;
+                }
                 formData[key] = value; // Add each key/value pair to the formData object.
             });
 
@@ -784,15 +787,15 @@
                                         }
 
                                         // Handle image previews (as before)
-                                        if (key === 'iconfile' && formData[key]) {
+                                        if (key === 'iconfile' && isPngDataUrl(formData[key])) {
                                             document.getElementById('id_iconbase64').value = formData[key];
                                             document.getElementById('icon-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
                                         }
-                                        if (key === 'logofile' && formData[key]) {
+                                        if (key === 'logofile' && isPngDataUrl(formData[key])) {
                                             document.getElementById('id_logobase64').value = formData[key];
                                             document.getElementById('logo-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
                                         }
-                                        if (key === 'privacyfile' && formData[key]) {
+                                        if (key === 'privacyfile' && isPngDataUrl(formData[key])) {
                                             document.getElementById('id_privacybase64').value = formData[key];
                                             document.getElementById('privacy-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
                                         }
@@ -806,6 +809,10 @@
                     reader.readAsText(file);
                 }
             });
+        }
+
+        function isPngDataUrl(value) {
+            return typeof value === 'string' && value.startsWith('data:image/png;base64,');
         }
     </script>
 </body>
