@@ -317,6 +317,14 @@ jobs:
           sed -i -e 's|{software_update_url ? <UpdateMe /> : ""}||' ./src/ui/index.tis
           sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
 
+      - name: hide-cm
+        continue-on-error: true
+        if: env.hidecm == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff -o hidecm.diff
+          git apply hidecm.diff
+
       - name: Build rustdesk
         id: build
         shell: bash
