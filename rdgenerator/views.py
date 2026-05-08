@@ -1,6 +1,6 @@
 import io
 from pathlib import Path
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.core.files.base import ContentFile
 import os
@@ -17,6 +17,16 @@ from .forms import GenerateForm
 from .models import GithubRun
 from PIL import Image
 from urllib.parse import quote
+
+def list_generated_files(run_uuid):
+    output_dir = os.path.join('exe', run_uuid)
+    if not os.path.isdir(output_dir):
+        return []
+    return sorted(
+        name
+        for name in os.listdir(output_dir)
+        if os.path.isfile(os.path.join(output_dir, name))
+    )
 
 def generator_view(request):
     if request.method == 'POST':
@@ -383,7 +393,8 @@ def check_for_file(request):
         return render(request, 'generated.html', {
             'filename': filename, 
             'uuid': uuid, 
-            'platform': platform
+            'platform': platform,
+            'files': list_generated_files(uuid)
         })
         
     elif current_status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
@@ -392,7 +403,8 @@ def check_for_file(request):
             'filename': filename, 
             'uuid': uuid, 
             'platform': platform,
-            'status': gh_run.status
+            'status': gh_run.status,
+            'files': list_generated_files(uuid)
         })
         
     else:
@@ -408,6 +420,8 @@ def download(request):
     filename = request.GET['filename']
     uuid = request.GET['uuid']
     file_path = os.path.join('exe', uuid, filename)
+    if not os.path.isfile(file_path):
+        raise Http404("Generated file not found")
     with open(file_path, 'rb') as file:
         content = file.read()
     response = HttpResponse(content, headers={

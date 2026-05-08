@@ -264,3 +264,11 @@ User constraint recorded:
   - The imported config contains a non-ASCII company name.
   - On Windows runners, the Python action used the platform default output/file encoding and raised `UnicodeEncodeError` while masking/writing secrets.
 - Fixed the decrypt action to use UTF-8 stdout/stderr and UTF-8 `GITHUB_ENV` writes, and to stringify values before masking/exporting.
+- Re-ran the imported JSON flow after the UTF-8 fix:
+  - GitHub Actions run `25533835760` completed successfully.
+  - The server received `Desk.exe`.
+  - The waiting page moved to the generated-download page.
+- Found another upstream usability bug after successful generation:
+  - `generated.html` always showed platform-specific hardcoded download links, including `Desk.msi`, even when only `Desk.exe` was uploaded.
+  - Clicking a missing artifact would raise a backend 500.
+- Fixed generated/failure pages to list only files actually present under the run's output directory, and changed `/download` to return 404 for missing generated files.
