@@ -189,6 +189,7 @@ User constraint recorded:
 - Updated `docker-compose.yml` to read deployment settings from `.env` instead of storing placeholder values directly in the compose file.
 - Added `.env.example` for non-secret deployment configuration reference.
 - Updated `.dockerignore` so `.env` and runtime artifact directories are not copied into the Docker image.
+- Added Docker build args `PIP_INDEX_URL` and `PIP_TRUSTED_HOST` so deployments with restricted or unstable PyPI access can use a local/regional package mirror without hardcoding it.
 - Planned deployment path:
   `/opt/rdgen`
 - Planned public test URL:

@@ -1,6 +1,10 @@
 services:
   rdgen:
-    build: .
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: "${PIP_INDEX_URL:-https://pypi.org/simple}"
+        PIP_TRUSTED_HOST: "${PIP_TRUSTED_HOST:-}"
     restart: unless-stopped
     environment:
       SECRET_KEY: "${SECRET_KEY}"
