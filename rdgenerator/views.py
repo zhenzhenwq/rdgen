@@ -277,12 +277,12 @@ def generator_view(request):
                 "filename":filename
             }
 
-            temp_json_path = f"data_{uuid.uuid4()}.json"
-            zip_filename = f"secrets_{uuid.uuid4()}.zip"
-            zip_path = "temp_zips/%s" % (zip_filename)
             Path("temp_zips").mkdir(parents=True, exist_ok=True)
+            temp_json_path = os.path.join("temp_zips", f"data_{uuid.uuid4()}.json")
+            zip_filename = f"secrets_{uuid.uuid4()}.zip"
+            zip_path = os.path.join("temp_zips", zip_filename)
 
-            with open(temp_json_path, "w") as f:
+            with open(temp_json_path, "w", encoding="utf-8") as f:
                 json.dump(inputs_raw, f)
 
             with pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
@@ -354,12 +354,13 @@ def check_for_file(request):
     uuid = request.GET.get('uuid')
     platform = request.GET.get('platform')
     gh_run = get_object_or_404(GithubRun, uuid=uuid)
+    current_status = (gh_run.status or '').lower()
     if gh_run.github_run_id:
         github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
     else:
         github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
 
-    if gh_run.github_run_id and gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
+    if gh_run.github_run_id and current_status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
         headers = {
             "Authorization": f"Bearer {_settings.GHBEARER}",
             "Accept": "application/vnd.github+json"
@@ -374,17 +375,18 @@ def check_for_file(request):
                 if gh_data['status'] == 'completed':
                     gh_run.status = gh_data['conclusion']
                     gh_run.save()
+                    current_status = (gh_run.status or '').lower()
         except Exception as e:
             print(f"Error checking GitHub: {e}")
     
-    if gh_run.status == "success":
+    if current_status == "success":
         return render(request, 'generated.html', {
             'filename': filename, 
             'uuid': uuid, 
             'platform': platform
         })
         
-    elif gh_run.status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
+    elif current_status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
         return render(request, 'failure.html', {
             'log_url': github_log_url, 
             'filename': filename, 
@@ -546,6 +548,7 @@ def save_custom_client(request):
         for chunk in file.chunks():
             f.write(chunk)
 
+    GithubRun.objects.filter(Q(uuid=myuuid)).update(status="success")
     return HttpResponse("File saved successfully!")
 
 def cleanup_secrets(request):

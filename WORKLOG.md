@@ -232,3 +232,14 @@ User constraint recorded:
   - The container application runs as Unix user `user` (`uid=1000`) and could not write `temp_zips/secrets_*.zip`.
   - Fixed the live server by changing those host directory owners to uid/gid `1000:1000`.
   - Added `entrypoint.sh` so future container starts create and chown runtime artifact directories before dropping to the app user.
+- Reproduced the browser-only 500 with the imported config after the directory ownership fix:
+  - The imported form data was accepted by the frontend and included `platform=windows`, `hidecm=on`, and the imported base64 images.
+  - The backend still returned Django's generic 500 page before it printed a GitHub dispatch response.
+  - Confirmed `GithubRun` DB writes work and the container can reach `https://api.github.com`.
+  - Confirmed the app user cannot write files in `/opt/rdgen` but can write inside `temp_zips/`.
+  - Root cause: `generator_view` wrote `data_*.json` to the project root before zipping secrets. After the Docker entrypoint began running Gunicorn as the unprivileged app user, that root-level temporary file write raised `PermissionError`.
+- Fixed the browser-only 500 path:
+  - Moved the temporary `data_*.json` file into `temp_zips/`, the same runtime directory already created and chowned for app writes.
+  - Used UTF-8 when writing the temporary JSON because imported configs may contain non-ASCII company names.
+  - Marked `GithubRun` as `success` when GitHub Actions uploads a finished client to `/save_custom_client`.
+  - Normalized status comparisons in `/check_for_file` so both workflow conclusions and upload callbacks can advance the waiting page.
