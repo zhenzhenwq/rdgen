@@ -255,3 +255,12 @@ User constraint recorded:
   - Added a `./data:/opt/rdgen/data` Compose mount.
   - Updated `entrypoint.sh` to create/chown `data`, run migrations as the app user, then start Gunicorn.
   - Removed build-time migration so the runtime database owns its files correctly.
+- Verified the browser flow with `C:\Users\32590\Downloads\Desk (1).json` after the database fix:
+  - `/generator` returned HTTP 200.
+  - The page navigated to `/check_for_file`.
+  - A `GithubRun` record was saved with the returned GitHub run id.
+- The triggered Windows workflow then failed in `.github/actions/decrypt-secrets` during `Load Secrets`.
+- Root cause:
+  - The imported config contains a non-ASCII company name.
+  - On Windows runners, the Python action used the platform default output/file encoding and raised `UnicodeEncodeError` while masking/writing secrets.
+- Fixed the decrypt action to use UTF-8 stdout/stderr and UTF-8 `GITHUB_ENV` writes, and to stringify values before masking/exporting.
