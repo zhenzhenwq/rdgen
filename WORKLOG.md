@@ -194,3 +194,20 @@ User constraint recorded:
   `/opt/rdgen`
 - Planned public test URL:
   `http://120.55.0.199:8000`
+
+### Server Deployment Completed
+
+- Deployed current fork code to:
+  `/opt/rdgen`
+- Wrote server-local `.env` with deployment secrets and runtime settings. The `.env` file is not committed and is excluded from the Docker build context.
+- Because the server does not have `git`, deployment used the GitHub branch archive download:
+  `https://github.com/zhenzhenwq/rdgen/archive/refs/heads/master.tar.gz`
+- Server-local `.env` uses an Aliyun PyPI mirror for Docker builds because the default PyPI index failed from inside the server build container.
+- Built and started the service with:
+  `docker compose up -d --build`
+- Docker container status after deployment:
+  `healthy`
+- Public URL verified with HTTP 200:
+  `http://120.55.0.199:8000/`
+- Browser check confirmed the deployed page loads and contains:
+  `Allow hiding the connection window from remote screen.`
