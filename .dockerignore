@@ -14,3 +14,9 @@ LICENSE
 *.pyc
 .venv
 db.sqlite3
+.env
+output/
+.tools/
+exe/
+png/
+temp_zips/

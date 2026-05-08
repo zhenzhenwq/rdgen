@@ -188,6 +188,7 @@ User constraint recorded:
   `http://120.55.0.199:8000`
 - Updated `docker-compose.yml` to read deployment settings from `.env` instead of storing placeholder values directly in the compose file.
 - Added `.env.example` for non-secret deployment configuration reference.
+- Updated `.dockerignore` so `.env` and runtime artifact directories are not copied into the Docker image.
 - Planned deployment path:
   `/opt/rdgen`
 - Planned public test URL:
