@@ -290,3 +290,13 @@ User constraint recorded:
 - Verification:
   - `python -m py_compile rdgenerator\forms.py rdgenerator\views.py` passed.
   - `git diff --check` passed.
+- Follow-up frontend fix:
+  - Avoid saving empty file-input objects into exported JSON.
+  - Only render imported image previews when the imported value is a PNG data URL, preventing `/[object Object]` preview requests.
+- Deployment verification:
+  - Deployed commit `c6717f35d769bd58a3e9460e6ae2feb58ae4f837` to `/opt/rdgen`.
+  - Docker container reported `healthy`.
+  - Public homepage returned HTTP 200 at `http://120.55.0.199:8000/`.
+  - Browser import test with `C:\Users\32590\Downloads\Desk (1).json` populated the form without triggering a new build.
+  - Confirmed source-code and sponsor links are absent from the generator page.
+  - Saved browser screenshot to `output/playwright/rdgen-blue-chinese-home.png`.
