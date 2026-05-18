@@ -480,3 +480,24 @@ User constraint recorded:
   - Secrets were accepted by GitHub API during creation.
 - Caveat:
   - Self-signed signatures prove file integrity after signing, but Windows will not trust the publisher on other machines until the public `.cer` certificate is installed into trusted certificate stores.
+
+### SignTest Build Verification
+
+- Triggered a real Windows x64 generator build through the deployed generator at `120.55.0.199:8000`.
+- Test input:
+  - filename/app name: `SignTest`
+  - UUID: `82f5ea38-c4ab-461e-a090-4e03f5d014bd`
+  - RustDesk version: `1.4.6`
+- GitHub Actions run:
+  - `26007760512`
+  - `Build Windows` completed successfully.
+  - `sign dlls` completed successfully.
+  - `sign exe and msi` completed successfully.
+- Downloaded generated files from the generator server:
+  - `D:\rustdesk-生成器\sign-test-output\SignTest.exe`
+  - `D:\rustdesk-生成器\sign-test-output\SignTest.msi`
+- Authenticode verification:
+  - Both files have a signature.
+  - Signer subject: `CN=RDGen Self-Signed Code Signing`
+  - Thumbprint: `198E54637FF5B21D964BDB7A06E964B79BAD0FFA`
+  - PowerShell status: `UnknownError` with message that the chain terminates in an untrusted root, which is expected until `rdgen-selfsigned-codesign.cer` is installed as trusted.
