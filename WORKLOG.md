@@ -340,3 +340,143 @@ User constraint recorded:
   - Disabled Flutter pub-cache restore in `.github/workflows/bridge.yml`.
   - Removed `${PUB_CACHE}/hosted/pub.dev/.cache` before bridge `flutter pub get`.
   - Kept cargo/tool caches intact.
+
+### Jssvag Clean Local Config Retest
+
+- Backed up and removed local client state:
+  - `C:\Users\32590\AppData\Roaming\Jssvag`
+  - `C:\Users\32590\AppData\Local\Jssvag`
+  - Backup directory: `D:\rustdesk-生成器\backups\Jssvag-20260508-173215`
+- Started `C:\Users\32590\Downloads\Jssvag (7).exe`; it launched from `%LOCALAPPDATA%\Jssvag`.
+- Fresh client config no longer contained the old `vwag.cc` rendezvous server.
+- Fresh client log showed:
+  - generated new ID `6568890`
+  - `start rendezvous mediator of desk.jssvag.com`
+  - UDP/NAT responses from `desk.jssvag.com:21116` and `desk.jssvag.com:21115`
+  - `sysinfo updated`
+  - repeated `register_pk of desk due to key not confirmed`
+- DNS confirmed `desk.jssvag.com -> 45.207.213.2`.
+- Pulled read-only database snapshots from the RustDesk server to `D:\rustdesk-生成器\server-snapshots\rustdesk-20260508-173643`.
+- The RustDesk API database recorded the fresh Windows 11 client:
+  - peer ID `6568890`
+  - hostname `desktop-s1vq4l4`
+  - version `1.4.6`
+  - last IP `220.166.163.248`
+  - created `2026-05-08 17:33:59 +08:00`
+  - updated `2026-05-08 17:36:20 +08:00`
+- Server observation:
+  - formal container `rustdesk-rustdesk-1` still had `MUST_LOGIN=Y` in the running environment.
+  - test container `rustdesk-test` had `MUST_LOGIN=N` and separate `22114-22119` ports.
+
+### RustDesk Server OSS Native Retest
+
+- User reported Jssvag UI still shows `Not ready. Please check your connection`.
+- Installed official RustDesk Server OSS `.deb` packages on `45.207.213.2`:
+  - `rustdesk-server-hbbs_1.1.15_amd64.deb`
+  - `rustdesk-server-hbbr_1.1.15_amd64.deb`
+- Backed up previous Docker data to `/root/rd-official-install/backup-before-official-20260508-094704`.
+- Stopped Docker RustDesk containers and disabled their restart policy:
+  - `rustdesk-rustdesk-1`
+  - `rustdesk-test`
+- Started official native systemd services:
+  - `rustdesk-hbbs.service`
+  - `rustdesk-hbbr.service`
+- Reused the original server key pair from `/data/rustdesk/server` in `/var/lib/rustdesk-server`.
+- Added systemd overrides:
+  - `hbbs`: `/usr/bin/hbbs -r 45.207.213.2:21117 -k dH0WO9xf8kmRM1IjDhprjn+MhuXnIEvhnTWQR21agIY=`
+  - `hbbr`: `/usr/bin/hbbr -k dH0WO9xf8kmRM1IjDhprjn+MhuXnIEvhnTWQR21agIY=`
+- Verified listeners are native `hbbs/hbbr` on `21115-21119`; Docker no longer owns those ports.
+- Read the user's reference script `C:\Users\32590\Desktop\阿里云服务器信息写入.bat`; it uses `xdesk.exe --config "host=...,key=..."`.
+- Confirmed RustDesk 1.4.6 source only applies `--config` when the client is installed and running with admin/root privileges, so it does not update the portable Jssvag runtime.
+- Directly wrote Jssvag local config in `Jssvag2.toml`:
+  - `custom-rendezvous-server = '45.207.213.2'`
+  - `relay-server = '45.207.213.2:21117'`
+  - `key = 'dH0WO9xf8kmRM1IjDhprjn+MhuXnIEvhnTWQR21agIY='`
+- Found local DNS/proxy issue:
+  - `desk.jssvag.com` resolved locally to `198.18.0.75`, not `45.207.213.2`.
+  - MaoMaoCloud TUN was a default route and HTTP proxy was enabled at `127.0.0.1:7892`.
+- Added a host route for `45.207.213.2/32` via `WLAN` gateway `192.168.31.1`; `Test-NetConnection` then used source `192.168.31.25`.
+- After bypassing TUN and using direct IP, Jssvag log showed stable NAT responses from `45.207.213.2:21116` and `45.207.213.2:21115`, but still repeated:
+  - `register_pk of 45.207.213.2:21116 due to key not confirmed`
+- Forced TCP by setting `disable-udp = 'Y'`; client connected but timed out waiting for rendezvous handshake:
+  - `rendezvous mediator error: deadline has elapsed`
+- Server `/var/lib/rustdesk-server/db_v2.sqlite3` `peer` table remained empty.
+- Current conclusion:
+  - Official native server is installed and owns ports correctly.
+  - Local fake-IP/proxy was a real problem and was bypassed for `45.207.213.2`.
+  - The current pre-existing `Jssvag (7).exe` still does not complete key confirmation with the native server; likely needs a newly generated client that embeds server fields using the generator fix committed later (`fa50cd9`).
+
+### RustDesk Official Client Same Failure
+
+- User confirmed the official RustDesk client shows the same connection problem as Jssvag.
+- Temporarily configured the official client to use the RustDesk server:
+  - `custom-rendezvous-server = '45.207.213.2'`
+  - `relay-server = '45.207.213.2:21117'`
+  - `key = 'dH0WO9xf8kmRM1IjDhprjn+MhuXnIEvhnTWQR21agIY='`
+- Official client log repeated:
+  - `register_pk of 45.207.213.2:21116 due to key not confirmed`
+  - TCP NAT test responses from `45.207.213.2:21116` and `45.207.213.2:21115`
+- Verified the native official server is active and listening:
+  - `hbbs`: TCP `21115`, TCP/UDP `21116`, TCP `21118`
+  - `hbbr`: TCP `21117`, TCP `21119`
+  - Linux firewall/UFW is not blocking input.
+- Synthetic UDP tests:
+  - From the local PC, explicitly bound to WLAN `192.168.31.25`, UDP packets to `45.207.213.2:21116` did not appear on `45.207.213.2` `ens17`.
+  - From the separate server `120.55.0.199`, UDP packets to `45.207.213.2:21116` also did not appear on `45.207.213.2` `ens17`.
+  - From `45.207.213.2` to `120.55.0.199`, UDP packets were captured successfully on `120.55.0.199`.
+  - From the local PC to `120.55.0.199:21116`, UDP packets were captured successfully.
+- Conclusion:
+  - The shared failure is not caused by the generator or by the official Windows client configuration.
+  - `45.207.213.2` is not receiving inbound public UDP traffic on `21116`; this happens before packets reach the server OS.
+  - The likely fix is in the cloud/provider firewall or security group for `45.207.213.2`: allow inbound `21116/UDP` at minimum, and keep the RustDesk TCP ports open.
+
+### Multi-Method UDP Recheck
+
+- Re-ran several independent checks after the user requested more test methods.
+- Method 1: `tcpdump` on `45.207.213.2` `ens17` with local PC and `120.55.0.199` sending synthetic UDP to `45.207.213.2:21116`.
+  - Result: `0` matching UDP packets captured.
+- Method 2: same server capture with TCP and UDP to the same destination port.
+  - Local TCP connection to `45.207.213.2:21116` was captured immediately.
+  - Local UDP packet to `45.207.213.2:21116` was not captured.
+- Method 3: `120.55.0.199` sent UDP to multiple destination ports on `45.207.213.2`: `53`, `443`, `21115`, `21116`, `21117`, `21118`, `21119`, `40000`.
+  - Result: no inbound UDP packets to `45.207.213.2` were captured.
+- Method 4: reverse sanity check from `45.207.213.2` to `120.55.0.199:41116`.
+  - Result: UDP packets were captured successfully on `120.55.0.199`, proving the testing method works and UDP outbound from `45.207.213.2` works.
+- Method 5: server network/firewall counters.
+  - `hbbs` listens on `*:21116/UDP`.
+  - `INPUT` policy is `ACCEPT`; no host firewall rule explains the drop.
+  - After synthetic test bursts, host-level packet counters did not reflect the missing inbound UDP test packets.
+- Method 6: real official RustDesk client restart while capturing `21115-21119`.
+  - Server captured only TCP NAT-test traffic on `21115/21116`.
+  - No UDP packets were captured.
+  - Official client log still showed `start udp: 45.207.213.2:21116` and repeated `register_pk ... due to key not confirmed`.
+- Updated conclusion:
+  - External inbound UDP to `45.207.213.2` is blocked before the packet reaches the server OS.
+  - This appears broader than only `21116/UDP`; tested external UDP to several destination ports did not reach `45.207.213.2`.
+  - Fix remains provider-side security group/firewall/upstream UDP policy, not generator code.
+
+### Windows Self-Signed Code Signing
+
+- User chose the self-signed certificate path for generated Windows clients.
+- Generated a local self-signed code signing certificate:
+  - PFX: `D:\rustdesk-生成器\codesign\rdgen-selfsigned-codesign.pfx`
+  - Public CER: `D:\rustdesk-生成器\codesign\rdgen-selfsigned-codesign.cer`
+  - PFX base64 and password helper files are in the same `codesign` directory.
+  - Certificate thumbprint: `198E54637FF5B21D964BDB7A06E964B79BAD0FFA`
+- Added GitHub Actions repository secrets through the GitHub API:
+  - `CODE_SIGN_PFX_BASE64`
+  - `CODE_SIGN_PFX_PASSWORD`
+- Updated Windows workflows to support local Authenticode signing with `signtool.exe`:
+  - `.github/workflows/generator-windows.yml`
+  - `.github/workflows/generator-windows-x86.yml`
+  - `.github/workflows/sh-generator-windows.yml`
+- Signing behavior:
+  - If `CODE_SIGN_PFX_BASE64` and `CODE_SIGN_PFX_PASSWORD` are configured, workflows decode the PFX and sign generated `.exe`, `.dll`, and `.msi` files.
+  - Timestamp signing is attempted first with `http://timestamp.digicert.com`; if timestamping fails, the workflow retries signing without timestamping.
+  - If no self-signing secrets exist, the existing external signing service path using `SIGN_BASE_URL` / `SIGN_API_KEY` remains supported.
+  - If neither signing method is configured, the workflow keeps the old skip behavior and continues with unsigned files.
+- Validation:
+  - Parsed the modified workflow YAML files successfully with PyYAML.
+  - Secrets were accepted by GitHub API during creation.
+- Caveat:
+  - Self-signed signatures prove file integrity after signing, but Windows will not trust the publisher on other machines until the public `.cer` certificate is installed into trusted certificate stores.

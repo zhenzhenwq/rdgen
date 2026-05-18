@@ -42,6 +42,21 @@
 8. Preserve `GithubRun.github_run_id` support from current upstream, but handle GitHub dispatch responses defensively.
 9. Add download existence checks before presenting or serving build artifacts.
 
+## Deployment / Server Checklist
+
+1. Before blaming generated clients, verify the RustDesk server receives inbound UDP:
+   - `21116/UDP` must reach the server OS for normal OSS rendezvous registration.
+   - Use `tcpdump` on the server and send a synthetic UDP packet from an external host.
+2. Keep these RustDesk OSS ports open in cloud security groups and host firewalls:
+   - `21115/TCP`
+   - `21116/TCP`
+   - `21116/UDP`
+   - `21117/TCP`
+   - `21118/TCP`
+   - `21119/TCP`
+3. Do not rely on the client `Disable UDP` or `Use WebSocket` toggles as a generic workaround for the OSS server; the RustDesk client UI notes that these features are not included in the OSS server.
+4. For the current `45.207.213.2` server, inbound `21116/UDP` did not reach `ens17` from either the local PC or `120.55.0.199`, while UDP to `120.55.0.199` worked. Fix the provider-side firewall/security group before further client debugging.
+
 ## Code Quality Candidates
 
 1. Move inline CSS and JavaScript out of `generator.html`.
