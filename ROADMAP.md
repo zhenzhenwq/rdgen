@@ -30,6 +30,18 @@
 2. The main generator page now uses a blue-white theme.
 3. The bottom source-code and sponsor links were removed from the generator page.
 
+## Recently Completed Functional Work
+
+1. Hide connection window is now handled as a real RustDesk setting/workflow feature:
+   - `allow-hide-cm = Y`
+   - permanent password verification mode when enabled
+   - `approve-mode = password` when enabled
+   - Windows workflow patch application
+2. Settings entry hiding is wired through generator config and Windows source patching.
+3. Windows self-signed signing is wired into GitHub Actions and verified with a generated `SignTest` build.
+4. Android now produces both a universal APK and three ABI split APKs.
+5. Android output was verified on the deployed generator with `WuYouDesk`, UUID `9de4743a-ec38-4266-b155-cd383ae64685`.
+
 ## Backend Hardening Candidates
 
 1. Validate and normalize manual `key=value` settings before splitting lines.
@@ -56,6 +68,20 @@
    - `21119/TCP`
 3. Do not rely on the client `Disable UDP` or `Use WebSocket` toggles as a generic workaround for the OSS server; the RustDesk client UI notes that these features are not included in the OSS server.
 4. For the current `45.207.213.2` server, inbound `21116/UDP` did not reach `ens17` from either the local PC or `120.55.0.199`, while UDP to `120.55.0.199` worked. Fix the provider-side firewall/security group before further client debugging.
+5. For the generator server `120.55.0.199`, remember `/opt/rdgen` currently is not a git checkout. `git pull` fails there because `git` is not installed and `.git` is absent.
+6. For generator deployment, prefer a deliberate Docker rebuild/recreate from a known source tree. Do not assume the host directory is automatically synchronized with the GitHub repository.
+
+## Immediate Next Steps After Handoff
+
+1. Decide whether to deploy the latest `list_generated_files()` Android ordering change to `120.55.0.199`; functionality works already, but universal currently may not display first on the live page until deployed.
+2. Fix or bypass local Git/GitHub credential and proxy issues, then confirm remote contains the latest commits.
+3. If not yet pushed, push the latest handoff/documentation commits, including `d4c7f42` and the newest `add new window handoff memory` commit.
+4. If the user wants Android labels friendlier than filenames, update `generated.html` to display:
+   - Android universal package
+   - Android ARM64
+   - Android ARMv7
+   - Android x86_64
+5. If the user resumes Windows signing, explain clearly that self-signed signatures still show untrusted publisher until the public CER is trusted on the target machine.
 
 ## Code Quality Candidates
 

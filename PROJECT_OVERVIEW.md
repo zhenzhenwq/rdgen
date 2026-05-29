@@ -98,3 +98,60 @@ Prior project themes that are personal/specific and should be isolated or avoide
 - Custom module copying from that overlay.
 - Account/auth gate/client module changes tied to the user's RustDesk fork.
 - Chinese-only end-user status strings unless the new project explicitly chooses Chinese localization.
+
+## Current Customized Direction
+
+The current project has moved away from the author's public English UI and toward the user's deployed generator:
+
+- Visible generator UI is Chinese.
+- Main visual theme is blue and white.
+- Sponsor/source-code footer links were removed from the generator page.
+- The generated/download/failure/waiting pages have been localized and styled consistently enough for current deployment.
+- The generator is intended to remain generally usable, not locked to the user's older personal fork.
+
+## Current Implemented Feature Set
+
+Important implemented changes compared with the upstream author's baseline:
+
+- Hide connection window support:
+  - `hidecm` now forces `approve-mode = password` in generated settings.
+  - `verification-method` is set to permanent-password behavior when hiding the connection window.
+  - Windows workflows apply `hidecm.diff` before build.
+- Hide RustDesk settings entry:
+  - Form field `settings` controls whether client settings are allowed or disabled.
+  - `settingsN` writes `disable-settings = Y`.
+  - Windows workflows can apply `hide_settings_menu.diff`.
+- Built-in server settings:
+  - `rdgenerator/views.py` writes `custom-rendezvous-server` and `relay-server` into the generated config.
+  - This fixed earlier cases where generated clients did not actually embed the desired server.
+- Windows self-signed code signing:
+  - GitHub Actions can sign generated Windows EXE, DLL, and MSI outputs using `CODE_SIGN_PFX_BASE64` and `CODE_SIGN_PFX_PASSWORD`.
+  - External signing service behavior remains available if configured.
+  - If no signing secrets are configured, workflows skip signing rather than fail.
+- Android universal APK output:
+  - Android matrix still builds three ABI split APKs.
+  - The deploy job now creates and uploads a fourth `-universal.apk`.
+  - The intended Android download set is:
+    - `${filename}-universal.apk`
+    - `${filename}-aarch64.apk`
+    - `${filename}-armv7.apk`
+    - `${filename}-x86_64.apk`
+
+## External Systems
+
+- Live generator URL: `http://120.55.0.199:8000/`
+- Live generator host directory: `/opt/rdgen`
+- Live generator Docker service: `rdgen-rdgen-1`
+- Current project repo/fork: `https://github.com/zhenzhenwq/rdgen.git`
+- Upstream author's repo: `https://github.com/bryangerlach/rdgen`
+- Author's public generator: `https://rdgen.crayoneater.org/`
+- Old user project, read-only only: `D:\rustdesk_web客户端\rdgen-repo`
+
+Secrets are intentionally not stored here. Ask the user or use already configured secure stores when a task requires SSH, GitHub, or signing credentials.
+
+## Current Test Links
+
+- Android universal verification:
+  `http://120.55.0.199:8000/check_for_file?filename=WuYouDesk&uuid=9de4743a-ec38-4266-b155-cd383ae64685&platform=android`
+- Old Android report that only has pre-fix split APKs:
+  `http://120.55.0.199:8000/check_for_file?filename=WuYouDesk&uuid=dcaa5218-3b21-4883-a4e9-d28a96c467eb&platform=android`

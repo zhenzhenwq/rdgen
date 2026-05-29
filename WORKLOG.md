@@ -537,3 +537,19 @@ User constraint recorded:
     - `WuYouDesk-armv7.apk`
     - `WuYouDesk-x86_64.apk`
 - Verified the old reported UUID `dcaa5218-3b21-4883-a4e9-d28a96c467eb` still only has the three split APKs because it was generated before the workflow change.
+
+### New Window Handoff Preparation
+
+- User planned to switch to a new conversation/window and requested durable project memory.
+- Updated:
+  - `AGENTS.md`
+  - `PROJECT_OVERVIEW.md`
+  - `ROADMAP.md`
+  - `WORKLOG.md`
+- Added a dedicated handoff file:
+  - `NEW_WINDOW_HANDOFF.md`
+- Important handoff constraints:
+  - Do not write to the old project `D:\rustdesk_web客户端\rdgen-repo`.
+  - Do not store plaintext server passwords, GitHub tokens, or signing passwords in repo files.
+  - Continue from `D:\rustdesk-生成器\rdgen`.
+  - Verify GitHub remote state before assuming local `origin/master` is current.
