@@ -527,3 +527,13 @@ User constraint recorded:
   - `${filename}-armv7.apk`
   - `${filename}-x86_64.apk`
 - Also updated `list_generated_files()` ordering so Android universal output appears before split APKs.
+- Pushed commit `65b491a add android universal apk output` to GitHub.
+- Triggered and monitored a test Android build:
+  - Filename: `WuYouDesk`
+  - UUID: `9de4743a-ec38-4266-b155-cd383ae64685`
+  - Result on generator server:
+    - `WuYouDesk-universal.apk`
+    - `WuYouDesk-aarch64.apk`
+    - `WuYouDesk-armv7.apk`
+    - `WuYouDesk-x86_64.apk`
+- Verified the old reported UUID `dcaa5218-3b21-4883-a4e9-d28a96c467eb` still only has the three split APKs because it was generated before the workflow change.
