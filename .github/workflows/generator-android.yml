@@ -572,6 +572,12 @@ jobs:
           # override default build-tools version (29.0.3) -- optional
           BUILD_TOOLS_VERSION: "30.0.2"
 
+      - name: Upload split APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-split-${{ matrix.job.arch }}
+          path: ./signed-apk/${{ env.filename }}-${{ matrix.job.arch }}.apk
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
@@ -628,10 +634,145 @@ jobs:
         run: |
           echo "STATUS_URL=${{ env.apiServer }}/api/updategh" >> $GITHUB_ENV
 
+      - name: Download split APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-split-*
+          merge-multiple: true
+          path: ./android-apks
+
+      - name: Create universal APK from split APKs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          filename = "${{ env.filename }}"
+          apk_dir = Path("android-apks")
+          inputs = {
+              "aarch64": apk_dir / f"{filename}-aarch64.apk",
+              "armv7": apk_dir / f"{filename}-armv7.apk",
+              "x86_64": apk_dir / f"{filename}-x86_64.apk",
+          }
+          missing = [str(path) for path in inputs.values() if not path.is_file()]
+          if missing:
+              raise SystemExit(f"Missing split APKs for universal build: {missing}")
+
+          out_dir = Path("universal-apk")
+          out_dir.mkdir(exist_ok=True)
+          unsigned = out_dir / f"{filename}-universal-unsigned.apk"
+          seen = set()
+
+          def copy_entry(dst, src, info):
+              new_info = zipfile.ZipInfo(info.filename, date_time=info.date_time)
+              new_info.compress_type = info.compress_type
+              new_info.comment = info.comment
+              new_info.extra = info.extra
+              new_info.internal_attr = info.internal_attr
+              new_info.external_attr = info.external_attr
+              new_info.create_system = info.create_system
+              dst.writestr(new_info, src.read(info))
+
+          with zipfile.ZipFile(unsigned, "w") as dst:
+              for arch, apk in inputs.items():
+                  with zipfile.ZipFile(apk, "r") as src:
+                      for info in src.infolist():
+                          name = info.filename
+                          if info.is_dir() or name.startswith("META-INF/"):
+                              continue
+                          if arch != "aarch64" and not name.startswith("lib/"):
+                              continue
+                          if name in seen:
+                              continue
+                          copy_entry(dst, src, info)
+                          seen.add(name)
+
+          print(f"Created {unsigned}")
+          PY
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Sign universal APK
+        shell: bash
+        env:
+          ANDROID_SIGNING_KEY: ${{ secrets.ANDROID_SIGNING_KEY }}
+          ANDROID_ALIAS: ${{ secrets.ANDROID_ALIAS }}
+          ANDROID_KEY_STORE_PASSWORD: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "build-tools;35.0.0"
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          UNSIGNED="./universal-apk/${{ env.filename }}-universal-unsigned.apk"
+          ALIGNED="./universal-apk/${{ env.filename }}-universal-aligned.apk"
+          FINAL="./universal-apk/${{ env.filename }}-universal.apk"
+
+          if [ -n "${ANDROID_SIGNING_KEY:-}" ] && [ -n "${ANDROID_ALIAS:-}" ] && [ -n "${ANDROID_KEY_STORE_PASSWORD:-}" ]; then
+            KEYSTORE="./universal-apk/release.keystore"
+            echo "$ANDROID_SIGNING_KEY" | base64 -d > "$KEYSTORE"
+            KEY_ALIAS="$ANDROID_ALIAS"
+            STORE_PASS="$ANDROID_KEY_STORE_PASSWORD"
+            KEY_PASS="${ANDROID_KEY_PASSWORD:-$ANDROID_KEY_STORE_PASSWORD}"
+          else
+            KEYSTORE="./universal-apk/debug.keystore"
+            KEY_ALIAS="androiddebugkey"
+            STORE_PASS="android"
+            KEY_PASS="android"
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE" \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          "$ZIPALIGN" -f -p 4 "$UNSIGNED" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$STORE_PASS" \
+            --key-pass "pass:$KEY_PASS" \
+            --out "$FINAL" \
+            "$ALIGNED"
+          "$APKSIGNER" verify --verbose "$FINAL"
+
+      - name: send universal APK to rdgen server
+        if: ${{ env.rdgen == 'true' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./universal-apk/${{ env.filename }}-universal.apk" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+
+      - name: send universal APK to api server
+        if: ${{ env.rdgen == 'false' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./universal-apk/${{ env.filename }}-universal.apk" ${{ env.apiServer }}/api/save_custom_client
+
       - uses: geekyeggo/delete-artifact@v5
         continue-on-error: true
         with:
             name: ${{ env.filename }}-*.deb
+
+      - uses: geekyeggo/delete-artifact@v5
+        continue-on-error: true
+        with:
+            name: android-split-*
 
   cleanup:
     needs: [build-rustdesk-android, deploy]

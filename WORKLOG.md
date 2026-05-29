@@ -501,3 +501,29 @@ User constraint recorded:
   - Signer subject: `CN=RDGen Self-Signed Code Signing`
   - Thumbprint: `198E54637FF5B21D964BDB7A06E964B79BAD0FFA`
   - PowerShell status: `UnknownError` with message that the chain terminates in an untrusted root, which is expected until `rdgen-selfsigned-codesign.cer` is installed as trusted.
+
+### Android Universal APK Output
+
+- User reported Android generation only showed inconsistent split APK variants and asked for both:
+  - one all-in-one APK
+  - three separate ABI APKs
+- Checked generated files for UUID `dcaa5218-3b21-4883-a4e9-d28a96c467eb`.
+- Current deployed output contained only split APKs:
+  - `WuYouDesk-aarch64.apk`
+  - `WuYouDesk-armv7.apk`
+  - `WuYouDesk-x86_64.apk`
+- Root cause:
+  - `.github/workflows/generator-android.yml` builds a three-entry ABI matrix and uploads each split APK separately.
+  - No workflow step produced or uploaded a universal APK.
+- Implemented workflow change:
+  - Each ABI matrix job uploads its split APK as an Actions artifact.
+  - The `deploy` job downloads the three split APK artifacts after the matrix completes.
+  - The `deploy` job creates `${filename}-universal.apk` by combining the native `lib/` folders from `aarch64`, `armv7`, and `x86_64` split APKs.
+  - The universal APK is zipaligned, signed with the configured Android release key if present, otherwise with a generated debug key, and verified with `apksigner`.
+  - The universal APK is uploaded back to the generator server/API server beside the split APKs.
+- Expected Android output after the change:
+  - `${filename}-universal.apk`
+  - `${filename}-aarch64.apk`
+  - `${filename}-armv7.apk`
+  - `${filename}-x86_64.apk`
+- Also updated `list_generated_files()` ordering so Android universal output appears before split APKs.

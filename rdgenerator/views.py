@@ -22,11 +22,16 @@ def list_generated_files(run_uuid):
     output_dir = os.path.join('exe', run_uuid)
     if not os.path.isdir(output_dir):
         return []
-    return sorted(
+    files = [
         name
         for name in os.listdir(output_dir)
         if os.path.isfile(os.path.join(output_dir, name))
-    )
+    ]
+    android_order = ['-universal.apk', '-aarch64.apk', '-armv7.apk', '-x86_64.apk']
+    return sorted(files, key=lambda name: (
+        next((idx for idx, suffix in enumerate(android_order) if name.endswith(suffix)), len(android_order)),
+        name.lower(),
+    ))
 
 def generator_view(request):
     if request.method == 'POST':
