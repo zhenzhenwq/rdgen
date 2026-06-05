@@ -553,3 +553,43 @@ User constraint recorded:
   - Do not store plaintext server passwords, GitHub tokens, or signing passwords in repo files.
   - Continue from `D:\rustdesk-生成器\rdgen`.
   - Verify GitHub remote state before assuming local `origin/master` is current.
+
+### Feature Document Gap Pass
+
+- Read the detailed feature document from `C:/Users/32590/Desktop/01-代码修改文档.md` and compared it against the current generator.
+- Added generator options for previously missing desktop runtime behaviors:
+  - ID-side copy button that copies ID plus temporary password.
+  - Manual temporary password dialog and no automatic temporary-password refresh after a connection.
+  - Windows start-on-boot checkbox under the temporary-password area.
+  - Hide Network entry in desktop settings.
+  - Incoming-only compact layout with configurable content width and height.
+- Added/extended source patch scripts under `.github/patches/`:
+  - `runtime_features.py`
+  - `hide_network_setting.py`
+  - `incoming_compact.py`
+  - `force_disable_file_transfer.py`
+  - `silent_install.py`
+- Updated workflows so the new optional patches are applied to the appropriate build paths:
+  - Windows x64 and self-hosted Windows
+  - Windows x86 where applicable
+  - Linux
+  - macOS
+  - Android for force-disabling file transfer
+- UI behavior verified locally:
+  - Windows x64 shows desktop runtime options and incoming compact width/height when direction is incoming.
+  - Windows x86 hides Flutter-only options but keeps Windows silent install.
+  - Android hides the desktop behavior section.
+- Validation completed locally:
+  - Python compile checks for generator and patch scripts.
+  - `git diff --check` passed with only line-ending warnings.
+  - Workflow YAML parsed successfully.
+  - Django `manage.py check` passed in a temporary venv.
+  - Browser/Chrome DevTools MCP smoke test passed on the local generator page.
+- Caveat: real GitHub Actions builds still need to verify that every exact-source patch applies cleanly to the selected RustDesk source version.
+
+### RustDesk Linux Default Fix Wiring
+
+- User asked to regenerate the previously prepared RustDesk fixes through the generator instead of treating `rustdesk-src` as the main delivery path.
+- Confirmed the Linux generator workflow did not yet apply the packaged default RustDesk fix diff as a dedicated step.
+- Added a workflow step in `.github/workflows/generator-linux.yml` to download and apply `.github/patches/rustdesk_default_linux.diff` before dependency setup and build.
+- This keeps the generator as the packaging layer while still carrying the earlier RustDesk capture/input/CM fixes into generated Linux builds.

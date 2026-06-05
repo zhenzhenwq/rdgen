@@ -173,6 +173,16 @@ jobs:
           name: bridge-artifact
           path: ./
 
+      - name: Apply default RustDesk Linux fixes
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/rustdesk_default_linux.diff
+            git apply rustdesk_default_linux.diff
+
       - name: Setup vcpkg with Github Actions binary cache
         if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
         uses: lukka/run-vcpkg@v11
@@ -266,8 +276,10 @@ jobs:
             sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py
             python allowCustom.py
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
-            git apply removeSetupServerTip.diff
+            if [ "${{ env.removeSetupServerTip }}" = "true" ]; then
+              wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
+              git apply removeSetupServerTip.diff
+            fi
             echo -n "${{ env.custom }}" | cat > ./custom_.txt
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
             sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
@@ -344,6 +356,32 @@ jobs:
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff
             git apply hide_settings_menu.diff
+
+      - name: hide network setting
+        if: env.hideNetworkSetting == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py
+            python hide_network_setting.py
+
+      - name: runtime desktop features
+        if: env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/runtime_features.py
+            args=()
+            if [ "${{ env.copyIdPasswordButton }}" = "true" ]; then args+=(--copy-id-password); fi
+            if [ "${{ env.manualTemporaryPassword }}" = "true" ]; then args+=(--manual-temporary-password); fi
+            if [ "${{ env.showStartOnBootCheckbox }}" = "true" ]; then args+=(--show-start-on-boot); fi
+            python runtime_features.py "${args[@]}"
         
       - name: removeNewVersionNotif
         continue-on-error: true
@@ -351,6 +389,28 @@ jobs:
         run: | 
           sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
           sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+
+      - name: force disable file transfer
+        if: env.forceDisableFileTransfer == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py
+            python force_disable_file_transfer.py
+
+      - name: incoming-only compact layout
+        if: env.incomingCompactMode == 'true' && env.direction == 'incoming'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/incoming_compact.py
+            python incoming_compact.py --width "${{ env.incomingContentWidth }}" --height "${{ env.incomingContentHeight }}"
 
       - name: Restore bridge files
         if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
