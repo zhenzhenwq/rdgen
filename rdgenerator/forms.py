@@ -11,6 +11,7 @@ class GenerateForm(forms.Form):
         help_text="nightly 是开发版，功能更新但稳定性可能较低"
     )
     delayFix = forms.BooleanField(initial=True, required=False)
+    beijingCustom = forms.BooleanField(label="北京定制", initial=False, required=False)
 
     #General
     exename = forms.CharField(label="配置名称", required=True)

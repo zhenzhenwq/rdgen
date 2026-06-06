@@ -407,6 +407,7 @@
                     <span class="help-text">{{ form.version.help_text }}</span>
                 {% endif %}
                 <label for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复使用第三方 API 时的连接延迟</label>
+                <label id="beijingCustomOption" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京定制</label>
             </div>
         </div>
         <div class="container">   
@@ -527,13 +528,38 @@
         </div>
     </form>
     <script>
+        const platformSelect = document.getElementById('id_platform');
+        const beijingCustomOption = document.getElementById('beijingCustomOption');
+        const beijingCustomToggle = document.getElementById("{{ form.beijingCustom.id_for_label }}");
+
+        function syncPlatformIconState() {
+            document.querySelectorAll('.platform-icon').forEach(icon => {
+                icon.classList.toggle('active', icon.dataset.platform === platformSelect.value);
+            });
+        }
+
+        function syncBeijingCustomVisibility() {
+            const supportsBeijingCustom = platformSelect.value === 'linux';
+            beijingCustomOption.hidden = !supportsBeijingCustom;
+            beijingCustomToggle.disabled = !supportsBeijingCustom;
+            if (!supportsBeijingCustom) {
+                beijingCustomToggle.checked = false;
+            }
+        }
+
         document.querySelectorAll('.platform-icon').forEach(icon => {
             icon.addEventListener('click', function() {
-                document.querySelectorAll('.platform-icon').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                document.getElementById('id_platform').value = this.dataset.platform;
+                platformSelect.value = this.dataset.platform;
+                syncPlatformIconState();
+                syncBeijingCustomVisibility();
             });
         });
+        platformSelect.addEventListener('change', function() {
+            syncPlatformIconState();
+            syncBeijingCustomVisibility();
+        });
+        syncPlatformIconState();
+        syncBeijingCustomVisibility();
         document.getElementById("{{ form.iconfile.id_for_label }}").addEventListener('change', function(event) {
             previewImage(event.target, 'icon-preview');
         });
@@ -803,6 +829,8 @@
                                     });
                                 }
                             }
+                            syncPlatformIconState();
+                            syncBeijingCustomVisibility();
                         } catch (error) {
                             alert("配置导入失败：JSON 文件无效。");
                         }

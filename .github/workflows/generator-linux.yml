@@ -13,6 +13,11 @@ on:
         required: true
         default: ''
         type: string
+      beijingCustom:
+        description: 'Apply Beijing custom Linux compatibility'
+        required: false
+        default: false
+        type: boolean
 
 env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
@@ -32,6 +37,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836"
   VERSION: "${{ inputs.version }}"
+  beijingCustom: "${{ inputs.beijingCustom || 'false' }}"
   NDK_VERSION: "r27c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -182,6 +188,15 @@ jobs:
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/rustdesk_default_linux.diff
             git apply rustdesk_default_linux.diff
+
+      - name: Apply Beijing custom Linux compatibility patches
+        if: env.beijingCustom == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          shell: bash
+          command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_legacy_uinput_keyboard.diff
             git apply mrkj_legacy_uinput_keyboard.diff
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_fast_service.py
@@ -605,6 +620,14 @@ jobs:
             for FILE in $(echo $FILES | sed "s/\n/ /g"); do
               sed -ie "s|rustdesk|${{ env.filename }}|g" $FILE
             done
+
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              mkdir -p /tmp/beijing-custom-linux-shim
+              wget -O /tmp/beijing-custom-linux-shim/rustdesk_no_sysvipc_shim.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_no_sysvipc_shim.c
+              wget -O /tmp/beijing-custom-linux-shim/rustdesk_uinput_input_fallback.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_uinput_input_fallback.c
+              wget -O /tmp/beijing_custom_linux_packaging.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_packaging.py
+              python3 /tmp/beijing_custom_linux_packaging.py --source-dir /tmp/beijing-custom-linux-shim --filename "${{ env.filename }}"
+            fi
 
             python3 ./build.py --flutter --skip-cargo
             for name in rustdesk*??.deb; do

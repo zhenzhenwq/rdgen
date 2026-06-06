@@ -45,6 +45,7 @@ def generator_view(request):
             platform = form.cleaned_data['platform']
             version = form.cleaned_data['version']
             delayFix = form.cleaned_data['delayFix']
+            beijingCustom = form.cleaned_data['beijingCustom'] and platform == 'linux'
             cycleMonitor = form.cleaned_data['cycleMonitor']
             xOffline = form.cleaned_data['xOffline']
             hidecm = form.cleaned_data['hidecm']
@@ -289,6 +290,7 @@ def generator_view(request):
                 "urlLink":urlLink,
                 "downloadLink":downloadLink,
                 "delayFix": 'true' if delayFix else 'false',
+                "beijingCustom": 'true' if beijingCustom else 'false',
                 "rdgen":'true',
                 "cycleMonitor": 'true' if cycleMonitor else 'false',
                 "xOffline": 'true' if xOffline else 'false',
