@@ -8,6 +8,7 @@ from pathlib import Path
 
 SHIM_NAME = "librustdesk_no_sysvipc.so"
 MARKER = "Beijing custom compatibility"
+SUDOERS_MARKER = "Beijing custom sudoers compatibility"
 
 
 def parse_args() -> argparse.Namespace:
@@ -80,6 +81,36 @@ def write_dropin(root: Path, filename: str, shim_path: str) -> None:
     )
 
 
+def write_sudoers(root: Path, filename: str) -> None:
+    sudoers_dir = root / "flutter" / "tmpdeb" / "etc" / "sudoers.d"
+    sudoers_dir.mkdir(parents=True, exist_ok=True)
+    sudoers = sudoers_dir / f"{filename}-ld-preload"
+    env_names = (
+        "LD_PRELOAD RUSTDESK_NO_SYSVIPC_SHIM_LOG "
+        "RUSTDESK_UINPUT_INPUT_FALLBACK RUSTDESK_UINPUT_INPUT_LOG "
+        "RUSTDESK_XCB_MOUSE_FALLBACK RUSTDESK_UINPUT_MOUSE_MODE "
+        "RUSTDESK_UINPUT_MOUSE_REL_SCALE RUSTDESK_UINPUT_WIDTH "
+        "RUSTDESK_UINPUT_HEIGHT RUSTDESK_FORCE_CM_NO_UI "
+        "RUSTDESK_DISABLE_TRAY RUSTDESK_PREWARM_CM_NO_UI"
+    )
+    commands = [
+        f"/usr/share/{filename}/{filename}",
+        f"/usr/share/{filename}/{filename}.real",
+        f"/usr/share/{filename}/{filename}.real.bin",
+    ]
+    lines = [f"# {SUDOERS_MARKER}"]
+    for command in commands:
+        lines.extend(
+            [
+                f'Defaults!{command} env_keep += "{env_names}"',
+                f'Defaults!{command} env_delete -= "LD_*"',
+                f"Defaults!{command} setenv",
+            ]
+        )
+    sudoers.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    sudoers.chmod(0o440)
+
+
 def patch_postinst(root: Path, filename: str) -> None:
     postinst = root / "res" / "DEBIAN" / "postinst"
     if not postinst.exists():
@@ -120,6 +151,7 @@ def main() -> None:
     shim_install_path.chmod(0o755)
 
     write_dropin(root, filename, f"/{shim_rel_path.as_posix()}")
+    write_sudoers(root, filename)
     patch_postinst(root, filename)
     print(f"Applied Beijing custom Linux packaging for {filename}")
 
