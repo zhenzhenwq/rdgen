@@ -571,6 +571,8 @@ jobs:
             export DEB_ARCH=${{ matrix.job.deb_arch }}
             mkdir -p flutter/tmpdeb/usr/share/rustdesk
             cp ./custom_.txt ./flutter/tmpdeb/usr/share/rustdesk/custom_.txt
+            mkdir -p "./flutter/tmpdeb/usr/share/${{ env.filename }}"
+            cp ./custom_.txt "./flutter/tmpdeb/usr/share/${{ env.filename }}/custom_.txt"
             if [[ "${{ env.logolink_url }}" != "false" ]]; then
               wget -O ./flutter/assets/logo.png ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }}
             fi
