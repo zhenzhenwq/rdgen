@@ -186,6 +186,8 @@ jobs:
             git apply mrkj_legacy_uinput_keyboard.diff
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_fast_service.py
             python3 mrkj_linux_fast_service.py
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_x11_mouse_uinput_keyboard.py
+            python3 mrkj_linux_x11_mouse_uinput_keyboard.py
 
       - name: Setup vcpkg with Github Actions binary cache
         if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
