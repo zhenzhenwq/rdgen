@@ -184,6 +184,8 @@ jobs:
             git apply rustdesk_default_linux.diff
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_legacy_uinput_keyboard.diff
             git apply mrkj_legacy_uinput_keyboard.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_fast_service.py
+            python3 mrkj_linux_fast_service.py
 
       - name: Setup vcpkg with Github Actions binary cache
         if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
