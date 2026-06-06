@@ -670,14 +670,14 @@ jobs:
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
