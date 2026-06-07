@@ -65,7 +65,7 @@ def write_dropin(root: Path, filename: str, shim_path: str) -> None:
                 "[Service]",
                 f"Environment=LD_PRELOAD={shim_path}",
                 "Environment=RUSTDESK_NO_SYSVIPC_SHIM_LOG=0",
-                "Environment=RUSTDESK_UINPUT_INPUT_FALLBACK=1",
+                "Environment=RUSTDESK_UINPUT_INPUT_FALLBACK=0",
                 "Environment=RUSTDESK_UINPUT_INPUT_LOG=1",
                 "Environment=RUSTDESK_XCB_MOUSE_FALLBACK=1",
                 "Environment=RUSTDESK_UINPUT_MOUSE_MODE=anchor",
