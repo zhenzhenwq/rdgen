@@ -9,6 +9,7 @@ from pathlib import Path
 SHIM_NAME = "librustdesk_no_sysvipc.so"
 MARKER = "Beijing custom compatibility"
 SUDOERS_MARKER = "Beijing custom sudoers compatibility"
+UINPUT_MARKER = "Beijing custom uinput compatibility"
 
 
 def parse_args() -> argparse.Namespace:
@@ -111,6 +112,22 @@ def write_sudoers(root: Path, filename: str) -> None:
     sudoers.chmod(0o440)
 
 
+def write_uinput_udev_rule(root: Path, filename: str) -> None:
+    rules_dir = root / "flutter" / "tmpdeb" / "etc" / "udev" / "rules.d"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    rule = rules_dir / f"99-{filename}-uinput.rules"
+    rule.write_text(
+        "\n".join(
+            [
+                f"# {UINPUT_MARKER}",
+                'KERNEL=="uinput", MODE="0666", TAG+="uaccess"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def patch_postinst(root: Path, filename: str) -> None:
     postinst = root / "res" / "DEBIAN" / "postinst"
     if not postinst.exists():
@@ -126,6 +143,14 @@ def patch_postinst(root: Path, filename: str) -> None:
         if line.strip() == target:
             indent = line[: len(line) - len(line.lstrip())]
             lines[index] = (
+                f"{indent}# {UINPUT_MARKER}: allow the user-mode server to open /dev/uinput.\n"
+                f"{indent}if command -v udevadm >/dev/null 2>&1; then\n"
+                f"{indent}    udevadm control --reload-rules || true\n"
+                f"{indent}    udevadm trigger --name-match=uinput || true\n"
+                f"{indent}fi\n"
+                f"{indent}if [ -e /dev/uinput ]; then\n"
+                f"{indent}    chmod 0666 /dev/uinput || true\n"
+                f"{indent}fi\n"
                 f"{indent}# {MARKER}: restart so the drop-in applies on upgrades.\n"
                 f"{indent}systemctl restart {filename} || systemctl start {filename}"
             )
@@ -152,6 +177,7 @@ def main() -> None:
 
     write_dropin(root, filename, f"/{shim_rel_path.as_posix()}")
     write_sudoers(root, filename)
+    write_uinput_udev_rule(root, filename)
     patch_postinst(root, filename)
     print(f"Applied Beijing custom Linux packaging for {filename}")
 
