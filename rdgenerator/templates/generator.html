@@ -108,7 +108,7 @@
             line-height: 1.5;
         }
 
-        input[type="text"], input[type="password"], select, textarea {
+        input[type="text"], input[type="password"], input[type="number"], select, textarea {
             width: 100%;
             padding: 10px 12px;
             margin-bottom: 12px;
@@ -128,6 +128,7 @@
 
         input[type="text"]:focus,
         input[type="password"]:focus,
+        input[type="number"]:focus,
         select:focus,
         textarea:focus {
             border-color: var(--blue);
@@ -312,6 +313,84 @@
             font-size: 13px;
         }
 
+        .desktop-behavior-section {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+        }
+
+        .desktop-behavior-section h3 {
+            color: var(--text);
+            margin: 0 0 8px;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .desktop-behavior-section h3 i {
+            color: var(--blue);
+            margin-right: 8px;
+        }
+
+        .desktop-behavior-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px 16px;
+        }
+
+        .desktop-behavior-field {
+            min-width: 0;
+        }
+
+        .desktop-behavior-field > label {
+            margin-bottom: 6px;
+        }
+
+        .desktop-behavior-field select,
+        .desktop-behavior-field input[type="number"] {
+            margin-bottom: 0;
+        }
+
+        .desktop-behavior-field .help-text {
+            margin: 6px 0 0;
+        }
+
+        .desktop-behavior-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 42px;
+            margin-bottom: 0;
+            padding: 8px 10px;
+            background: rgba(231, 241, 255, 0.66);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            color: var(--text);
+            font-weight: 600;
+            line-height: 1.45;
+        }
+
+        .desktop-behavior-toggle input {
+            margin-right: 0;
+            flex: 0 0 auto;
+        }
+
+        .desktop-behavior-compact-field {
+            grid-column: 1 / -1;
+        }
+
+        .desktop-behavior-size {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px 16px;
+            margin-top: 10px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--line);
+        }
+
+        .desktop-behavior-size[hidden] {
+            display: none !important;
+        }
+
         .password-requirement {
             display: none;
             color: var(--amber);
@@ -355,6 +434,11 @@
                 right: 12px;
                 left: 12px;
                 max-width: none;
+            }
+
+            .desktop-behavior-grid,
+            .desktop-behavior-size {
+                grid-template-columns: 1fr;
             }
         }
       </style>
@@ -406,8 +490,8 @@
                 {% if form.version.help_text %}
                     <span class="help-text">{{ form.version.help_text }}</span>
                 {% endif %}
-                <label for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复使用第三方 API 时的连接延迟</label>
-                <label id="beijingCustomOption" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京定制</label>
+                <label id="delayFixOption" for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复使用第三方 API 时的连接延迟</label>
+                <label id="beijingCustomOption" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京 Linux 定制</label>
             </div>
         </div>
         <div class="container">   
@@ -415,6 +499,7 @@
                 <h2><i class="fas fa-sliders-h"></i> 基础信息</h2>
                     <label for="{{ form.exename.id_for_label }}">配置名称（仅限英文、数字、下划线，不能包含空格或特殊字符）：</label>
                     {{ form.exename }}<span id="filenameError" class="error"></span><br><br>
+                    <div id="basicCustomFields" class="linux-custom-content">
                     <label for="{{ form.appname.id_for_label }}">自定义应用名称（留空则使用默认名称）：</label>
                     {{ form.appname }}<br><br>
                     <label for="{{ form.direction.id_for_label }}">连接类型：</label>
@@ -423,11 +508,55 @@
                     {{ form.installation }}<br><br>
                     <label for="{{ form.settings.id_for_label }}">设置入口：</label>
                     {{ form.settings }}<br><br>
+                    <div id="desktopBehaviorSection" class="desktop-behavior-section">
+                        <h3><i class="fas fa-window-maximize"></i> 桌面端行为</h3>
+                        <div class="desktop-behavior-grid">
+                            <div class="desktop-behavior-field">
+                                <label for="{{ form.defaultViewStyle.id_for_label }}">默认显示方式：</label>
+                                {{ form.defaultViewStyle }}
+                            </div>
+                            <label class="desktop-behavior-toggle" for="{{ form.removeSetupServerTip.id_for_label }}">
+                                {{ form.removeSetupServerTip }} 隐藏底部“自建服务器”提示
+                            </label>
+                            <label class="desktop-behavior-toggle" for="{{ form.hideNetworkSetting.id_for_label }}">
+                                {{ form.hideNetworkSetting }} 隐藏设置里的“网络”入口
+                            </label>
+                            <label id="silentInstallOption" class="desktop-behavior-toggle" for="{{ form.silentInstallOnDoubleClick.id_for_label }}">
+                                {{ form.silentInstallOnDoubleClick }} Windows 安装包双击后静默安装
+                            </label>
+                            <label id="copyIdPasswordButtonOption" class="desktop-behavior-toggle" for="{{ form.copyIdPasswordButton.id_for_label }}">
+                                {{ form.copyIdPasswordButton }} ID 旁增加复制按钮
+                            </label>
+                            <label id="manualTemporaryPasswordOption" class="desktop-behavior-toggle" for="{{ form.manualTemporaryPassword.id_for_label }}">
+                                {{ form.manualTemporaryPassword }} 允许手动设置临时密码
+                            </label>
+                            <label id="startOnBootOption" class="desktop-behavior-toggle" for="{{ form.showStartOnBootCheckbox.id_for_label }}">
+                                {{ form.showStartOnBootCheckbox }} 显示开机自启选项
+                            </label>
+                            <div id="incomingCompactWrapper" class="desktop-behavior-compact-field">
+                                <label class="desktop-behavior-toggle" for="{{ form.incomingCompactMode.id_for_label }}">
+                                    {{ form.incomingCompactMode }} 仅被控紧凑布局
+                                </label>
+                                <span class="help-text">仅在连接类型为“仅允许被控”的 Windows 64 位、Linux、macOS 生成包中生效。</span>
+                                <div id="incomingCompactDetails" class="desktop-behavior-size" hidden>
+                                    <div class="desktop-behavior-field">
+                                        <label for="{{ form.incomingContentWidth.id_for_label }}">窗口内容宽度：</label>
+                                        {{ form.incomingContentWidth }}
+                                    </div>
+                                    <div class="desktop-behavior-field">
+                                        <label for="{{ form.incomingContentHeight.id_for_label }}">窗口内容高度：</label>
+                                        {{ form.incomingContentHeight }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><br><br>
                     <label for="{{ form.androidappid.id_for_label }}">自定义 Android App ID（留空则使用默认 ID）：</label>
                     {{ form.androidappid }}<br><br>
+                    </div>
             </div>
 
-            <div class="section">
+            <div class="section linux-custom-content">
                 <h2><i class="fas fa-server"></i> 自定义服务器</h2>
                     <label for="{{ form.serverIP.id_for_label }}">服务器地址：</label>
                     {{ form.serverIP }}<br><br>
@@ -443,7 +572,7 @@
                     {{ form.compname }}<br><br>
             </div>
         </div>
-        <div class="container">
+        <div class="container linux-custom-content">
             <div class="section">
                 <h2><i class="fas fa-shield-alt"></i> 安全设置</h2>
                     <label for="{{ form.passApproveMode.id_for_label }}">连接确认方式：</label>
@@ -459,7 +588,7 @@
                     
                     <label for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} 用户无操作时自动关闭传入会话</label><br>
 
-                    <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 允许从远程屏幕隐藏连接窗口</label><br>
+                    <label id="hidecmOption" for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 允许从远程屏幕隐藏连接窗口</label><br>
             </div>
         
             <div class="section">
@@ -483,7 +612,7 @@
                     {{ form.theme }} {{ form.themeDorO }} <span class="help-text">默认表示客户端可修改，强制覆盖表示永久锁定该主题。</span><br><br>
             </div>
         </div>
-        <div class="container">
+        <div class="container linux-custom-content">
             <div class="section">
                 <h2><i class="fas fa-lock"></i> 权限设置</h2>
                     <p class="help-text">以下权限可作为默认值，也可强制覆盖为不可修改。</p>
@@ -493,6 +622,7 @@
                     <div class="checkbox-group">
                         <label for="{{ form.enableKeyboard.id_for_label }}">{{ form.enableKeyboard }} 键盘/鼠标</label>
                         <label for="{{ form.enableClipboard.id_for_label }}">{{ form.enableClipboard }} 剪贴板</label>
+                        <label for="{{ form.enableFileCopyPaste.id_for_label }}">{{ form.enableFileCopyPaste }} 文件复制粘贴</label>
                         <label for="{{ form.enableFileTransfer.id_for_label }}">{{ form.enableFileTransfer }} 文件传输</label>
                         <label for="{{ form.enableAudio.id_for_label }}">{{ form.enableAudio }} 音频</label>
                         <label for="{{ form.enableTCP.id_for_label }}">{{ form.enableTCP }} TCP 隧道</label>
@@ -505,10 +635,11 @@
                         <label for="{{ form.enableTerminal.id_for_label }}">{{ form.enableTerminal }} 远程终端</label>
                     </div><br>
                 <h2><i class="fas fa-code"></i> 代码增强</h2>
-                    <label for="{{ form.cycleMonitor.id_for_label }}">{{ form.cycleMonitor }} 在最小化工具栏添加显示器切换按钮</label><br>
-                    <label for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} 地址簿离线设备显示 X 标记</label><br>
-                    <label for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} 移除新版本通知</label><br>
-                    <label for="{{ form.hideSettingsMenu.id_for_label }}">{{ form.hideSettingsMenu }} 隐藏主界面右上角三点菜单</label><br>
+                    <label id="cycleMonitorOption" for="{{ form.cycleMonitor.id_for_label }}">{{ form.cycleMonitor }} 在最小化工具栏添加显示器切换按钮</label><br>
+                    <label id="xOfflineOption" for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} 地址簿离线设备显示 X 标记</label><br>
+                    <label id="removeNewVersionNotifOption" for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} 移除新版本通知</label><br>
+                    <label id="hideSettingsMenuOption" for="{{ form.hideSettingsMenu.id_for_label }}">{{ form.hideSettingsMenu }} 隐藏主界面右上角三点菜单</label><br>
+                    <label id="forceDisableFileTransferOption" for="{{ form.forceDisableFileTransfer.id_for_label }}">{{ form.forceDisableFileTransfer }} 从源码强制禁用文件传输</label><br>
             </div>
 
             <div class="section">
@@ -529,8 +660,35 @@
     </form>
     <script>
         const platformSelect = document.getElementById('id_platform');
+        const desktopPlatforms = new Set(['windows', 'windows-x86', 'linux', 'macos']);
+        const flutterDesktopPlatforms = new Set(['windows', 'linux', 'macos']);
+        const compactLayoutPlatforms = new Set(['windows', 'linux', 'macos']);
+        const windowsPlatforms = new Set(['windows', 'windows-x86']);
         const beijingCustomOption = document.getElementById('beijingCustomOption');
         const beijingCustomToggle = document.getElementById("{{ form.beijingCustom.id_for_label }}");
+        const delayFixOption = document.getElementById('delayFixOption');
+        const linuxCustomContent = document.querySelectorAll('.linux-custom-content');
+        const desktopBehaviorSection = document.getElementById('desktopBehaviorSection');
+        const silentInstallOption = document.getElementById('silentInstallOption');
+        const linuxGatedOptions = [
+            'hidecmOption',
+            'cycleMonitorOption',
+            'xOfflineOption',
+            'removeNewVersionNotifOption',
+            'hideSettingsMenuOption',
+            'forceDisableFileTransferOption',
+        ].map(id => document.getElementById(id));
+        const copyIdPasswordButtonOption = document.getElementById('copyIdPasswordButtonOption');
+        const manualTemporaryPasswordOption = document.getElementById('manualTemporaryPasswordOption');
+        const startOnBootOption = document.getElementById('startOnBootOption');
+        const incomingCompactWrapper = document.getElementById('incomingCompactWrapper');
+        const incomingCompactToggle = document.getElementById("{{ form.incomingCompactMode.id_for_label }}");
+        const incomingCompactDetails = document.getElementById('incomingCompactDetails');
+
+        function selectedDirection() {
+            const checked = document.querySelector('input[name="direction"]:checked');
+            return checked ? checked.value : '';
+        }
 
         function syncPlatformIconState() {
             document.querySelectorAll('.platform-icon').forEach(icon => {
@@ -538,28 +696,53 @@
             });
         }
 
-        function syncBeijingCustomVisibility() {
+        function updateDesktopBehaviorVisibility() {
+            const isDesktop = desktopPlatforms.has(platformSelect.value);
+            const isWindowsBuild = windowsPlatforms.has(platformSelect.value);
+            const supportsFlutterDesktop = flutterDesktopPlatforms.has(platformSelect.value);
+            const supportsCompactLayout = compactLayoutPlatforms.has(platformSelect.value);
+            const isIncomingOnly = selectedDirection() === 'incoming';
             const supportsBeijingCustom = platformSelect.value === 'linux';
+            const beijingCustomEnabled = supportsBeijingCustom && beijingCustomToggle.checked;
+            const linuxCustomAllowed = platformSelect.value !== 'linux' || beijingCustomEnabled;
             beijingCustomOption.hidden = !supportsBeijingCustom;
             beijingCustomToggle.disabled = !supportsBeijingCustom;
-            if (!supportsBeijingCustom) {
-                beijingCustomToggle.checked = false;
-            }
+            delayFixOption.hidden = !linuxCustomAllowed;
+            linuxCustomContent.forEach(element => {
+                element.hidden = !linuxCustomAllowed;
+            });
+            desktopBehaviorSection.hidden = !isDesktop || !linuxCustomAllowed;
+            silentInstallOption.hidden = !isWindowsBuild;
+            linuxGatedOptions.forEach(option => {
+                if (option) {
+                    option.hidden = !linuxCustomAllowed;
+                }
+            });
+            copyIdPasswordButtonOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
+            manualTemporaryPasswordOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
+            startOnBootOption.hidden = platformSelect.value !== 'windows';
+            incomingCompactWrapper.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed);
+            incomingCompactDetails.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed && incomingCompactToggle.checked);
         }
 
         document.querySelectorAll('.platform-icon').forEach(icon => {
             icon.addEventListener('click', function() {
                 platformSelect.value = this.dataset.platform;
                 syncPlatformIconState();
-                syncBeijingCustomVisibility();
+                updateDesktopBehaviorVisibility();
             });
         });
         platformSelect.addEventListener('change', function() {
             syncPlatformIconState();
-            syncBeijingCustomVisibility();
+            updateDesktopBehaviorVisibility();
         });
+        document.querySelectorAll('input[name="direction"]').forEach(input => {
+            input.addEventListener('change', updateDesktopBehaviorVisibility);
+        });
+        beijingCustomToggle.addEventListener('change', updateDesktopBehaviorVisibility);
+        incomingCompactToggle.addEventListener('change', updateDesktopBehaviorVisibility);
         syncPlatformIconState();
-        syncBeijingCustomVisibility();
+        updateDesktopBehaviorVisibility();
         document.getElementById("{{ form.iconfile.id_for_label }}").addEventListener('change', function(event) {
             previewImage(event.target, 'icon-preview');
         });
@@ -582,6 +765,7 @@
         });
         const enableKeyboard = document.getElementById("{{ form.enableKeyboard.id_for_label }}");
         const enableClipboard = document.getElementById("{{ form.enableClipboard.id_for_label }}");
+        const enableFileCopyPaste = document.getElementById("{{ form.enableFileCopyPaste.id_for_label }}");
         const enableFileTransfer = document.getElementById("{{ form.enableFileTransfer.id_for_label }}");
         const enableAudio = document.getElementById("{{ form.enableAudio.id_for_label }}");
         const enableTCP = document.getElementById("{{ form.enableTCP.id_for_label }}");
@@ -597,6 +781,7 @@
             if (this.value === 'full') {
                 enableKeyboard.checked = true;
                 enableClipboard.checked = true;
+                enableFileCopyPaste.checked = true;
                 enableFileTransfer.checked = true;
                 enableAudio.checked = true;
                 enableTCP.checked = true;
@@ -610,6 +795,7 @@
 
                 enableKeyboard.disabled = true;
                 enableClipboard.disabled = true;
+                enableFileCopyPaste.disabled = true;
                 enableFileTransfer.disabled = true;
                 enableAudio.disabled = true;
                 enableTCP.disabled = true;
@@ -619,10 +805,11 @@
                 enableRemoteModi.disabled = true;
                 enablePrinter.disabled = true;
                 enableCamera.disabled = true;
-                enableTerminal.disable = true;
+                enableTerminal.disabled = true;
             } else if (this.value === 'view') {
                 enableKeyboard.checked = false;
                 enableClipboard.checked = false;
+                enableFileCopyPaste.checked = false;
                 enableFileTransfer.checked = false;
                 enableAudio.checked = false;
                 enableTCP.checked = false;
@@ -636,6 +823,7 @@
 
                 enableKeyboard.disabled = true;
                 enableClipboard.disabled = true;
+                enableFileCopyPaste.disabled = true;
                 enableFileTransfer.disabled = true;
                 enableAudio.disabled = true;
                 enableTCP.disabled = true;
@@ -645,10 +833,11 @@
                 enableRemoteModi.disabled = true;
                 enablePrinter.disabled = true;
                 enableCamera.disabled = true;
-                enableTerminal.disable = true;
+                enableTerminal.disabled = true;
             } else if (this.value === 'custom') {
                 enableKeyboard.disabled = false;
                 enableClipboard.disabled = false;
+                enableFileCopyPaste.disabled = false;
                 enableFileTransfer.disabled = false;
                 enableAudio.disabled = false;
                 enableTCP.disabled = false;
@@ -659,6 +848,9 @@
                 enablePrinter.checked = false;
                 enableCamera.checked = false;
                 enableTerminal.checked = false;
+                enablePrinter.disabled = false;
+                enableCamera.disabled = false;
+                enableTerminal.disabled = false;
             }
         });
         function previewImage(input, previewContainerId) {
@@ -788,7 +980,7 @@
             const fileInput = document.getElementById("fileInput");
             fileInput.click();
 
-            fileInput.addEventListener("change", (event) => {
+            fileInput.onchange = (event) => {
                 const file = event.target.files[0];
                 if (file) {
                     const reader = new FileReader();
@@ -808,7 +1000,7 @@
                                                 element.checked = false; // Uncheck others in the group
                                             }
                                         } else if (element.type === 'checkbox') {
-                                            element.checked = formData[key];
+                                            element.checked = formData[key] === true || formData[key] === 'true' || formData[key] === 'on';
                                         } else if (element.type !== 'file') {
                                             element.value = formData[key];
                                         }
@@ -830,14 +1022,14 @@
                                 }
                             }
                             syncPlatformIconState();
-                            syncBeijingCustomVisibility();
+                            updateDesktopBehaviorVisibility();
                         } catch (error) {
                             alert("配置导入失败：JSON 文件无效。");
                         }
                     };
                     reader.readAsText(file);
                 }
-            });
+            };
         }
 
         function isPngDataUrl(value) {

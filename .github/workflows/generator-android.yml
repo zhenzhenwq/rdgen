@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: ''
+        default: '1.4.7'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -198,7 +198,10 @@ jobs:
         continue-on-error: true
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          if [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]]; then
+            curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff -o flutter_3.24.4_dropdown_menu_enableFilter.diff
+            git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          fi
   
 
       - uses: nttld/setup-ndk@v1
@@ -395,8 +398,8 @@ jobs:
           shell: bash
           continue_on_error: true
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff
-            git apply cycle_monitor.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py
+            python cycle_monitor.py
 
       - name: use X for offline display instead of orange circle
         if: env.xOffline == 'true'
@@ -407,8 +410,8 @@ jobs:
           shell: bash
           continue_on_error: true
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
-            git apply xoffline.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py
+            python xoffline.py
 
       - name: hide-cm
         if: env.hidecm == 'true'
@@ -419,8 +422,8 @@ jobs:
           shell: bash
           continue_on_error: true
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
-            git apply hidecm.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py
+            python hidecm.py
 
       - name: hide settings menu
         if: env.hideSettingsMenu == 'true'
@@ -438,8 +441,19 @@ jobs:
         continue-on-error: true
         if: env.removeNewVersionNotif == 'true'
         run: | 
-          sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
-          sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
+          python remove_new_version_notif.py
+
+      - name: force disable file transfer
+        if: env.forceDisableFileTransfer == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py
+            python force_disable_file_transfer.py
 
       - name: replace flutter icons
         if: ${{ env.iconlink_url != 'false' }}

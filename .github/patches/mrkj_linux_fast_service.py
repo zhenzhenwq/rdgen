@@ -117,6 +117,17 @@ def main() -> None:
                 return;
             }
 """
+    old_active_refresh_147 = """            if !self.sid.is_empty() && is_active_and_seat0(&self.sid) {
+                // Xwayland display and xauth may not be available in a short time after login.
+                if is_xwayland_running() && !self.is_login_wayland() {
+                    self.get_display_xauth_xwayland();
+                    self.is_rustdesk_subprocess = false;
+                } else if self.is_wayland() {
+                    self.get_display_xauth_wayland();
+                }
+                return;
+            }
+"""
     new_active_refresh = """            if !self.sid.is_empty() && is_active_and_seat0(&self.sid) {
                 if self.protocol == DISPLAY_SERVER_X11
                     && (self.display.is_empty() || self.xauth.is_empty())
@@ -127,16 +138,22 @@ def main() -> None:
                     // Xwayland display and xauth may not be available in a short time after login.
                     self.get_display_xauth_xwayland();
                     self.is_rustdesk_subprocess = false;
+                } else if self.is_wayland() {
+                    self.get_display_xauth_wayland();
                 }
                 return;
             }
 """
-    text = replace_once(
-        text,
-        old_active_refresh,
-        new_active_refresh,
-        "use fast X11 env on active session refresh",
-    )
+    if new_active_refresh not in text:
+        if old_active_refresh_147 in text:
+            text = text.replace(old_active_refresh_147, new_active_refresh, 1)
+        else:
+            text = replace_once(
+                text,
+                old_active_refresh,
+                new_active_refresh,
+                "use fast X11 env on active session refresh",
+            )
 
     old_x11_branch = """            } else {
                 self.get_display_x11();

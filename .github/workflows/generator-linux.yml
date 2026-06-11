@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: ''
+        default: '1.4.7'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -179,7 +179,8 @@ jobs:
           name: bridge-artifact
           path: ./
 
-      - name: Apply default RustDesk Linux fixes
+      - name: Apply Beijing custom Linux base fixes
+        if: env.beijingCustom == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 3
@@ -187,7 +188,19 @@ jobs:
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/rustdesk_default_linux.diff
-            git apply rustdesk_default_linux.diff
+            if [ "${{ env.VERSION }}" = "1.4.7" ]; then
+              git apply \
+                --include=libs/enigo/src/linux/nix_impl.rs \
+                --include=libs/scrap/src/x11/capturer.rs \
+                --include=libs/scrap/src/x11/ffi.rs \
+                --include=res/rustdesk.service \
+                --include=src/core_main.rs \
+                rustdesk_default_linux.diff
+              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_linux_147_compat.py
+              python3 beijing_linux_147_compat.py
+            else
+              git apply rustdesk_default_linux.diff
+            fi
 
       - name: Apply Beijing custom Linux compatibility patches
         if: env.beijingCustom == 'true'
@@ -197,8 +210,10 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_legacy_uinput_keyboard.diff
-            git apply mrkj_legacy_uinput_keyboard.diff
+            if [ "${{ env.VERSION }}" != "1.4.7" ]; then
+              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_legacy_uinput_keyboard.diff
+              git apply mrkj_legacy_uinput_keyboard.diff
+            fi
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_fast_service.py
             python3 mrkj_linux_fast_service.py
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_x11_mouse_uinput_keyboard.py
@@ -233,7 +248,7 @@ jobs:
         shell: bash
 
       - name: icon stuff
-        if: ${{ env.iconlink_url != 'false' }}
+        if: ${{ env.beijingCustom == 'true' && env.iconlink_url != 'false' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -261,7 +276,7 @@ jobs:
             b64=""
 
       - name: change appname to custom
-        if: env.appname != 'rustdesk'
+        if: env.beijingCustom == 'true' && env.appname != 'rustdesk'
         continue-on-error: true
         shell: bash
         run: |
@@ -278,7 +293,7 @@ jobs:
           sed -i -e '/-p tmpdeb\/usr\/lib\/rustdesk/d' ./build.py
 
       - name: change company name
-        if: env.compname != 'Purslane Ltd'
+        if: env.beijingCustom == 'true' && env.compname != 'Purslane Ltd'
         continue-on-error: true
         shell: bash
         run: |
@@ -287,6 +302,7 @@ jobs:
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./libs/portable/Cargo.toml
           
       - name: allow custom.txt
+        if: env.beijingCustom == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -295,18 +311,18 @@ jobs:
           command: |
             sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
             sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py
             python allowCustom.py
-            if [ "${{ env.removeSetupServerTip }}" = "true" ]; then
-              wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
-              git apply removeSetupServerTip.diff
+            if [ "${{ env.beijingCustom }}" = "true" ] && [ "${{ env.removeSetupServerTip }}" = "true" ]; then
+              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_setup_server_tip.py
+              python remove_setup_server_tip.py
             fi
             echo -n "${{ env.custom }}" | cat > ./custom_.txt
             # sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
             sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
           
       - name: change url to custom
-        if: env.urlLink != 'https://rustdesk.com'
+        if: env.beijingCustom == 'true' && env.urlLink != 'https://rustdesk.com'
         continue-on-error: true
         shell: bash
         run: |  
@@ -319,7 +335,7 @@ jobs:
           sed -i -e "s|https://rustdesk.com/privacy.html|${{ env.urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
 
       - name: change download link to custom
-        if: env.downloadLink != 'https://rustdesk.com/download'
+        if: env.beijingCustom == 'true' && env.downloadLink != 'https://rustdesk.com/download'
         continue-on-error: true
         shell: bash
         run: |
@@ -329,46 +345,46 @@ jobs:
 
       - name: fix connection delay
         continue-on-error: true
-        if: ${{ env.delayFix == 'true' }}
+        if: ${{ env.beijingCustom == 'true' && env.delayFix == 'true' }}
         shell: bash
         run: |
           sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
 
       - name: add cycle monitors to toolbar
-        if: env.cycleMonitor == 'true'
+        if: env.beijingCustom == 'true' && env.cycleMonitor == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff
-            git apply cycle_monitor.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py
+            python cycle_monitor.py
 
       - name: use X for offline display instead of orange circle
-        if: env.xOffline == 'true'
+        if: env.beijingCustom == 'true' && env.xOffline == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
-            git apply xoffline.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py
+            python xoffline.py
 
       - name: hide-cm
-        if: env.hidecm == 'true'
+        if: env.beijingCustom == 'true' && env.hidecm == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
-            git apply hidecm.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py
+            python hidecm.py
 
       - name: hide settings menu
-        if: env.hideSettingsMenu == 'true'
+        if: env.beijingCustom == 'true' && env.hideSettingsMenu == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -379,7 +395,7 @@ jobs:
             git apply hide_settings_menu.diff
 
       - name: hide network setting
-        if: env.hideNetworkSetting == 'true'
+        if: env.beijingCustom == 'true' && env.hideNetworkSetting == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -390,7 +406,7 @@ jobs:
             python hide_network_setting.py
 
       - name: runtime desktop features
-        if: env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true'
+        if: env.beijingCustom == 'true' && (env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true')
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -406,13 +422,13 @@ jobs:
         
       - name: removeNewVersionNotif
         continue-on-error: true
-        if: env.removeNewVersionNotif == 'true'
+        if: env.beijingCustom == 'true' && env.removeNewVersionNotif == 'true'
         run: | 
-          sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
-          sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
+          python remove_new_version_notif.py
 
       - name: force disable file transfer
-        if: env.forceDisableFileTransfer == 'true'
+        if: env.beijingCustom == 'true' && env.forceDisableFileTransfer == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -423,7 +439,7 @@ jobs:
             python force_disable_file_transfer.py
 
       - name: incoming-only compact layout
-        if: env.incomingCompactMode == 'true' && env.direction == 'incoming'
+        if: env.beijingCustom == 'true' && env.incomingCompactMode == 'true' && env.direction == 'incoming'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -525,9 +541,11 @@ jobs:
             echo $JOBS
 
             # Make the right unit stop when the services is stopped by tray
-            sed -ie "s|\(systemctl\s\+\S\+\s\){app_name}|\1${{ env.filename }}|g" src/platform/linux.rs
-            sed -ie 's|\({home}/{p}/{app_name0}2\?.toml\)|\\"\1\\"|g' src/platform/linux.rs
-            sed -ie 's|\(/root/{p}/\)|\\"\1\\"|g' src/platform/linux.rs
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              sed -ie "s|\(systemctl\s\+\S\+\s\){app_name}|\1${{ env.filename }}|g" src/platform/linux.rs
+              sed -ie 's|\({home}/{p}/{app_name0}2\?.toml\)|\\"\1\\"|g' src/platform/linux.rs
+              sed -ie 's|\(/root/{p}/\)|\\"\1\\"|g' src/platform/linux.rs
+            fi
 
             cargo build --lib $JOBS --features hwcodec,flutter,unix-file-copy-paste --release
             rm -rf target/release/deps target/release/build
@@ -578,7 +596,8 @@ jobs:
                   pushd /opt/flutter
                 ;;
               esac
-              git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+              git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
               popd
             fi
 
@@ -588,14 +607,16 @@ jobs:
             chmod 777 output -R
             export CARGO_INCREMENTAL=0
             export DEB_ARCH=${{ matrix.job.deb_arch }}
-            mkdir -p flutter/tmpdeb/usr/share/rustdesk
-            cp ./custom_.txt ./flutter/tmpdeb/usr/share/rustdesk/custom_.txt
-            mkdir -p "./flutter/tmpdeb/usr/share/${{ env.filename }}"
-            cp ./custom_.txt "./flutter/tmpdeb/usr/share/${{ env.filename }}/custom_.txt"
-            if [[ "${{ env.logolink_url }}" != "false" ]]; then
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              mkdir -p flutter/tmpdeb/usr/share/rustdesk
+              cp ./custom_.txt ./flutter/tmpdeb/usr/share/rustdesk/custom_.txt
+              mkdir -p "./flutter/tmpdeb/usr/share/${{ env.filename }}"
+              cp ./custom_.txt "./flutter/tmpdeb/usr/share/${{ env.filename }}/custom_.txt"
+            fi
+            if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.logolink_url }}" != "false" ]]; then
               wget -O ./flutter/assets/logo.png ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }}
             fi
-            if [[ "${{ env.iconlink_url }}" != "false" ]]; then
+            if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.iconlink_url }}" != "false" ]]; then
               mv ./flutter/assets/icon.svg ./flutter/assets/icon.svg.bak
               convert ./res/icon.png ./flutter/assets/icon.svg
               convert ./res/128x128.png -resize 200% ./flutter/assets/128x128@2x.png || true
@@ -610,16 +631,26 @@ jobs:
             fi
 
             # Change files names in the output .deb
-            sed -ie "s|\(cp .* \)tmpdeb/usr/share/rustdesk/files/systemd/|\1tmpdeb/usr/share/rustdesk/files/systemd/${{ env.filename }}.service|g" build.py
-            sed -ie "s|cp -r \(.\+\)\* \([^ ]\+\)/rustdesk|mv \1rustdesk \1${{ env.filename }}; cp -r \1\* \2/${{ env.filename }}|g" build.py
-            sed -ie "s|\(tmpdeb/[^ ]*\)rustdesk|\1${{ env.filename }}|g" build.py
-            sed -ie "s|Package: rustdesk|Package: ${{ env.filename }}|g" build.py
-            sed -ie "s|RustDesk|${{ env.appname }}|g" res/rustdesk.desktop
-            FILES=$(sed -ne "s~.*cp\s\(../\)\?\+\(.\+\.\(desktop\|service\)\)\s\+tmpdeb/.*~\2~p" build.py | sort | uniq)
-            FILES=$(echo -e "$FILES\n$(ls --color=never res/DEBIAN/*)")
-            for FILE in $(echo $FILES | sed "s/\n/ /g"); do
-              sed -ie "s|rustdesk|${{ env.filename }}|g" $FILE
-            done
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              sed -ie "s|\(cp .* \)tmpdeb/usr/share/rustdesk/files/systemd/|\1tmpdeb/usr/share/rustdesk/files/systemd/${{ env.filename }}.service|g" build.py
+              sed -ie "s|cp -r \(.\+\)\* \([^ ]\+\)/rustdesk|mv \1rustdesk \1${{ env.filename }}; cp -r \1\* \2/${{ env.filename }}|g" build.py
+              sed -ie "s|\(tmpdeb/[^ ]*\)rustdesk|\1${{ env.filename }}|g" build.py
+              sed -ie "s|Package: rustdesk|Package: ${{ env.filename }}|g" build.py
+              sed -ie "s|RustDesk|${{ env.appname }}|g" res/rustdesk.desktop
+              FILES=$(sed -ne "s~.*cp\s\(../\)\?\+\(.\+\.\(desktop\|service\)\)\s\+tmpdeb/.*~\2~p" build.py | sort | uniq)
+              FILES=$(echo -e "$FILES\n$(ls --color=never res/DEBIAN/*)")
+              for FILE in $(echo $FILES | sed "s/\n/ /g"); do
+                sed -ie "s|rustdesk|${{ env.filename }}|g" $FILE
+              done
+            fi
+
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              mkdir -p /tmp/beijing-custom-linux-shim
+              wget -O /tmp/beijing-custom-linux-shim/rustdesk_no_sysvipc_shim.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_no_sysvipc_shim.c
+              wget -O /tmp/beijing-custom-linux-shim/rustdesk_uinput_input_fallback.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_uinput_input_fallback.c
+              wget -O /tmp/beijing_custom_linux_packaging.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_packaging.py
+              python3 /tmp/beijing_custom_linux_packaging.py --source-dir /tmp/beijing-custom-linux-shim --filename "${{ env.filename }}"
+            fi
 
             if [[ "${{ env.beijingCustom }}" == "true" ]]; then
               mkdir -p /tmp/beijing-custom-linux-shim
@@ -771,7 +802,7 @@ jobs:
           mv ${{ env.filename }}-${{ matrix.job.arch }}.deb appimage/rustdesk.deb
 
       - name: icon stuff
-        if: ${{ env.iconlink_url != 'false' }}
+        if: ${{ env.beijingCustom == 'true' && env.iconlink_url != 'false' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -808,8 +839,10 @@ jobs:
       - name: Build appimage package
         shell: bash
         run: |
-          sed -ie "s|rustdesk|${{ env.filename }}|g" appimage/*
-          mv appimage/rustdesk.deb "appimage/${{ env.filename }}.deb"
+          if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+            sed -ie "s|rustdesk|${{ env.filename }}|g" appimage/*
+            mv appimage/rustdesk.deb "appimage/${{ env.filename }}.deb"
+          fi
 
           # install libarchive-tools for bsdtar command used in AppImageBuilder.yml
           sudo apt-get update -y
@@ -819,7 +852,11 @@ jobs:
           # run appimage-builder
           pushd appimage
           sudo appimage-builder --skip-tests --recipe ./AppImageBuilder-${{ matrix.job.arch }}.yml
-          sudo mv ./${{ env.filename }}-${{ env.VERSION }}-${{ matrix.job.arch }}.AppImage ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
+          if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+            sudo mv ./${{ env.filename }}-${{ env.VERSION }}-${{ matrix.job.arch }}.AppImage ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
+          else
+            sudo mv ./rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.AppImage ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
+          fi
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}

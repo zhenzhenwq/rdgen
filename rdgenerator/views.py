@@ -43,39 +43,65 @@ def generator_view(request):
             else:
                 selfhosted = False
             platform = form.cleaned_data['platform']
+            desktop_platforms = {'windows', 'windows-x86', 'linux', 'macos'}
+            flutter_desktop_platforms = {'windows', 'linux', 'macos'}
+            windows_platforms = {'windows', 'windows-x86'}
             version = form.cleaned_data['version']
-            delayFix = form.cleaned_data['delayFix']
             beijingCustom = form.cleaned_data['beijingCustom'] and platform == 'linux'
-            cycleMonitor = form.cleaned_data['cycleMonitor']
-            xOffline = form.cleaned_data['xOffline']
-            hidecm = form.cleaned_data['hidecm']
-            removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif']
-            hideSettingsMenu = form.cleaned_data['hideSettingsMenu']
+            linuxCustomAllowed = platform != 'linux' or beijingCustom
+            default_server = 'rs-ny.rustdesk.com'
+            default_key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw='
+            default_url_link = "https://rustdesk.com"
+            default_download_link = "https://rustdesk.com/download"
+            default_appname = "rustdesk"
+            default_compname = "Purslane Ltd"
+            delayFix = form.cleaned_data['delayFix'] and linuxCustomAllowed
+            cycleMonitor = form.cleaned_data['cycleMonitor'] and linuxCustomAllowed
+            xOffline = form.cleaned_data['xOffline'] and linuxCustomAllowed
+            hidecm = form.cleaned_data['hidecm'] and linuxCustomAllowed
+            removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif'] and linuxCustomAllowed
+            hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and linuxCustomAllowed
             server = form.cleaned_data['serverIP']
             key = form.cleaned_data['key']
             apiServer = form.cleaned_data['apiServer']
             urlLink = form.cleaned_data['urlLink']
             downloadLink = form.cleaned_data['downloadLink']
             if not server:
-                server = 'rs-ny.rustdesk.com' #default rustdesk server
+                server = default_server
             if not key:
-                key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' #default rustdesk key
+                key = default_key
             if not apiServer:
-                apiServer = server+":21114"
+                api_host = server.removeprefix("https://").removeprefix("http://").rstrip("/")
+                apiServer = f"http://{api_host}:21114"
             if not urlLink:
-                urlLink = "https://rustdesk.com"
+                urlLink = default_url_link
             if not downloadLink:
-                downloadLink = "https://rustdesk.com/download"
+                downloadLink = default_download_link
             direction = form.cleaned_data['direction']
             installation = form.cleaned_data['installation']
             settings = form.cleaned_data['settings']
+            hideNetworkSetting = form.cleaned_data['hideNetworkSetting'] and platform in desktop_platforms and linuxCustomAllowed
+            defaultViewStyle = form.cleaned_data['defaultViewStyle'] if linuxCustomAllowed else 'adaptive'
+            removeSetupServerTip = form.cleaned_data['removeSetupServerTip'] and platform in desktop_platforms and linuxCustomAllowed
+            silentInstallOnDoubleClick = form.cleaned_data['silentInstallOnDoubleClick'] and platform in windows_platforms
+            copyIdPasswordButton = form.cleaned_data['copyIdPasswordButton'] and platform in flutter_desktop_platforms and linuxCustomAllowed
+            manualTemporaryPassword = form.cleaned_data['manualTemporaryPassword'] and platform in flutter_desktop_platforms and linuxCustomAllowed
+            showStartOnBootCheckbox = form.cleaned_data['showStartOnBootCheckbox'] and platform == 'windows'
+            incomingCompactMode = (
+                form.cleaned_data['incomingCompactMode']
+                and direction == 'incoming'
+                and platform in flutter_desktop_platforms
+                and linuxCustomAllowed
+            )
+            incomingContentWidth = form.cleaned_data.get('incomingContentWidth') or 220
+            incomingContentHeight = form.cleaned_data.get('incomingContentHeight') or 300
             appname = form.cleaned_data['appname']
             if not appname:
-                appname = "rustdesk"
+                appname = default_appname
             filename = form.cleaned_data['exename']
             compname = form.cleaned_data['compname']
             if not compname:
-                compname = "Purslane Ltd"
+                compname = default_compname
             androidappid = form.cleaned_data['androidappid']
             if not androidappid:
                 androidappid = "com.carriez.flutter_hbb"
@@ -93,7 +119,9 @@ def generator_view(request):
             permissionsType = form.cleaned_data['permissionsType']
             enableKeyboard = form.cleaned_data['enableKeyboard']
             enableClipboard = form.cleaned_data['enableClipboard']
+            enableFileCopyPaste = form.cleaned_data['enableFileCopyPaste']
             enableFileTransfer = form.cleaned_data['enableFileTransfer']
+            forceDisableFileTransfer = form.cleaned_data['forceDisableFileTransfer'] and linuxCustomAllowed
             enableAudio = form.cleaned_data['enableAudio']
             enableTCP = form.cleaned_data['enableTCP']
             enableRemoteRestart = form.cleaned_data['enableRemoteRestart']
@@ -113,7 +141,17 @@ def generator_view(request):
             else:
                 filename = "rustdesk"
             if not all(char.isascii() for char in appname):
-                appname = "rustdesk"
+                appname = default_appname
+            if not linuxCustomAllowed:
+                server = default_server
+                key = default_key
+                apiServer = f"http://{default_server}:21114"
+                urlLink = default_url_link
+                downloadLink = default_download_link
+                direction = "both"
+                appname = default_appname
+                filename = default_appname
+                compname = default_compname
             myuuid = str(uuid.uuid4())
             protocol = _settings.PROTOCOL
             host = request.get_host()
@@ -148,15 +186,27 @@ def generator_view(request):
                 privacylink_url = "false"
                 privacylink_uuid = "false"
                 privacylink_file = "false"
+            if not linuxCustomAllowed:
+                iconlink_url = "false"
+                iconlink_uuid = "false"
+                iconlink_file = "false"
+                logolink_url = "false"
+                logolink_uuid = "false"
+                logolink_file = "false"
+                privacylink_url = "false"
+                privacylink_uuid = "false"
+                privacylink_file = "false"
 
             ###create the custom.txt json here and send in as inputs below
             decodedCustom = {}
-            if direction != "Both":
+            if direction != "both":
                 decodedCustom['conn-type'] = direction
             if installation == "installationN":
                 decodedCustom['disable-installation'] = 'Y'
             if settings == "settingsN":
                 decodedCustom['disable-settings'] = 'Y'
+            if hideNetworkSetting:
+                decodedCustom['hide-network-setting'] = 'Y'
             if appname.upper() != "RUSTDESK":
                 decodedCustom['app-name'] = appname
             decodedCustom['custom-rendezvous-server'] = server
@@ -165,6 +215,8 @@ def generator_view(request):
             decodedCustom['key'] = key
             decodedCustom['override-settings'] = {}
             decodedCustom['default-settings'] = {}
+            if platform in desktop_platforms and linuxCustomAllowed:
+                decodedCustom['default-settings']['view-style'] = defaultViewStyle
             if permPass != "":
                 decodedCustom['password'] = permPass
             if theme != "system":
@@ -182,11 +234,13 @@ def generator_view(request):
             #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
             decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
             effectiveApproveMode = 'password' if hidecm else passApproveMode
+            effectiveEnableFileTransfer = enableFileTransfer and not forceDisableFileTransfer
             if permissionsDorO == "default":
                 decodedCustom['default-settings']['access-mode'] = permissionsType
                 decodedCustom['default-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
                 decodedCustom['default-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-                decodedCustom['default-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
+                decodedCustom['default-settings']['enable-file-copy-paste'] = 'Y' if enableFileCopyPaste else 'N'
+                decodedCustom['default-settings']['enable-file-transfer'] = 'Y' if effectiveEnableFileTransfer else 'N'
                 decodedCustom['default-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
                 decodedCustom['default-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
                 decodedCustom['default-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
@@ -205,7 +259,8 @@ def generator_view(request):
                 decodedCustom['override-settings']['access-mode'] = permissionsType
                 decodedCustom['override-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
                 decodedCustom['override-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-                decodedCustom['override-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
+                decodedCustom['override-settings']['enable-file-copy-paste'] = 'Y' if enableFileCopyPaste else 'N'
+                decodedCustom['override-settings']['enable-file-transfer'] = 'Y' if effectiveEnableFileTransfer else 'N'
                 decodedCustom['override-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
                 decodedCustom['override-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
                 decodedCustom['override-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
@@ -221,13 +276,17 @@ def generator_view(request):
                 decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
                 decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
 
-            for line in defaultManual.splitlines():
-                k, value = line.split('=')
-                decodedCustom['default-settings'][k.strip()] = value.strip()
+            if linuxCustomAllowed:
+                for line in defaultManual.splitlines():
+                    k, value = line.split('=')
+                    decodedCustom['default-settings'][k.strip()] = value.strip()
 
-            for line in overrideManual.splitlines():
-                k, value = line.split('=')
-                decodedCustom['override-settings'][k.strip()] = value.strip()
+                for line in overrideManual.splitlines():
+                    k, value = line.split('=')
+                    decodedCustom['override-settings'][k.strip()] = value.strip()
+
+            if not linuxCustomAllowed:
+                decodedCustom = {}
             
             decodedCustomJson = json.dumps(decodedCustom)
 
@@ -292,6 +351,18 @@ def generator_view(request):
                 "delayFix": 'true' if delayFix else 'false',
                 "beijingCustom": 'true' if beijingCustom else 'false',
                 "rdgen":'true',
+                "direction": direction,
+                "hideNetworkSetting": 'true' if hideNetworkSetting else 'false',
+                "defaultViewStyle": defaultViewStyle,
+                "removeSetupServerTip": 'true' if removeSetupServerTip else 'false',
+                "silentInstallOnDoubleClick": 'true' if silentInstallOnDoubleClick else 'false',
+                "copyIdPasswordButton": 'true' if copyIdPasswordButton else 'false',
+                "manualTemporaryPassword": 'true' if manualTemporaryPassword else 'false',
+                "showStartOnBootCheckbox": 'true' if showStartOnBootCheckbox else 'false',
+                "incomingCompactMode": 'true' if incomingCompactMode else 'false',
+                "incomingContentWidth": str(incomingContentWidth),
+                "incomingContentHeight": str(incomingContentHeight),
+                "forceDisableFileTransfer": 'true' if forceDisableFileTransfer else 'false',
                 "cycleMonitor": 'true' if cycleMonitor else 'false',
                 "xOffline": 'true' if xOffline else 'false',
                 "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',

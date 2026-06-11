@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: ''
+        default: '1.4.7'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -205,10 +205,12 @@ jobs:
           sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
           sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
           
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py
           python allowCustom.py
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff
-          git apply removeSetupServerTip.diff
+          if [ "${{ env.removeSetupServerTip }}" = "true" ]; then
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_setup_server_tip.py
+            python remove_setup_server_tip.py
+          fi
             
           # Update pubspec.yaml with proper YAML formatting
           cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
@@ -248,7 +250,10 @@ jobs:
         continue-on-error: true
         run: |
             cd $(dirname $(dirname $(which flutter)))
-            [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+            if [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]]; then
+              curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff -o flutter_3.24.4_dropdown_menu_enableFilter.diff
+              git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+            fi
       
       - name: Workaround for flutter issue
         shell: bash
@@ -426,22 +431,22 @@ jobs:
         continue-on-error: true
         if: env.cycleMonitor == 'true'
         run: |
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff
-          git apply cycle_monitor.diff
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py
+          python cycle_monitor.py
   
       - name: use X for offline display instead of orange circle
         continue-on-error: true
         if: env.xOffline == 'true'
         run: |
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
-          git apply xoffline.diff
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py
+          python xoffline.py
 
       - name: hide-cm
         continue-on-error: true
         if: env.hidecm == 'true'
         run: |
-          wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
-          git apply hidecm.diff
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py
+          python hidecm.py
 
       - name: hide settings menu
         continue-on-error: true
@@ -450,12 +455,40 @@ jobs:
           wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff
           git apply hide_settings_menu.diff
 
+      - name: hide network setting
+        if: env.hideNetworkSetting == 'true'
+        run: |
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py
+          python hide_network_setting.py
+
+      - name: runtime desktop features
+        if: env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true'
+        run: |
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/runtime_features.py
+          args=()
+          if [ "${{ env.copyIdPasswordButton }}" = "true" ]; then args+=(--copy-id-password); fi
+          if [ "${{ env.manualTemporaryPassword }}" = "true" ]; then args+=(--manual-temporary-password); fi
+          if [ "${{ env.showStartOnBootCheckbox }}" = "true" ]; then args+=(--show-start-on-boot); fi
+          python runtime_features.py "${args[@]}"
+
       - name: removeNewVersionNotif
         continue-on-error: true
         if: env.removeNewVersionNotif == 'true'
         run: | 
-          sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
-          sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
+          python remove_new_version_notif.py
+
+      - name: force disable file transfer
+        if: env.forceDisableFileTransfer == 'true'
+        run: |
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py
+          python force_disable_file_transfer.py
+
+      - name: incoming-only compact layout
+        if: env.incomingCompactMode == 'true' && env.direction == 'incoming'
+        run: |
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/incoming_compact.py
+          python incoming_compact.py --width "${{ env.incomingContentWidth }}" --height "${{ env.incomingContentHeight }}"
 
       - name: Restore bridge files
         uses: actions/download-artifact@master

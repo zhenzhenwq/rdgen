@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: ''
+        default: '1.4.7'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -257,11 +257,13 @@ jobs:
           max_attempts: 3
           shell: pwsh
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py -OutFile allowCustom.py
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py -OutFile allowCustom.py
             python allowCustom.py
             # Remove Setup Server Tip
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff -OutFile removeSetupServerTip.diff
-            git apply removeSetupServerTip.diff  
+            if ("${{ env.removeSetupServerTip }}" -eq "true") {
+              Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_setup_server_tip.py -OutFile remove_setup_server_tip.py
+              python remove_setup_server_tip.py
+            }
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}
@@ -314,8 +316,8 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff -OutFile cycle_monitor.diff
-            git apply cycle_monitor.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py -OutFile cycle_monitor.py
+            python cycle_monitor.py
 
       - name: use X for offline display instead of orange circle
         if: env.xOffline == 'true'
@@ -326,16 +328,16 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff -OutFile xoffline.diff
-            git apply xoffline.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py -OutFile xoffline.py
+            python xoffline.py
 
       - name: removeNewVersionNotif
         continue-on-error: true
         if: env.removeNewVersionNotif == 'true'
         shell: bash
         run: | 
-          sed -i -e 's|updateUrl.isNotEmpty|false|' ./flutter/lib/desktop/pages/desktop_home_page.dart
-          sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
+          python remove_new_version_notif.py
 
       - name: hide-cm
         if: env.hidecm == 'true'
@@ -346,8 +348,8 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff -OutFile hidecm.diff
-            git apply hidecm.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py -OutFile hidecm.py
+            python hidecm.py
 
       - name: hide settings menu
         if: env.hideSettingsMenu == 'true'
@@ -359,6 +361,65 @@ jobs:
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff -OutFile hide_settings_menu.diff
             git apply hide_settings_menu.diff
+
+      - name: hide network setting
+        if: env.hideNetworkSetting == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py -OutFile hide_network_setting.py
+            python hide_network_setting.py
+
+      - name: runtime desktop features
+        if: env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/runtime_features.py -OutFile runtime_features.py
+            $featureArgs = @()
+            if ("${{ env.copyIdPasswordButton }}" -eq "true") { $featureArgs += "--copy-id-password" }
+            if ("${{ env.manualTemporaryPassword }}" -eq "true") { $featureArgs += "--manual-temporary-password" }
+            if ("${{ env.showStartOnBootCheckbox }}" -eq "true") { $featureArgs += "--show-start-on-boot" }
+            python runtime_features.py @featureArgs
+
+      - name: force disable file transfer
+        if: env.forceDisableFileTransfer == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py -OutFile force_disable_file_transfer.py
+            python force_disable_file_transfer.py
+
+      - name: silent install on double click
+        if: env.silentInstallOnDoubleClick == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/silent_install.py -OutFile silent_install.py
+            python silent_install.py
+
+      - name: incoming-only compact layout
+        if: env.incomingCompactMode == 'true' && env.direction == 'incoming'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/incoming_compact.py -OutFile incoming_compact.py
+            python incoming_compact.py --width "${{ env.incomingContentWidth }}" --height "${{ env.incomingContentHeight }}"
 
       - name: replace flutter icons
         if: ${{ env.iconlink_url != 'false' }}

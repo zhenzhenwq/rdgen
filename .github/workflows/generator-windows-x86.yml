@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: ''
+        default: '1.4.7'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -206,7 +206,9 @@ jobs:
           sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
           sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
           sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
-          sed -i -e 's|<span>{translate("Ready")}, <span .link #setup-server>{translate("setup_server_tip")}</span></span>|translate("Ready")|' ./src/ui/index.tis
+          if [ "${{ env.removeSetupServerTip }}" = "true" ]; then
+            sed -i -e 's|<span>{translate("Ready")}, <span .link #setup-server>{translate("setup_server_tip")}</span></span>|translate("Ready")|' ./src/ui/index.tis
+          fi
 
       - name: allow custom.txt
         uses: nick-fields/retry@v3
@@ -216,8 +218,8 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.diff -OutFile allowCustom.diff
-            git apply allowCustom.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py -OutFile allowCustom.py
+            python allowCustom.py
 
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@master
@@ -314,16 +316,16 @@ jobs:
         if: env.removeNewVersionNotif == 'true'
         shell: bash
         run: | 
-          sed -i -e 's|{software_update_url ? <UpdateMe /> : ""}||' ./src/ui/index.tis
-          sed -i '/let (request, url) =/,/Ok(())/{/Ok(())/!d}' ./src/common.rs
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py -o remove_new_version_notif.py
+          python remove_new_version_notif.py
 
       - name: hide-cm
         continue-on-error: true
         if: env.hidecm == 'true'
         shell: bash
         run: |
-          curl -L https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff -o hidecm.diff
-          git apply hidecm.diff
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py -o hidecm.py
+          python hidecm.py
 
       - name: hide settings menu
         continue-on-error: true
@@ -332,6 +334,28 @@ jobs:
         run: |
           curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff -o hide_settings_menu.diff
           git apply hide_settings_menu.diff
+
+      - name: hide network setting
+        continue-on-error: true
+        if: env.hideNetworkSetting == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py -o hide_network_setting.py
+          python hide_network_setting.py
+
+      - name: force disable file transfer
+        if: env.forceDisableFileTransfer == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py -o force_disable_file_transfer.py
+          python force_disable_file_transfer.py
+
+      - name: silent install on double click
+        if: env.silentInstallOnDoubleClick == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/silent_install.py -o silent_install.py
+          python silent_install.py
 
       - name: Build rustdesk
         id: build

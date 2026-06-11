@@ -6,12 +6,12 @@ class GenerateForm(forms.Form):
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64 位'),('windows-x86','Windows 32 位'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
     version = forms.ChoiceField(
-        choices=[('master','nightly'),('1.4.6','1.4.6'),('1.4.5','1.4.5'),('1.4.4','1.4.4'),('1.4.3','1.4.3'),('1.4.2','1.4.2'),('1.4.1','1.4.1'),('1.4.0','1.4.0'),('1.3.9','1.3.9'),('1.3.8','1.3.8'),('1.3.7','1.3.7'),('1.3.6','1.3.6'),('1.3.5','1.3.5'),('1.3.4','1.3.4'),('1.3.3','1.3.3')],
-        initial='1.4.6',
+        choices=[('master','nightly'),('1.4.7','1.4.7'),('1.4.6','1.4.6'),('1.4.5','1.4.5'),('1.4.4','1.4.4'),('1.4.3','1.4.3'),('1.4.2','1.4.2'),('1.4.1','1.4.1'),('1.4.0','1.4.0'),('1.3.9','1.3.9'),('1.3.8','1.3.8'),('1.3.7','1.3.7'),('1.3.6','1.3.6'),('1.3.5','1.3.5'),('1.3.4','1.3.4'),('1.3.3','1.3.3')],
+        initial='1.4.7',
         help_text="nightly 是开发版，功能更新但稳定性可能较低"
     )
     delayFix = forms.BooleanField(initial=True, required=False)
-    beijingCustom = forms.BooleanField(label="北京定制", initial=False, required=False)
+    beijingCustom = forms.BooleanField(label="北京 Linux 定制", initial=False, required=False)
 
     #General
     exename = forms.CharField(label="配置名称", required=True)
@@ -29,6 +29,33 @@ class GenerateForm(forms.Form):
         ('settingsY', '允许设置'),
         ('settingsN', '禁用设置')
     ], initial='settingsY')
+    hideNetworkSetting = forms.BooleanField(initial=False, required=False)
+    defaultViewStyle = forms.ChoiceField(label="默认显示方式", choices=[
+        ('adaptive', '适应窗口'),
+        ('original', '原始尺寸')
+    ], initial='adaptive')
+    removeSetupServerTip = forms.BooleanField(initial=True, required=False)
+    silentInstallOnDoubleClick = forms.BooleanField(initial=False, required=False)
+    copyIdPasswordButton = forms.BooleanField(initial=False, required=False)
+    manualTemporaryPassword = forms.BooleanField(initial=False, required=False)
+    showStartOnBootCheckbox = forms.BooleanField(initial=False, required=False)
+    incomingCompactMode = forms.BooleanField(initial=False, required=False)
+    incomingContentWidth = forms.IntegerField(
+        label="仅被控内容宽度",
+        initial=220,
+        min_value=180,
+        max_value=640,
+        required=False,
+        widget=forms.NumberInput(attrs={'min': 180, 'max': 640, 'step': 1})
+    )
+    incomingContentHeight = forms.IntegerField(
+        label="仅被控内容高度",
+        initial=300,
+        min_value=220,
+        max_value=840,
+        required=False,
+        widget=forms.NumberInput(attrs={'min': 220, 'max': 840, 'step': 1})
+    )
     androidappid = forms.CharField(label="自定义 Android App ID", required=False)
 
     #Custom Server
@@ -67,13 +94,15 @@ class GenerateForm(forms.Form):
     permissionsType = forms.ChoiceField(choices=[('custom', '自定义'),('full', '完全访问'),('view','仅屏幕共享')], initial='custom')
     enableKeyboard =  forms.BooleanField(initial=True, required=False)
     enableClipboard = forms.BooleanField(initial=True, required=False)
+    enableFileCopyPaste = forms.BooleanField(initial=True, required=False)
     enableFileTransfer = forms.BooleanField(initial=True, required=False)
+    forceDisableFileTransfer = forms.BooleanField(initial=False, required=False)
     enableAudio = forms.BooleanField(initial=True, required=False)
     enableTCP = forms.BooleanField(initial=True, required=False)
     enableRemoteRestart = forms.BooleanField(initial=True, required=False)
     enableRecording = forms.BooleanField(initial=True, required=False)
     enableBlockingInput = forms.BooleanField(initial=True, required=False)
-    enableRemoteModi = forms.BooleanField(initial=False, required=False)
+    enableRemoteModi = forms.BooleanField(initial=True, required=False)
     hidecm = forms.BooleanField(initial=False, required=False)
     enablePrinter = forms.BooleanField(initial=True, required=False)
     enableCamera = forms.BooleanField(initial=True, required=False)
