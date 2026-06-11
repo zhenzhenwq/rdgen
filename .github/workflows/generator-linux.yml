@@ -419,6 +419,17 @@ jobs:
             if [ "${{ env.manualTemporaryPassword }}" = "true" ]; then args+=(--manual-temporary-password); fi
             if [ "${{ env.showStartOnBootCheckbox }}" = "true" ]; then args+=(--show-start-on-boot); fi
             python runtime_features.py "${args[@]}"
+
+      - name: remove recent sessions
+        if: env.beijingCustom == 'true' && env.removeRecentSessions == 'true'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_recent_sessions.py
+            python remove_recent_sessions.py
         
       - name: removeNewVersionNotif
         continue-on-error: true

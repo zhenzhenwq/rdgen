@@ -119,6 +119,7 @@ class GenerateForm(forms.Form):
     xOffline = forms.BooleanField(initial=False, required=False)
     removeNewVersionNotif = forms.BooleanField(initial=False, required=False)
     hideSettingsMenu = forms.BooleanField(initial=False, required=False)
+    removeRecentSessions = forms.BooleanField(initial=False, required=False)
 
     def clean_iconfile(self):
         print("checking icon")

@@ -61,6 +61,7 @@ def generator_view(request):
             hidecm = form.cleaned_data['hidecm'] and linuxCustomAllowed
             removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif'] and linuxCustomAllowed
             hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and linuxCustomAllowed
+            removeRecentSessions = form.cleaned_data['removeRecentSessions'] and platform in desktop_platforms and linuxCustomAllowed
             server = form.cleaned_data['serverIP']
             key = form.cleaned_data['key']
             apiServer = form.cleaned_data['apiServer']
@@ -367,6 +368,7 @@ def generator_view(request):
                 "xOffline": 'true' if xOffline else 'false',
                 "removeNewVersionNotif": 'true' if removeNewVersionNotif else 'false',
                 "hideSettingsMenu": 'true' if hideSettingsMenu else 'false',
+                "removeRecentSessions": 'true' if removeRecentSessions else 'false',
                 "compname": compname,
                 "androidappid":androidappid,
                 "filename":filename

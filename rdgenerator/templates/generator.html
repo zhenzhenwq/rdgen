@@ -639,6 +639,7 @@
                     <label id="xOfflineOption" for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} 地址簿离线设备显示 X 标记</label><br>
                     <label id="removeNewVersionNotifOption" for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} 移除新版本通知</label><br>
                     <label id="hideSettingsMenuOption" for="{{ form.hideSettingsMenu.id_for_label }}">{{ form.hideSettingsMenu }} 隐藏主界面右上角三点菜单</label><br>
+                    <label id="removeRecentSessionsOption" for="{{ form.removeRecentSessions.id_for_label }}">{{ form.removeRecentSessions }} 移除最近访问记录</label><br>
                     <label id="forceDisableFileTransferOption" for="{{ form.forceDisableFileTransfer.id_for_label }}">{{ form.forceDisableFileTransfer }} 从源码强制禁用文件传输</label><br>
             </div>
 
@@ -678,6 +679,7 @@
             'hideSettingsMenuOption',
             'forceDisableFileTransferOption',
         ].map(id => document.getElementById(id));
+        const removeRecentSessionsOption = document.getElementById('removeRecentSessionsOption');
         const copyIdPasswordButtonOption = document.getElementById('copyIdPasswordButtonOption');
         const manualTemporaryPasswordOption = document.getElementById('manualTemporaryPasswordOption');
         const startOnBootOption = document.getElementById('startOnBootOption');
@@ -720,6 +722,7 @@
             });
             copyIdPasswordButtonOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
             manualTemporaryPasswordOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
+            removeRecentSessionsOption.hidden = !(isDesktop && linuxCustomAllowed);
             startOnBootOption.hidden = platformSelect.value !== 'windows';
             incomingCompactWrapper.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed);
             incomingCompactDetails.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed && incomingCompactToggle.checked);

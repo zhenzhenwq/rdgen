@@ -343,6 +343,13 @@ jobs:
           curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py -o hide_network_setting.py
           python hide_network_setting.py
 
+      - name: remove recent sessions
+        if: env.removeRecentSessions == 'true'
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_recent_sessions.py -o remove_recent_sessions.py
+          python remove_recent_sessions.py
+
       - name: force disable file transfer
         if: env.forceDisableFileTransfer == 'true'
         shell: bash

@@ -86,6 +86,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "xOffline": "on",
             "removeNewVersionNotif": "on",
             "hideSettingsMenu": "on",
+            "removeRecentSessions": "on",
         }
         return data
 
@@ -134,6 +135,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "xOffline",
             "removeNewVersionNotif",
             "hideSettingsMenu",
+            "removeRecentSessions",
         ]
         for key in expected_true_flags:
             self.assertEqual(inputs_raw[key], "true", key)
@@ -176,6 +178,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["manualTemporaryPassword"], "false")
         self.assertEqual(inputs_raw["showStartOnBootCheckbox"], "false")
         self.assertEqual(inputs_raw["incomingCompactMode"], "false")
+        self.assertEqual(inputs_raw["removeRecentSessions"], "true")
         self.assertEqual(inputs_raw["beijingCustom"], "false")
 
     def test_android_generation_suppresses_desktop_only_flags(self):
@@ -191,6 +194,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "manualTemporaryPassword",
             "showStartOnBootCheckbox",
             "incomingCompactMode",
+            "removeRecentSessions",
             "beijingCustom",
         ]
         for key in expected_false_flags:
@@ -211,6 +215,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["manualTemporaryPassword"], "true")
         self.assertEqual(inputs_raw["incomingCompactMode"], "true")
         self.assertEqual(inputs_raw["forceDisableFileTransfer"], "true")
+        self.assertEqual(inputs_raw["removeRecentSessions"], "true")
         self.assertEqual(custom_config["hide-network-setting"], "Y")
         self.assertEqual(custom_config["default-settings"]["view-style"], "adaptive")
         self.assertEqual(custom_config["default-settings"]["enable-file-transfer"], "N")
@@ -234,6 +239,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "xOffline",
             "removeNewVersionNotif",
             "hideSettingsMenu",
+            "removeRecentSessions",
         ]
         for key in expected_false_flags:
             self.assertEqual(inputs_raw[key], "false", key)
