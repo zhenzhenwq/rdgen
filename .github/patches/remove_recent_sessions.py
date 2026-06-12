@@ -405,7 +405,7 @@ def patch_recent_writes() -> None:
     }
 """,
         """    pub fn set_direct_failure(&mut self, value: i32) {
-        self.direct_failures = value;
+        self.config.direct_failures = value;
     }
 """,
         "direct-failure recent-session store",
