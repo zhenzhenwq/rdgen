@@ -55,7 +55,97 @@ def patch_peer_tab_model() -> None:
     !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
   ]);
 """
-    write_text(path, replace_once(text, old, new, "recent tab visibility"))
+    text = replace_once(text, old, new, "recent tab visibility")
+    text = replace_once(
+        text,
+        """  setCurrentTab(int index) {
+    if (_currentTab != index) {
+      _currentTab = index;
+      notifyListeners();
+    }
+  }
+""",
+        """  setCurrentTab(int index) {
+    if (index < 0 ||
+        index >= maxTabCount ||
+        !visibleEnabledOrderedIndexs.contains(index)) {
+      _trySetCurrentTabToFirstVisibleEnabled();
+      return;
+    }
+    if (_currentTab != index) {
+      _currentTab = index;
+      notifyListeners();
+    }
+  }
+""",
+        "disabled recent tab selection guard",
+    )
+    write_text(path, text)
+
+
+def patch_peer_tab_page() -> None:
+    path = ROOT / "flutter/lib/common/widgets/peer_tab_page.dart"
+    text = read_text(path)
+    text = replace_once(
+        text,
+        """    _TabEntry(RecentPeersView(
+      menuPadding: _menuPadding(),
+    )),
+""",
+        """    _TabEntry(const SizedBox.shrink()),
+""",
+        "recent tab widget entry",
+    )
+    text = replace_once(
+        text,
+        """  Future<void> handleTabSelection(int tabIndex) async {
+    if (tabIndex < entries.length) {
+      if (tabIndex != gFFI.peerTabModel.currentTab) {
+        gFFI.peerTabModel.setCurrentTabCachedPeers([]);
+      }
+      gFFI.peerTabModel.setCurrentTab(tabIndex);
+      entries[tabIndex].load?.call(hint: false);
+    }
+  }
+""",
+        """  Future<void> handleTabSelection(int tabIndex) async {
+    if (tabIndex < 0 ||
+        tabIndex >= entries.length ||
+        !gFFI.peerTabModel.visibleEnabledOrderedIndexs.contains(tabIndex)) {
+      return;
+    }
+    if (tabIndex != gFFI.peerTabModel.currentTab) {
+      gFFI.peerTabModel.setCurrentTabCachedPeers([]);
+    }
+    gFFI.peerTabModel.setCurrentTab(tabIndex);
+    entries[tabIndex].load?.call(hint: false);
+  }
+""",
+        "disabled recent tab tap guard",
+    )
+    text = replace_once(
+        text,
+        """        child = entries[0].widget;
+""",
+        """        child = entries[model.visibleEnabledOrderedIndexs[0]].widget;
+""",
+        "recent tab fallback view",
+    )
+    text = replace_once(
+        text,
+        """              case 0:
+                for (var p in peers) {
+                  await bind.mainRemovePeer(id: p.id);
+                }
+                bind.mainLoadRecentPeers();
+                break;
+""",
+        """              case 0:
+                break;
+""",
+        "recent tab delete action",
+    )
+    write_text(path, text)
 
 
 def patch_flutter_bridge() -> None:
@@ -183,6 +273,30 @@ def patch_flutter_recent_callers() -> None:
     )
     write_text(path, text)
 
+    path = ROOT / "flutter/lib/common/widgets/peer_card.dart"
+    text = read_text(path)
+    text = replace_once(
+        text,
+        """            case PeerTabIndex.recent:
+              await bind.mainRemovePeer(id: id);
+              bind.mainLoadRecentPeers();
+              break;
+""",
+        """            case PeerTabIndex.recent:
+              break;
+""",
+        "recent peer card remove action",
+    )
+    text = replace_once(
+        text,
+        """  void _update() => bind.mainLoadRecentPeers();
+""",
+        """  void _update() {}
+""",
+        "recent peer card refresh",
+    )
+    write_text(path, text)
+
 
 def patch_address_book_recent_sync() -> None:
     path = ROOT / "flutter/lib/models/ab_model.dart"
@@ -307,6 +421,16 @@ def patch_recent_writes() -> None:
     )
     text = replace_once(
         text,
+        """        // Save recent peers, then push event to flutter. So flutter can refresh peer page.
+        self.lc.write().unwrap().handle_peer_info(&pi);
+""",
+        """        // Keep peer info in memory only; do not create or refresh recent-session records.
+        self.lc.write().unwrap().handle_peer_info(&pi);
+""",
+        "recent peer save comment",
+    )
+    text = replace_once(
+        text,
         """        #[cfg(windows)]
         {
             let mut path = std::env::temp_dir();
@@ -396,6 +520,7 @@ def patch_legacy_ui() -> None:
 
 def main() -> None:
     patch_peer_tab_model()
+    patch_peer_tab_page()
     patch_flutter_bridge()
     patch_flutter_recent_callers()
     patch_address_book_recent_sync()
