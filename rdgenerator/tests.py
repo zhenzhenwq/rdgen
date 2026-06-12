@@ -126,6 +126,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "hideNetworkSetting",
             "removeSetupServerTip",
             "silentInstallOnDoubleClick",
+            "hidecm",
             "copyIdPasswordButton",
             "manualTemporaryPassword",
             "showStartOnBootCheckbox",
@@ -196,6 +197,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "incomingCompactMode",
             "removeRecentSessions",
             "beijingCustom",
+            "hidecm",
         ]
         for key in expected_false_flags:
             self.assertEqual(inputs_raw[key], "false", key)
@@ -211,6 +213,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["beijingCustom"], "true")
         self.assertEqual(inputs_raw["hideNetworkSetting"], "true")
         self.assertEqual(inputs_raw["removeSetupServerTip"], "true")
+        self.assertEqual(inputs_raw["hidecm"], "true")
         self.assertEqual(inputs_raw["copyIdPasswordButton"], "true")
         self.assertEqual(inputs_raw["manualTemporaryPassword"], "true")
         self.assertEqual(inputs_raw["incomingCompactMode"], "true")
@@ -231,6 +234,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "delayFix",
             "hideNetworkSetting",
             "removeSetupServerTip",
+            "hidecm",
             "copyIdPasswordButton",
             "manualTemporaryPassword",
             "incomingCompactMode",

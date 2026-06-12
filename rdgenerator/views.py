@@ -58,7 +58,7 @@ def generator_view(request):
             delayFix = form.cleaned_data['delayFix'] and linuxCustomAllowed
             cycleMonitor = form.cleaned_data['cycleMonitor'] and linuxCustomAllowed
             xOffline = form.cleaned_data['xOffline'] and linuxCustomAllowed
-            hidecm = form.cleaned_data['hidecm'] and linuxCustomAllowed
+            hidecm = form.cleaned_data['hidecm'] and platform in desktop_platforms and linuxCustomAllowed
             removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif'] and linuxCustomAllowed
             hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and linuxCustomAllowed
             removeRecentSessions = form.cleaned_data['removeRecentSessions'] and platform in desktop_platforms and linuxCustomAllowed
@@ -357,6 +357,7 @@ def generator_view(request):
                 "defaultViewStyle": defaultViewStyle,
                 "removeSetupServerTip": 'true' if removeSetupServerTip else 'false',
                 "silentInstallOnDoubleClick": 'true' if silentInstallOnDoubleClick else 'false',
+                "hidecm": 'true' if hidecm else 'false',
                 "copyIdPasswordButton": 'true' if copyIdPasswordButton else 'false',
                 "manualTemporaryPassword": 'true' if manualTemporaryPassword else 'false',
                 "showStartOnBootCheckbox": 'true' if showStartOnBootCheckbox else 'false',
