@@ -377,6 +377,33 @@ def patch_recent_writes() -> None:
     text = read_text(path)
     text = replace_once(
         text,
+        """    pub fn load_config(&self) -> PeerConfig {
+        debug_assert!(self.id.len() > 0);
+        PeerConfig::load(&self.id)
+    }
+""",
+        """    pub fn load_config(&self) -> PeerConfig {
+        debug_assert!(self.id.len() > 0);
+        self.config.clone()
+    }
+""",
+        "peer config disk load",
+    )
+    text = replace_once(
+        text,
+        """    pub fn save_config(&mut self, config: PeerConfig) {
+        config.store(&self.id);
+        self.config = config;
+    }
+""",
+        """    pub fn save_config(&mut self, config: PeerConfig) {
+        self.config = config;
+    }
+""",
+        "peer config disk store",
+    )
+    text = replace_once(
+        text,
         """                log::debug!("remember password of {}", self.id);
 """,
         "",
@@ -409,6 +436,15 @@ def patch_recent_writes() -> None:
     }
 """,
         "direct-failure recent-session store",
+    )
+    text = replace_once(
+        text,
+        """            self.config.store(&self.id);
+            return None;
+""",
+        """            return None;
+""",
+        "direct peer option store",
     )
     text = replace_once(
         text,
