@@ -398,6 +398,20 @@ def patch_recent_writes() -> None:
     )
     text = replace_once(
         text,
+        """    pub fn set_direct_failure(&mut self, value: i32) {
+        let mut config = self.load_config();
+        config.direct_failures = value;
+        self.save_config(config);
+    }
+""",
+        """    pub fn set_direct_failure(&mut self, value: i32) {
+        self.direct_failures = value;
+    }
+""",
+        "direct-failure recent-session store",
+    )
+    text = replace_once(
+        text,
         """        // no matter if change, for update file time
         self.save_config(config);
         self.supported_encoding = pi.encoding.clone().unwrap_or_default();

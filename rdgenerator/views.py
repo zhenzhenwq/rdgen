@@ -277,6 +277,11 @@ def generator_view(request):
                 decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
                 decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
 
+            if hidecm:
+                decodedCustom['override-settings']['approve-mode'] = 'password'
+                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password'
+                decodedCustom['override-settings']['allow-hide-cm'] = 'Y'
+
             if linuxCustomAllowed:
                 for line in defaultManual.splitlines():
                     k, value = line.split('=')

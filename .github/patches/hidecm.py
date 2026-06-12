@@ -128,10 +128,32 @@ def patch_server_model() -> None:
     print("Enabled hide_cm state updates in ServerModel.")
 
 
+def patch_ipc_hide_cm_gate() -> None:
+    path = ROOT / "src/ipc.rs"
+    text = path.read_text(encoding="utf-8")
+    old = """                } else if name == "hide_cm" {
+                    value = if crate::hbbs_http::sync::is_pro() || crate::common::is_custom_client()
+                    {
+                        Some(hbb_common::password_security::hide_cm().to_string())
+                    } else {
+                        None
+                    };
+"""
+    new = """                } else if name == "hide_cm" {
+                    value = Some(hbb_common::password_security::hide_cm().to_string());
+"""
+    if new in text:
+        print("hide_cm IPC lookup already bypasses pro/custom-client gate.")
+        return
+    path.write_text(replace_once(text, old, new, "hide_cm IPC pro/custom-client gate"), encoding="utf-8")
+    print("Allowed hide_cm IPC lookup for default app-name clients.")
+
+
 def main() -> None:
     patch_settings_page()
     patch_main()
     patch_server_model()
+    patch_ipc_hide_cm_gate()
 
 
 if __name__ == "__main__":

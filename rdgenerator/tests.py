@@ -166,7 +166,11 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(default_settings["allow-remote-config-modification"], "Y")
         self.assertEqual(default_settings["direct-server"], "Y")
         self.assertEqual(default_settings["custom-option"], "Y")
-        self.assertEqual(custom_config["override-settings"]["override-option"], "N")
+        override_settings = custom_config["override-settings"]
+        self.assertEqual(override_settings["approve-mode"], "password")
+        self.assertEqual(override_settings["verification-method"], "use-permanent-password")
+        self.assertEqual(override_settings["allow-hide-cm"], "Y")
+        self.assertEqual(override_settings["override-option"], "N")
 
     def test_windows_x86_keeps_windows_options_but_skips_flutter_only_flags(self):
         _, inputs_raw, _ = self._post_and_read_inputs(
