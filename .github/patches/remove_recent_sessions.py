@@ -498,6 +498,59 @@ def patch_recent_writes() -> None:
     )
     write_text(path, text)
 
+    path = ROOT / "src/ui_interface.rs"
+    text = read_text(path)
+    text = replace_once(
+        text,
+        """pub fn forget_password(id: String) {
+    let mut c = PeerConfig::load(&id);
+    c.password.clear();
+    c.store(&id);
+}
+""",
+        """pub fn forget_password(id: String) {
+    let mut c = PeerConfig::load(&id);
+    c.password.clear();
+}
+""",
+        "forget password recent store",
+    )
+    text = replace_once(
+        text,
+        """#[cfg(feature = "flutter")]
+pub fn set_peer_flutter_option(id: String, name: String, value: String) {
+    let mut c = PeerConfig::load(&id);
+    if value.is_empty() {
+        c.ui_flutter.remove(&name);
+    } else {
+        c.ui_flutter.insert(name, value);
+    }
+    c.store(&id);
+}
+""",
+        """#[cfg(feature = "flutter")]
+pub fn set_peer_flutter_option(_id: String, _name: String, _value: String) {}
+""",
+        "peer flutter option recent store",
+    )
+    text = replace_once(
+        text,
+        """pub fn set_peer_option(id: String, name: String, value: String) {
+    let mut c = PeerConfig::load(&id);
+    if value.is_empty() {
+        c.options.remove(&name);
+    } else {
+        c.options.insert(name, value);
+    }
+    c.store(&id);
+}
+""",
+        """pub fn set_peer_option(_id: String, _name: String, _value: String) {}
+""",
+        "peer option recent store",
+    )
+    write_text(path, text)
+
 
 def patch_legacy_ui() -> None:
     path = ROOT / "src/ui.rs"
