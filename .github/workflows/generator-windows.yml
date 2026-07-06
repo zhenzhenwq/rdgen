@@ -361,12 +361,30 @@ jobs:
       - name: ui.rs icon
         if: ${{ env.iconlink_url != 'false' }}
         continue-on-error: true
+        timeout-minutes: 5
         shell: bash
         run: |
           cp ./src/ui.rs ./src/ui.rs.bak
-          b64=$(base64 -w0 < ./res/icon.png)
-          perl -0777 -pe "s|iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHL[A-Za-z0-9+/=]+|$b64|g" -i.bak ./src/ui.rs
-          b64=""
+          python - <<'PY'
+          import base64
+          import pathlib
+          import re
+
+          ui = pathlib.Path("./src/ui.rs")
+          icon = pathlib.Path("./res/128x128.png")
+          if not icon.exists():
+              icon = pathlib.Path("./res/icon.png")
+
+          b64 = base64.b64encode(icon.read_bytes()).decode("ascii")
+          text = ui.read_text(encoding="utf-8")
+          pattern = r"iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHL[A-Za-z0-9+/=]+"
+          updated, count = re.subn(pattern, b64, text)
+          if count:
+              ui.write_text(updated, encoding="utf-8")
+              print(f"Replaced embedded ui.rs icon {count} time(s) using {icon}")
+          else:
+              print("Default embedded ui.rs icon marker not found; leaving file unchanged")
+          PY
 
       - name: fix connection delay
         continue-on-error: true
