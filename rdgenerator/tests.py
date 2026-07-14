@@ -9,6 +9,8 @@ import pyzipper
 from django.conf import settings
 from django.test import TestCase, override_settings
 
+from .forms import GenerateForm
+
 
 @override_settings(
     GHUSER="test-owner",
@@ -30,7 +32,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def _feature_payload(self, platform="windows", direction="incoming"):
         data = {
             "platform": platform,
-            "version": "1.4.7",
+            "version": "1.4.9",
             "delayFix": "on",
             "beijingCustom": "on",
             "exename": "AllFeatures",
@@ -172,9 +174,22 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(override_settings["allow-hide-cm"], "Y")
         self.assertEqual(override_settings["override-option"], "N")
 
+    def test_company_name_is_sed_escaped_in_workflow_input(self):
+        data = self._feature_payload(platform="windows")
+        data["compname"] = "Research & Development"
+        _, inputs_raw, _ = self._post_and_read_inputs(data)
+        self.assertEqual(inputs_raw["compname"], r"Research \& Development")
+
     def test_windows_x86_keeps_windows_options_but_skips_flutter_only_flags(self):
+        data = self._feature_payload(platform="windows-x86", direction="incoming")
+        data["cycleMonitor"] = ""
+        data["xOffline"] = ""
+        data["copyIdPasswordButton"] = ""
+        data["manualTemporaryPassword"] = ""
+        data["showStartOnBootCheckbox"] = ""
+        data["incomingCompactMode"] = ""
         _, inputs_raw, _ = self._post_and_read_inputs(
-            self._feature_payload(platform="windows-x86", direction="incoming")
+            data
         )
 
         self.assertEqual(inputs_raw["hideNetworkSetting"], "true")
@@ -187,8 +202,10 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["beijingCustom"], "false")
 
     def test_android_generation_suppresses_desktop_only_flags(self):
+        data = self._feature_payload(platform="android", direction="incoming")
+        data["hideSettingsMenu"] = ""
         _, inputs_raw, custom_config = self._post_and_read_inputs(
-            self._feature_payload(platform="android", direction="incoming")
+            data
         )
 
         expected_false_flags = [
@@ -202,10 +219,12 @@ class GeneratorFeaturePayloadTests(TestCase):
             "removeRecentSessions",
             "beijingCustom",
             "hidecm",
+            "hideSettingsMenu",
         ]
         for key in expected_false_flags:
             self.assertEqual(inputs_raw[key], "false", key)
         self.assertEqual(inputs_raw["forceDisableFileTransfer"], "true")
+        self.assertEqual(inputs_raw["xOffline"], "true")
         self.assertNotIn("hide-network-setting", custom_config)
 
     def test_linux_generation_serializes_beijing_custom_when_checked(self):
@@ -260,4 +279,211 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["iconlink_url"], "false")
         self.assertEqual(inputs_raw["logolink_url"], "false")
         self.assertEqual(inputs_raw["privacylink_url"], "false")
-        self.assertEqual(custom_config, {})
+
+    def test_default_version_is_1_4_9(self):
+        self.assertEqual(GenerateForm().fields["version"].initial, "1.4.9")
+
+    def test_hide_connection_window_requires_permanent_password(self):
+        data = self._feature_payload()
+        data["permanentPassword"] = ""
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("permanentPassword", form.errors)
+
+    def test_manual_settings_allow_blank_lines_and_equals_in_value(self):
+        data = self._feature_payload()
+        data["hidecm"] = ""
+        data["defaultManual"] = "\ntoken=part=two\n"
+        data["overrideManual"] = ""
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_invalid_manual_setting_is_a_form_error(self):
+        data = self._feature_payload()
+        data["hidecm"] = ""
+        data["defaultManual"] = "missing-separator"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("defaultManual", form.errors)
+
+    def test_android_rejects_logo(self):
+        data = self._feature_payload(platform="android")
+        data["hidecm"] = ""
+        data["logobase64"] = "data:image/png;base64,AA=="
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("logofile", form.errors)
+
+    def test_privacy_image_is_windows_64_only(self):
+        data = self._feature_payload(platform="macos")
+        data["hidecm"] = ""
+        data["privacybase64"] = "data:image/png;base64,AA=="
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("privacyfile", form.errors)
+
+    def test_windows_x86_rejects_flutter_only_options(self):
+        data = self._feature_payload(platform="windows-x86")
+        data["hidecm"] = ""
+        data["cycleMonitor"] = "on"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("cycleMonitor", form.errors)
+
+    def test_android_rejects_desktop_settings_menu_option(self):
+        data = self._feature_payload(platform="android")
+        data["hidecm"] = ""
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("hideSettingsMenu", form.errors)
+
+    def test_version_gated_features_reject_unsupported_versions(self):
+        requirements = {
+            "incomingCompactMode": "1.4.1",
+            "hideNetworkSetting": "1.4.3",
+            "hideSettingsMenu": "1.4.3",
+            "forceDisableFileTransfer": "1.4.4",
+        }
+        gated_fields = list(requirements)
+        for field, version in requirements.items():
+            with self.subTest(field=field, version=version):
+                data = self._feature_payload()
+                for gated_field in gated_fields:
+                    data[gated_field] = ""
+                data["version"] = version
+                data[field] = "on"
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+    def test_master_allows_version_gated_features(self):
+        data = self._feature_payload()
+        data["version"] = "master"
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_compact_dimensions_are_optional_when_feature_is_disabled(self):
+        data = self._feature_payload()
+        data["incomingCompactMode"] = ""
+        data.pop("incomingContentWidth")
+        data.pop("incomingContentHeight")
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rejects_build_script_metacharacters(self):
+        data = self._feature_payload()
+        data["exename"] = "client;touch-pwned"
+        data["serverIP"] = "server.example.com'"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("exename", form.errors)
+        self.assertIn("serverIP", form.errors)
+
+    def test_rejects_nonportable_build_names(self):
+        invalid_names = (
+            ("exename", "CON"),
+            ("appname", "NUL.txt"),
+            ("appname", "Client?"),
+            ("appname", "Client."),
+            ("appname", "-Client"),
+        )
+        for field, value in invalid_names:
+            with self.subTest(field=field, value=value):
+                data = self._feature_payload()
+                data[field] = value
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+    def test_rejects_build_names_that_exceed_filesystem_limits(self):
+        invalid_names = (
+            ("exename", "a" * 65),
+            ("appname", "\U0001F600" * 51),
+        )
+        for field, value in invalid_names:
+            with self.subTest(field=field):
+                data = self._feature_payload()
+                data[field] = value
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+    def test_linux_package_name_requires_at_least_two_characters(self):
+        data = self._feature_payload(platform="linux")
+        data["exename"] = "A"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("exename", form.errors)
+
+    def test_beijing_linux_rejects_unverified_versions(self):
+        for version in ("1.4.6", "master"):
+            with self.subTest(version=version):
+                data = self._feature_payload(platform="linux")
+                data["version"] = version
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn("beijingCustom", form.errors)
+
+    def test_single_character_name_remains_valid_for_windows(self):
+        data = self._feature_payload(platform="windows")
+        data["exename"] = "A"
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_linux_package_metadata_rejects_shell_substitution(self):
+        data = self._feature_payload(platform="linux")
+        data["appname"] = "$(touch unsafe)"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("appname", form.errors)
+
+    def test_linux_package_metadata_rejects_rpm_macros(self):
+        invalid_values = {
+            "appname": "Client%(printf unsafe)",
+            "compname": "Company%{lua:unsafe}",
+            "urlLink": "https://example.com/%{unsafe}",
+        }
+        for field, value in invalid_values.items():
+            with self.subTest(field=field):
+                data = self._feature_payload(platform="linux")
+                data[field] = value
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+    def test_linux_rpm_url_rejects_whitespace(self):
+        data = self._feature_payload(platform="linux")
+        data["urlLink"] = "https://example.com/a b"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("urlLink", form.errors)
+
+    def test_percent_encoded_url_is_allowed_without_linux_rpm_customization(self):
+        data = self._feature_payload(platform="linux")
+        data["beijingCustom"] = ""
+        data["urlLink"] = "https://example.com/a%20b"
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rejects_invalid_android_app_id(self):
+        data = self._feature_payload(platform="android")
+        data["hidecm"] = ""
+        data["hideSettingsMenu"] = ""
+        data["androidappid"] = "invalid-app-id"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("androidappid", form.errors)
+
+    def test_rejects_non_absolute_http_urls(self):
+        invalid_values = {
+            "apiServer": "api.example.com",
+            "urlLink": "not-a-url",
+            "downloadLink": "ftp://example.com/client",
+        }
+        for field, value in invalid_values.items():
+            with self.subTest(field=field):
+                data = self._feature_payload()
+                data[field] = value
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)

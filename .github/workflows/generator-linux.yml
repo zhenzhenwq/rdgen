@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: '1.4.7'
+        default: '1.4.9'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -31,14 +31,13 @@ env:
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836"
   VERSION: "${{ inputs.version }}"
   beijingCustom: "${{ inputs.beijingCustom || 'false' }}"
-  NDK_VERSION: "r27c"
+  NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
@@ -96,7 +95,7 @@ jobs:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -187,37 +186,22 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/rustdesk_default_linux.diff
-            if [ "${{ env.VERSION }}" = "1.4.7" ]; then
-              git apply \
-                --include=libs/enigo/src/linux/nix_impl.rs \
-                --include=libs/scrap/src/x11/capturer.rs \
-                --include=libs/scrap/src/x11/ffi.rs \
-                --include=res/rustdesk.service \
-                --include=src/core_main.rs \
-                rustdesk_default_linux.diff
-              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_linux_147_compat.py
-              python3 beijing_linux_147_compat.py
-            else
-              git apply rustdesk_default_linux.diff
-            fi
-
-      - name: Apply Beijing custom Linux compatibility patches
-        if: env.beijingCustom == 'true'
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 3
-          max_attempts: 3
-          shell: bash
-          command: |
-            if [ "${{ env.VERSION }}" != "1.4.7" ]; then
-              wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_legacy_uinput_keyboard.diff
-              git apply mrkj_legacy_uinput_keyboard.diff
-            fi
-            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_fast_service.py
-            python3 mrkj_linux_fast_service.py
-            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/mrkj_linux_x11_mouse_uinput_keyboard.py
-            python3 mrkj_linux_x11_mouse_uinput_keyboard.py
+            set -euo pipefail
+            rm -rf /tmp/rdgen-linux-patches
+            mkdir -p /tmp/rdgen-linux-patches
+            for patch in \
+              apply_linux_base_fixes.py \
+              rustdesk_default_linux.diff \
+              rustdesk_default_linux_149.diff \
+              beijing_linux_147_compat.py \
+              mrkj_legacy_uinput_keyboard.diff \
+              mrkj_linux_fast_service.py \
+              mrkj_linux_x11_mouse_uinput_keyboard.py; do
+              wget -O "/tmp/rdgen-linux-patches/${patch}" \
+                "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/${patch}"
+            done
+            python3 /tmp/rdgen-linux-patches/apply_linux_base_fixes.py \
+              --patches /tmp/rdgen-linux-patches
 
       - name: Setup vcpkg with Github Actions binary cache
         if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
@@ -277,7 +261,6 @@ jobs:
 
       - name: change appname to custom
         if: env.beijingCustom == 'true' && env.appname != 'rustdesk'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ env.appname }}"|' ./Cargo.toml
@@ -293,26 +276,32 @@ jobs:
           sed -i -e '/-p tmpdeb\/usr\/lib\/rustdesk/d' ./build.py
 
       - name: change company name
-        if: env.beijingCustom == 'true' && env.compname != 'Purslane Ltd'
-        continue-on-error: true
+        if: env.beijingCustom == 'true' && env.compname != 'Purslane Tech Pte. Ltd.'
         shell: bash
         run: |
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./libs/portable/Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./src/ui/index.tis
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./src/main.rs
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./Cargo.toml
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./libs/portable/Cargo.toml
+          sed -i -e 's|Purslane Ltd.|${{ env.compname }}|' ./src/ui/index.tis
+          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
           
-      - name: allow custom.txt
+      - name: allow custom_.txt
         if: env.beijingCustom == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
             sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py
-            python allowCustom.py
+            python allowCustom.py --linux-uri-filename="${{ env.filename }}"
             if [ "${{ env.beijingCustom }}" = "true" ] && [ "${{ env.removeSetupServerTip }}" = "true" ]; then
               wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_setup_server_tip.py
               python remove_setup_server_tip.py
@@ -323,7 +312,6 @@ jobs:
           
       - name: change url to custom
         if: env.beijingCustom == 'true' && env.urlLink != 'https://rustdesk.com'
-        continue-on-error: true
         shell: bash
         run: |  
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ env.urlLink }}|' ./build.py
@@ -336,7 +324,6 @@ jobs:
 
       - name: change download link to custom
         if: env.beijingCustom == 'true' && env.downloadLink != 'https://rustdesk.com/download'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/desktop/pages/desktop_home_page.dart
@@ -344,18 +331,18 @@ jobs:
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
 
       - name: fix connection delay
-        continue-on-error: true
         if: ${{ env.beijingCustom == 'true' && env.delayFix == 'true' }}
         shell: bash
         run: |
-          sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/delay_fix.py
+          python delay_fix.py
 
       - name: add cycle monitors to toolbar
         if: env.beijingCustom == 'true' && env.cycleMonitor == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py
@@ -366,7 +353,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py
@@ -377,7 +364,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py
@@ -388,18 +375,18 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
-            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff
-            git apply hide_settings_menu.diff
+            wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.py
+            python hide_settings_menu.py
 
       - name: hide network setting
         if: env.beijingCustom == 'true' && env.hideNetworkSetting == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py
@@ -410,7 +397,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/runtime_features.py
@@ -425,14 +412,13 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_recent_sessions.py
             python remove_recent_sessions.py
         
       - name: removeNewVersionNotif
-        continue-on-error: true
         if: env.beijingCustom == 'true' && env.removeNewVersionNotif == 'true'
         run: | 
           wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
@@ -443,7 +429,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py
@@ -454,7 +440,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: bash
           command: |
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/incoming_compact.py
@@ -466,6 +452,13 @@ jobs:
         with:
           name: bridge-artifact
           path: ./
+
+      - name: Validate customization
+        if: env.beijingCustom == 'true'
+        shell: bash
+        run: |
+          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/validate_customization.py
+          python validate_customization.py --platform=linux --server="${{ env.server }}" --key="${{ env.key }}" --api-server="${{ env.apiServer }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}" --download-link="${{ env.downloadLink }}"
 
       - uses: rustdesk-org/run-on-arch-action@amd64-support
         name: Build rustdesk
@@ -618,12 +611,6 @@ jobs:
             chmod 777 output -R
             export CARGO_INCREMENTAL=0
             export DEB_ARCH=${{ matrix.job.deb_arch }}
-            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
-              mkdir -p flutter/tmpdeb/usr/share/rustdesk
-              cp ./custom_.txt ./flutter/tmpdeb/usr/share/rustdesk/custom_.txt
-              mkdir -p "./flutter/tmpdeb/usr/share/${{ env.filename }}"
-              cp ./custom_.txt "./flutter/tmpdeb/usr/share/${{ env.filename }}/custom_.txt"
-            fi
             if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.logolink_url }}" != "false" ]]; then
               wget -O ./flutter/assets/logo.png ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }}
             fi
@@ -643,27 +630,8 @@ jobs:
 
             # Change files names in the output .deb
             if [[ "${{ env.beijingCustom }}" == "true" ]]; then
-              sed -ie "s|\(cp .* \)tmpdeb/usr/share/rustdesk/files/systemd/|\1tmpdeb/usr/share/rustdesk/files/systemd/${{ env.filename }}.service|g" build.py
-              sed -ie "s|cp -r \(.\+\)\* \([^ ]\+\)/rustdesk|mv \1rustdesk \1${{ env.filename }}; cp -r \1\* \2/${{ env.filename }}|g" build.py
-              sed -ie "s|\(tmpdeb/[^ ]*\)rustdesk|\1${{ env.filename }}|g" build.py
-              sed -ie "s|Package: rustdesk|Package: ${{ env.filename }}|g" build.py
-              sed -ie "s|RustDesk|${{ env.appname }}|g" res/rustdesk.desktop
-              FILES=$(sed -ne "s~.*cp\s\(../\)\?\+\(.\+\.\(desktop\|service\)\)\s\+tmpdeb/.*~\2~p" build.py | sort | uniq)
-              FILES=$(echo -e "$FILES\n$(ls --color=never res/DEBIAN/*)")
-              for FILE in $(echo $FILES | sed "s/\n/ /g"); do
-                sed -ie "s|rustdesk|${{ env.filename }}|g" $FILE
-              done
-            fi
-
-            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
-              mkdir -p /tmp/beijing-custom-linux-shim
-              wget -O /tmp/beijing-custom-linux-shim/rustdesk_no_sysvipc_shim.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_no_sysvipc_shim.c
-              wget -O /tmp/beijing-custom-linux-shim/rustdesk_uinput_input_fallback.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_uinput_input_fallback.c
-              wget -O /tmp/beijing_custom_linux_packaging.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_packaging.py
-              python3 /tmp/beijing_custom_linux_packaging.py --source-dir /tmp/beijing-custom-linux-shim --filename "${{ env.filename }}"
-            fi
-
-            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              wget -O /tmp/customize_linux_native_packages.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_linux_native_packages.py
+              python3 /tmp/customize_linux_native_packages.py --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}"
               mkdir -p /tmp/beijing-custom-linux-shim
               wget -O /tmp/beijing-custom-linux-shim/rustdesk_no_sysvipc_shim.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_no_sysvipc_shim.c
               wget -O /tmp/beijing-custom-linux-shim/rustdesk_uinput_input_fallback.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_uinput_input_fallback.c
@@ -686,9 +654,10 @@ jobs:
             esac
             HBB=`pwd` rpmbuild ./res/rpm-flutter.spec -bb
             pushd ~/rpmbuild/RPMS/${{ matrix.job.arch }}
-            for name in rustdesk*??.rpm; do
-                mv "$name" /workspace/output/"${{ env.filename }}-${{ matrix.job.arch }}.rpm"
-            done
+            package_name=$(printf '%s' '${{ env.filename }}' | tr '[:upper:]_' '[:lower:]-')
+            name=$(find . -maxdepth 1 -type f -name "${package_name}-*.rpm" -print -quit)
+            test -n "$name"
+            mv "$name" /workspace/output/"${{ env.filename }}-${{ matrix.job.arch }}.rpm"
 
             # rpm suse package
             echo -e "start packaging suse package"
@@ -700,15 +669,15 @@ jobs:
             esac
             HBB=`pwd` rpmbuild ./res/rpm-flutter-suse.spec -bb
             pushd ~/rpmbuild/RPMS/${{ matrix.job.arch }}
-            for name in rustdesk*??.rpm; do
-                mv "$name" /workspace/output/"${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm"
-            done
+            package_name=$(printf '%s' '${{ env.filename }}' | tr '[:upper:]_' '[:lower:]-')
+            name=$(find . -maxdepth 1 -type f -name "${package_name}-*.rpm" -print -quit)
+            test -n "$name"
+            mv "$name" /workspace/output/"${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm"
 
       # only x86_64 for arch since we can not find newest arm64 docker image to build
       # old arch image does not make sense for arch since it is "arch" which always update to date
       # and failed to makepkg arm64 on x86_64
       - name: Patch archlinux PKGBUILD
-        continue-on-error: true
         if: matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true' && env.VERSION != 'master'
         run: |
           sed -i "s/x86_64/${{ matrix.job.arch }}/g" res/PKGBUILD
@@ -717,7 +686,6 @@ jobs:
           fi
 
       - name: Build archlinux package
-        continue-on-error: true
         if: matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true' && env.VERSION != 'master'
         uses: rustdesk-org/arch-makepkg-action@master
         with:
@@ -726,10 +694,10 @@ jobs:
             cd res && HBB=`pwd`/.. FLUTTER=1 makepkg -f
 
       - name: Rename archlinux package
-        continue-on-error: true
         if:  matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true' && env.VERSION != 'master'
         run: |
-          cp ./res/rustdesk-${{ env.VERSION }}-0-x86_64.pkg.tar.zst ./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst
+          package_name=$(printf '%s' '${{ env.filename }}' | tr '[:upper:]_' '[:lower:]-')
+          cp "./res/${package_name}-${{ env.VERSION }}-0-x86_64.pkg.tar.zst" ./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
@@ -739,23 +707,29 @@ jobs:
           max_attempts: 3
           shell: bash
           command: |
+            set -euo pipefail
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+            if [[ "${{ matrix.job.arch }}" == "x86_64" && "${{ env.VERSION }}" != "master" ]]; then
+              curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            fi
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" ${{ env.apiServer }}/api/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" ${{ env.apiServer }}/api/save_custom_client || true
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" ${{ env.apiServer }}/api/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
+            if [[ "${{ matrix.job.arch }}" == "x86_64" && "${{ env.VERSION }}" != "master" ]]; then
+              curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" ${{ env.apiServer }}/api/save_custom_client
+            fi
 
       - name: Upload deb
         uses: actions/upload-artifact@master
@@ -851,43 +825,49 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ env.beijingCustom }}" == "true" ]]; then
-            sed -ie "s|rustdesk|${{ env.filename }}|g" appimage/*
-            mv appimage/rustdesk.deb "appimage/${{ env.filename }}.deb"
+            if [[ "${{ env.filename }}" != "rustdesk" ]]; then
+              mv appimage/rustdesk.deb "appimage/${{ env.filename }}.deb"
+            fi
+            wget -O /tmp/customize_appimage_recipe.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_appimage_recipe.py
+            python3 /tmp/customize_appimage_recipe.py --recipe="appimage/AppImageBuilder-${{ matrix.job.arch }}.yml" --filename="${{ env.filename }}" --app-name="${{ env.appname }}"
+            grep -F 'LD_PRELOAD: $APPDIR/usr/lib/${{ env.filename }}/librustdesk_no_sysvipc.so' "appimage/AppImageBuilder-${{ matrix.job.arch }}.yml"
           fi
 
           # install libarchive-tools for bsdtar command used in AppImageBuilder.yml
           sudo apt-get update -y
           sudo apt-get install -y libarchive-tools libfuse2
           # set-up appimage-builder
+          sudo pip3 install "setuptools_scm<10"
           sudo pip3 install git+https://github.com/rustdesk-org/appimage-builder.git
           # run appimage-builder
           pushd appimage
+          find . -maxdepth 1 -type f -name '*.AppImage' -delete
           sudo appimage-builder --skip-tests --recipe ./AppImageBuilder-${{ matrix.job.arch }}.yml
-          if [[ "${{ env.beijingCustom }}" == "true" ]]; then
-            sudo mv ./${{ env.filename }}-${{ env.VERSION }}-${{ matrix.job.arch }}.AppImage ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
-          else
-            sudo mv ./rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.AppImage ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
-          fi
+          mapfile -t built_appimages < <(find . -maxdepth 1 -type f -name '*.AppImage' -print)
+          test "${#built_appimages[@]}" -eq 1
+          sudo mv "${built_appimages[0]}" ./${{ env.filename }}-${{ matrix.job.arch }}.AppImage
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
           
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" ${{ env.apiServer }}/api/save_custom_client
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" ${{ env.apiServer }}/api/save_custom_client
 
   build-flatpak:
     name: Build flatpak ${{ matrix.job.target }}${{ matrix.job.suffix }}
@@ -900,7 +880,7 @@ jobs:
         job:
           - {
               target: x86_64-unknown-linux-gnu,
-              distro: ubuntu18.04,
+              distro: ubuntu22.04,
               on: ubuntu-22.04,
               arch: x86_64,
               suffix: "",
@@ -951,9 +931,34 @@ jobs:
         run: |
           mv ${{ env.filename }}-${{ matrix.job.arch }}.deb flatpak/rustdesk.deb
 
+      - name: Customize Flatpak manifest
+        if: env.beijingCustom == 'true'
+        shell: bash
+        run: |
+          wget -O /tmp/customize_flatpak_manifest.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_flatpak_manifest.py
+          python3 /tmp/customize_flatpak_manifest.py --manifest=flatpak/rustdesk.json --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}"
+          python3 - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+          manifest = json.load(open("flatpak/rustdesk.json", encoding="utf-8"))
+          filename = os.environ["filename"]
+          app_name = os.environ["appname"]
+          app_id = manifest["id"]
+          assert app_id.startswith("com.rdgen.app_")
+          assert manifest['command'] == filename
+          assert manifest['rename-desktop-file'] == f'{filename}.desktop'
+          assert manifest['rename-icon'] == filename
+          assert f'--env=LD_PRELOAD=/app/lib/{filename}/librustdesk_no_sysvipc.so' in manifest['finish-args']
+          assert "--device=all" not in manifest["finish-args"]
+          root = ET.parse(f"flatpak/{app_id}.metainfo.xml").getroot()
+          assert root.findtext("./id") == app_id
+          assert root.findtext("./launchable") == f"{app_id}.desktop"
+          assert root.findtext("./name") == app_name
+          PY
+
       - uses: rustdesk-org/run-on-arch-action@amd64-support
         name: Build rustdesk flatpak package for ${{ matrix.job.arch }}
-        continue-on-error: true
         timeout-minutes: 30
         id: flatpak
         with:
@@ -967,7 +972,7 @@ jobs:
           shell: /bin/bash
           install: |
             apt-get update -y
-            apt-get install -y git flatpak flatpak-builder
+            apt-get install -y git flatpak flatpak-builder python3
           run: |
             # disable git safe.directory
             git config --global --add safe.directory "*"
@@ -978,27 +983,30 @@ jobs:
             pushd flatpak
             git clone https://github.com/flathub/shared-modules.git --depth=1
             flatpak-builder --user --install-deps-from=flathub -y --force-clean --repo=repo ./build ./rustdesk.json
-            flatpak build-bundle ./repo ${{ env.filename }}-${{ matrix.job.arch }}.flatpak com.rustdesk.RustDesk
+            flatpak_id=$(python3 -c 'import json; print(json.load(open("rustdesk.json", encoding="utf-8"))["id"])')
+            flatpak build-bundle ./repo "${{ env.filename }}-${{ matrix.job.arch }}.flatpak" "$flatpak_id"
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
           
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" ${{ env.apiServer }}/api/save_custom_client
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" ${{ env.apiServer }}/api/save_custom_client
 
   deploy:
     needs: [build-rustdesk-linux,build-flatpak,build-appimage]

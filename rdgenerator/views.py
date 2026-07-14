@@ -54,13 +54,13 @@ def generator_view(request):
             default_url_link = "https://rustdesk.com"
             default_download_link = "https://rustdesk.com/download"
             default_appname = "rustdesk"
-            default_compname = "Purslane Ltd"
+            default_compname = "Purslane Tech Pte. Ltd."
             delayFix = form.cleaned_data['delayFix'] and linuxCustomAllowed
-            cycleMonitor = form.cleaned_data['cycleMonitor'] and linuxCustomAllowed
-            xOffline = form.cleaned_data['xOffline'] and linuxCustomAllowed
+            cycleMonitor = form.cleaned_data['cycleMonitor'] and platform in flutter_desktop_platforms and linuxCustomAllowed
+            xOffline = form.cleaned_data['xOffline'] and platform in (flutter_desktop_platforms | {'android'}) and linuxCustomAllowed
             hidecm = form.cleaned_data['hidecm'] and platform in desktop_platforms and linuxCustomAllowed
             removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif'] and linuxCustomAllowed
-            hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and linuxCustomAllowed
+            hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and platform in desktop_platforms and linuxCustomAllowed
             removeRecentSessions = form.cleaned_data['removeRecentSessions'] and platform in desktop_platforms and linuxCustomAllowed
             server = form.cleaned_data['serverIP']
             key = form.cleaned_data['key']
@@ -106,7 +106,7 @@ def generator_view(request):
             androidappid = form.cleaned_data['androidappid']
             if not androidappid:
                 androidappid = "com.carriez.flutter_hbb"
-            compname = compname.replace("&","\\&")
+            compname = compname.replace("&", "\\&")
             permPass = form.cleaned_data['permanentPassword']
             theme = form.cleaned_data['theme']
             themeDorO = form.cleaned_data['themeDorO']
@@ -141,8 +141,6 @@ def generator_view(request):
                 filename = filename.replace(" ","_")
             else:
                 filename = "rustdesk"
-            if not all(char.isascii() for char in appname):
-                appname = default_appname
             if not linuxCustomAllowed:
                 server = default_server
                 key = default_key
@@ -284,11 +282,15 @@ def generator_view(request):
 
             if linuxCustomAllowed:
                 for line in defaultManual.splitlines():
-                    k, value = line.split('=')
+                    if not line.strip():
+                        continue
+                    k, _separator, value = line.partition('=')
                     decodedCustom['default-settings'][k.strip()] = value.strip()
 
                 for line in overrideManual.splitlines():
-                    k, value = line.split('=')
+                    if not line.strip():
+                        continue
+                    k, _separator, value = line.partition('=')
                     decodedCustom['override-settings'][k.strip()] = value.strip()
 
             if not linuxCustomAllowed:

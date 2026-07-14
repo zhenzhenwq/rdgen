@@ -8,7 +8,6 @@ from pathlib import Path
 
 SHIM_NAME = "librustdesk_no_sysvipc.so"
 MARKER = "Beijing custom compatibility"
-SUDOERS_MARKER = "Beijing custom sudoers compatibility"
 UINPUT_MARKER = "Beijing custom uinput compatibility"
 
 
@@ -20,8 +19,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_filename(filename: str) -> None:
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]*", filename):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]+", filename):
         raise SystemExit(f"Invalid package filename for service/path use: {filename!r}")
+
+
+def remove_legacy_sudoers(root: Path, filename: str) -> None:
+    relative_path = Path("etc") / "sudoers.d" / f"{filename}-ld-preload"
+    for base in (root / "flutter" / "tmpdeb", root / ".rdgen-beijing"):
+        path = base / relative_path
+        if path.exists():
+            path.unlink()
 
 
 def build_shim(source_dir: Path) -> Path:
@@ -82,36 +89,6 @@ def write_dropin(root: Path, filename: str, shim_path: str) -> None:
     )
 
 
-def write_sudoers(root: Path, filename: str) -> None:
-    sudoers_dir = root / "flutter" / "tmpdeb" / "etc" / "sudoers.d"
-    sudoers_dir.mkdir(parents=True, exist_ok=True)
-    sudoers = sudoers_dir / f"{filename}-ld-preload"
-    env_names = (
-        "LD_PRELOAD RUSTDESK_NO_SYSVIPC_SHIM_LOG "
-        "RUSTDESK_UINPUT_INPUT_FALLBACK RUSTDESK_UINPUT_INPUT_LOG "
-        "RUSTDESK_XCB_MOUSE_FALLBACK RUSTDESK_UINPUT_MOUSE_MODE "
-        "RUSTDESK_UINPUT_MOUSE_REL_SCALE RUSTDESK_UINPUT_WIDTH "
-        "RUSTDESK_UINPUT_HEIGHT RUSTDESK_FORCE_CM_NO_UI "
-        "RUSTDESK_DISABLE_TRAY RUSTDESK_PREWARM_CM_NO_UI"
-    )
-    commands = [
-        f"/usr/share/{filename}/{filename}",
-        f"/usr/share/{filename}/{filename}.real",
-        f"/usr/share/{filename}/{filename}.real.bin",
-    ]
-    lines = [f"# {SUDOERS_MARKER}"]
-    for command in commands:
-        lines.extend(
-            [
-                f'Defaults!{command} env_keep += "{env_names}"',
-                f'Defaults!{command} env_delete -= "LD_*"',
-                f"Defaults!{command} setenv",
-            ]
-        )
-    sudoers.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    sudoers.chmod(0o440)
-
-
 def write_uinput_udev_rule(root: Path, filename: str) -> None:
     rules_dir = root / "flutter" / "tmpdeb" / "etc" / "udev" / "rules.d"
     rules_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +97,7 @@ def write_uinput_udev_rule(root: Path, filename: str) -> None:
         "\n".join(
             [
                 f"# {UINPUT_MARKER}",
-                'KERNEL=="uinput", MODE="0666", TAG+="uaccess"',
+                'KERNEL=="uinput", MODE="0660", TAG+="uaccess"',
                 "",
             ]
         ),
@@ -134,7 +111,15 @@ def patch_postinst(root: Path, filename: str) -> None:
         raise SystemExit(f"{postinst} not found")
 
     text = postinst.read_text(encoding="utf-8")
+    text = re.sub(
+        r"\n[ \t]*if \[ -e /dev/uinput \]; then\n"
+        r"[ \t]*chmod 0666 /dev/uinput \|\| true\n"
+        r"[ \t]*fi",
+        "",
+        text,
+    )
     if MARKER in text:
+        postinst.write_text(text, encoding="utf-8")
         return
 
     lines = text.splitlines()
@@ -148,9 +133,6 @@ def patch_postinst(root: Path, filename: str) -> None:
                 f"{indent}    udevadm control --reload-rules || true\n"
                 f"{indent}    udevadm trigger --name-match=uinput || true\n"
                 f"{indent}fi\n"
-                f"{indent}if [ -e /dev/uinput ]; then\n"
-                f"{indent}    chmod 0666 /dev/uinput || true\n"
-                f"{indent}fi\n"
                 f"{indent}# {MARKER}: restart so the drop-in applies on upgrades.\n"
                 f"{indent}systemctl restart {filename} || systemctl start {filename}"
             )
@@ -158,6 +140,27 @@ def patch_postinst(root: Path, filename: str) -> None:
             return
 
     raise SystemExit(f"Unable to find postinst line: {target}")
+
+
+def persist_native_package_files(root: Path, filename: str) -> None:
+    package_root = root / "flutter" / "tmpdeb"
+    persistent_root = root / ".rdgen-beijing"
+    relative_paths = [
+        Path("usr") / "lib" / filename / SHIM_NAME,
+        Path("etc")
+        / "systemd"
+        / "system"
+        / f"{filename}.service.d"
+        / "beijing-custom.conf",
+        Path("etc") / "udev" / "rules.d" / f"99-{filename}-uinput.rules",
+    ]
+    for relative_path in relative_paths:
+        source = package_root / relative_path
+        if not source.is_file():
+            raise SystemExit(f"Missing Beijing package file: {source}")
+        destination = persistent_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
 
 def main() -> None:
@@ -175,10 +178,11 @@ def main() -> None:
     shutil.copy2(shim, shim_install_path)
     shim_install_path.chmod(0o755)
 
+    remove_legacy_sudoers(root, filename)
     write_dropin(root, filename, f"/{shim_rel_path.as_posix()}")
-    write_sudoers(root, filename)
     write_uinput_udev_rule(root, filename)
     patch_postinst(root, filename)
+    persist_native_package_files(root, filename)
     print(f"Applied Beijing custom Linux packaging for {filename}")
 
 

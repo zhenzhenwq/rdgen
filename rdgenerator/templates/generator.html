@@ -28,6 +28,10 @@
             box-sizing: border-box;
         }
 
+        [hidden] {
+            display: none !important;
+        }
+
         body {
             font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
             background:
@@ -446,6 +450,19 @@
 <body>
     <h1><i class="fas fa-cogs"></i> RustDesk 自定义客户端生成器</h1>
     <form id="myForm" action="/generator" method="post" enctype="multipart/form-data">
+        {% if form.errors %}
+            <div class="errorlist" role="alert">
+                <strong>请修正以下内容：</strong>
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <div>{{ field.label|default:field.name }}：{{ error }}</div>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
         <div class="save-load-section-container">
             <div class="section">
                 <h2 id="saveLoadTitle">保存 / 导入配置 <i class="fas fa-chevron-down"></i></h2>
@@ -456,13 +473,6 @@
                 </div>
             </div>
         </div>
-        {% if form.iconfile.errors %}
-            <ul class="errorlist">
-                {% for error in form.iconfile.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
         <div class="platform">
             <h2><i class="fas fa-desktop"></i> 选择生成平台</h2>
                 <div class="platform-icons">
@@ -478,13 +488,7 @@
                     <i class="fab fa-android platform-icon" data-platform="android"></i>
                     <i class="fab fa-apple platform-icon" data-platform="macos"></i>
                 </div>
-                <select name="platform" id="id_platform">
-                    <option value="windows" selected>Windows 64 位</option>
-                    <option value="windows-x86">Windows 32 位</option>
-                    <option value="linux">Linux</option>
-                    <option value="android">Android</option>
-                    <option value="macos">macOS</option>
-                </select>
+                {{ form.platform }}
                 <label for="{{ form.version.id_for_label }}">RustDesk 版本：</label>
                 {{ form.version }}
                 {% if form.version.help_text %}
@@ -497,7 +501,7 @@
         <div class="container">   
             <div class="section">
                 <h2><i class="fas fa-sliders-h"></i> 基础信息</h2>
-                    <label for="{{ form.exename.id_for_label }}">配置名称（仅限英文、数字、下划线，不能包含空格或特殊字符）：</label>
+                    <label for="{{ form.exename.id_for_label }}">配置名称（仅限英文、数字、下划线或连字符，不能包含空格）：</label>
                     {{ form.exename }}<span id="filenameError" class="error"></span><br><br>
                     <div id="basicCustomFields" class="linux-custom-content">
                     <label for="{{ form.appname.id_for_label }}">自定义应用名称（留空则使用默认名称）：</label>
@@ -518,7 +522,7 @@
                             <label class="desktop-behavior-toggle" for="{{ form.removeSetupServerTip.id_for_label }}">
                                 {{ form.removeSetupServerTip }} 隐藏底部“自建服务器”提示
                             </label>
-                            <label class="desktop-behavior-toggle" for="{{ form.hideNetworkSetting.id_for_label }}">
+                            <label id="hideNetworkSettingOption" class="desktop-behavior-toggle" for="{{ form.hideNetworkSetting.id_for_label }}">
                                 {{ form.hideNetworkSetting }} 隐藏设置里的“网络”入口
                             </label>
                             <label id="silentInstallOption" class="desktop-behavior-toggle" for="{{ form.silentInstallOnDoubleClick.id_for_label }}">
@@ -568,7 +572,7 @@
                     {{ form.urlLink }}<br><br>
                     <label for="{{ form.downloadLink.id_for_label }}">更新下载地址（替换 https://rustdesk.com/download）：</label>
                     {{ form.downloadLink }}<br><br>
-                    <label for="{{ form.compname.id_for_label }}">版权公司名称（替换 Purslane Ltd）：</label>
+                    <label for="{{ form.compname.id_for_label }}">版权公司名称（替换 Purslane Tech Pte. Ltd.）：</label>
                     {{ form.compname }}<br><br>
             </div>
         </div>
@@ -600,14 +604,16 @@
                     {{ form.iconfile }}<br><br>
                     <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
                     <div id="icon-preview"></div><br><br>
-                    <label for="{{ form.logofile.id_for_label }}">自定义应用 Logo（PNG）</label>
-                    {{ form.logofile }}<br><br>
-                    <!-- <input type="file" name="logofile" id="logofile" accept="image/png"> -->
-                    <div id="logo-preview"></div><br><br>
-                    <label for="{{ form.privacyfile.id_for_label }}">自定义隐私屏幕（PNG）</label>
-                    {{ form.privacyfile }}<br><br>
-                    <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
-                    <div id="privacy-preview"></div><br><br>
+                    <div id="logoOption">
+                        <label for="{{ form.logofile.id_for_label }}">自定义应用 Logo（PNG）</label>
+                        {{ form.logofile }}<br><br>
+                        <div id="logo-preview"></div><br><br>
+                    </div>
+                    <div id="privacyOption">
+                        <label for="{{ form.privacyfile.id_for_label }}">自定义隐私屏幕（PNG）</label>
+                        {{ form.privacyfile }}<br><br>
+                        <div id="privacy-preview"></div><br><br>
+                    </div>
                     <label for="{{ form.theme.id_for_label }}">主题：</label>
                     {{ form.theme }} {{ form.themeDorO }} <span class="help-text">默认表示客户端可修改，强制覆盖表示永久锁定该主题。</span><br><br>
             </div>
@@ -661,10 +667,12 @@
     </form>
     <script>
         const platformSelect = document.getElementById('id_platform');
+        const versionSelect = document.getElementById('id_version');
         const desktopPlatforms = new Set(['windows', 'windows-x86', 'linux', 'macos']);
         const flutterDesktopPlatforms = new Set(['windows', 'linux', 'macos']);
         const compactLayoutPlatforms = new Set(['windows', 'linux', 'macos']);
         const windowsPlatforms = new Set(['windows', 'windows-x86']);
+        const beijingLinuxVersions = new Set(['1.4.7', '1.4.8', '1.4.9']);
         const beijingCustomOption = document.getElementById('beijingCustomOption');
         const beijingCustomToggle = document.getElementById("{{ form.beijingCustom.id_for_label }}");
         const delayFixOption = document.getElementById('delayFixOption');
@@ -683,6 +691,11 @@
         const copyIdPasswordButtonOption = document.getElementById('copyIdPasswordButtonOption');
         const manualTemporaryPasswordOption = document.getElementById('manualTemporaryPasswordOption');
         const startOnBootOption = document.getElementById('startOnBootOption');
+        const logoOption = document.getElementById('logoOption');
+        const privacyOption = document.getElementById('privacyOption');
+        const logoBase64Input = document.getElementById("{{ form.logobase64.id_for_label }}");
+        const privacyBase64Input = document.getElementById("{{ form.privacybase64.id_for_label }}");
+        const hideNetworkSettingOption = document.getElementById('hideNetworkSettingOption');
         const incomingCompactWrapper = document.getElementById('incomingCompactWrapper');
         const incomingCompactToggle = document.getElementById("{{ form.incomingCompactMode.id_for_label }}");
         const incomingCompactDetails = document.getElementById('incomingCompactDetails');
@@ -690,6 +703,32 @@
         function selectedDirection() {
             const checked = document.querySelector('input[name="direction"]:checked');
             return checked ? checked.value : '';
+        }
+
+        function supportsVersion(minimum) {
+            if (versionSelect.value === 'master') {
+                return true;
+            }
+            const current = versionSelect.value.split('.').map(Number);
+            const required = minimum.split('.').map(Number);
+            for (let index = 0; index < Math.max(current.length, required.length); index++) {
+                const currentPart = current[index] || 0;
+                const requiredPart = required[index] || 0;
+                if (currentPart !== requiredPart) {
+                    return currentPart > requiredPart;
+                }
+            }
+            return true;
+        }
+
+        function setOptionAvailability(element, available) {
+            if (!element) {
+                return;
+            }
+            element.hidden = !available;
+            element.querySelectorAll('input, select, textarea').forEach(control => {
+                control.disabled = !available;
+            });
         }
 
         function syncPlatformIconState() {
@@ -704,28 +743,52 @@
             const supportsFlutterDesktop = flutterDesktopPlatforms.has(platformSelect.value);
             const supportsCompactLayout = compactLayoutPlatforms.has(platformSelect.value);
             const isIncomingOnly = selectedDirection() === 'incoming';
-            const supportsBeijingCustom = platformSelect.value === 'linux';
+            const supportsBeijingCustom = platformSelect.value === 'linux' &&
+                beijingLinuxVersions.has(versionSelect.value);
             const beijingCustomEnabled = supportsBeijingCustom && beijingCustomToggle.checked;
             const linuxCustomAllowed = platformSelect.value !== 'linux' || beijingCustomEnabled;
+            const supportsLogo = platformSelect.value !== 'windows-x86' && platformSelect.value !== 'android';
+            const supportsPrivacy = platformSelect.value === 'windows';
+            setOptionAvailability(logoOption, supportsLogo);
+            setOptionAvailability(privacyOption, supportsPrivacy);
+            logoBase64Input.disabled = !supportsLogo;
+            privacyBase64Input.disabled = !supportsPrivacy;
             beijingCustomOption.hidden = !supportsBeijingCustom;
             beijingCustomToggle.disabled = !supportsBeijingCustom;
-            delayFixOption.hidden = !linuxCustomAllowed;
+            setOptionAvailability(delayFixOption, linuxCustomAllowed);
             linuxCustomContent.forEach(element => {
                 element.hidden = !linuxCustomAllowed;
             });
             desktopBehaviorSection.hidden = !isDesktop || !linuxCustomAllowed;
-            silentInstallOption.hidden = !isWindowsBuild;
+            setOptionAvailability(silentInstallOption, isWindowsBuild);
             linuxGatedOptions.forEach(option => {
                 if (option) {
-                    option.hidden = !linuxCustomAllowed;
+                    const flutterDesktopOnly = option.id === 'cycleMonitorOption';
+                    const flutterIncludingAndroid = option.id === 'xOfflineOption';
+                    const desktopOnly = option.id === 'hidecmOption' || option.id === 'hideSettingsMenuOption';
+                    const versionSupported =
+                        (option.id !== 'hideSettingsMenuOption' || supportsVersion('1.4.4')) &&
+                        (option.id !== 'forceDisableFileTransferOption' || supportsVersion('1.4.5'));
+                    const available = linuxCustomAllowed && versionSupported && !(
+                        (flutterDesktopOnly && !supportsFlutterDesktop) ||
+                        (flutterIncludingAndroid && !(supportsFlutterDesktop || platformSelect.value === 'android')) ||
+                        (desktopOnly && !isDesktop)
+                    );
+                    setOptionAvailability(option, available);
                 }
             });
-            copyIdPasswordButtonOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
-            manualTemporaryPasswordOption.hidden = !(supportsFlutterDesktop && linuxCustomAllowed);
-            removeRecentSessionsOption.hidden = !(isDesktop && linuxCustomAllowed);
-            startOnBootOption.hidden = platformSelect.value !== 'windows';
-            incomingCompactWrapper.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed);
-            incomingCompactDetails.hidden = !(supportsCompactLayout && isIncomingOnly && linuxCustomAllowed && incomingCompactToggle.checked);
+            setOptionAvailability(
+                hideNetworkSettingOption,
+                isDesktop && linuxCustomAllowed && supportsVersion('1.4.4')
+            );
+            setOptionAvailability(copyIdPasswordButtonOption, supportsFlutterDesktop && linuxCustomAllowed);
+            setOptionAvailability(manualTemporaryPasswordOption, supportsFlutterDesktop && linuxCustomAllowed);
+            setOptionAvailability(removeRecentSessionsOption, isDesktop && linuxCustomAllowed);
+            setOptionAvailability(startOnBootOption, platformSelect.value === 'windows');
+            const compactLayoutAvailable = supportsCompactLayout && isIncomingOnly &&
+                linuxCustomAllowed && supportsVersion('1.4.2');
+            setOptionAvailability(incomingCompactWrapper, compactLayoutAvailable);
+            incomingCompactDetails.hidden = !(compactLayoutAvailable && incomingCompactToggle.checked);
         }
 
         document.querySelectorAll('.platform-icon').forEach(icon => {
@@ -739,6 +802,7 @@
             syncPlatformIconState();
             updateDesktopBehaviorVisibility();
         });
+        versionSelect.addEventListener('change', updateDesktopBehaviorVisibility);
         document.querySelectorAll('input[name="direction"]').forEach(input => {
             input.addEventListener('change', updateDesktopBehaviorVisibility);
         });

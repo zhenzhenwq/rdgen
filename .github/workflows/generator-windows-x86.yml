@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: '1.4.7'
+        default: '1.4.9'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -26,7 +26,6 @@ env:
   ANDROID_FLUTTER_VERSION: "3.24.5"
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2025.08.27
   # If we change the `VCPKG COMMIT_ID`, please remember:
@@ -37,7 +36,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
   VERSION: "${{ inputs.version }}"
-  NDK_VERSION: "r27c"
+  NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
@@ -94,7 +93,7 @@ jobs:
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -132,7 +131,6 @@ jobs:
 
       - name: change appname to custom
         if: env.appname != 'rustdesk'
-        continue-on-error: true
         shell: bash
         run: |
           # ./Cargo.toml
@@ -171,36 +169,33 @@ jobs:
           sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\" /f|' ./src/platform/windows.rs
           
       - name: change company name
-        if: env.compname != 'Purslane Ltd'
-        continue-on-error: true
+        if: env.compname != 'Purslane Tech Pte. Ltd.'
         shell: bash
         run: |
-          sed -i -e 's|PURSLANE|${{ env.compname }}|' ./res/msi/preprocess.py
-          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./res/msi/preprocess.py
-          sed -i -e 's|Copyright &copy; 2025 Purslane Ltd.|Copyright \&copy; 2025 ${{ env.compname }}|' ./src/ui/index.tis
-          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./Cargo.toml
-          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./libs/portable/Cargo.toml
-          sed -i -e 's|Purslane Ltd.|${{ env.compname }}|' ./res/setup.nsi
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./src/ui/index.tis
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./libs/portable/Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./src/main.rs
+          sed -i -e 's|Purslane Ltd.|${{ env.compname }}|' ./src/ui/index.tis
+          sed -i -e 's|Purslane Ltd.|${{ env.compname }}|' ./Cargo.toml
+          sed -i -e 's|Purslane Ltd.|${{ env.compname }}|' ./libs/portable/Cargo.toml
+          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
              
       - name: change url to custom
         if: env.urlLink != 'https://rustdesk.com'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ env.urlLink }}|' ./build.py
           sed -i -e "s|<div .link .custom-event url='https://rustdesk.com'>|<div .link .custom-event url='${{ env.urlLink }}'>|" ./src/ui/index.tis
           sed -i -e "s|<div .link .custom-event url='https://rustdesk.com/privacy.html'>|<div .link .custom-event url='${{ env.urlLink }}/privacy.html'>|" ./src/ui/index.tis
-          sed -i -e "s|https://rustdesk.com/|${{env.urlLink }}|" ./res/setup.nsi
 
       - name: change download link to custom
         if: env.downloadLink != 'https://rustdesk.com/download'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
 
       - name: set server, key, and apiserver
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
@@ -210,13 +205,12 @@ jobs:
             sed -i -e 's|<span>{translate("Ready")}, <span .link #setup-server>{translate("setup_server_tip")}</span></span>|translate("Ready")|' ./src/ui/index.tis
           fi
 
-      - name: allow custom.txt
+      - name: allow custom_.txt
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
-          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py -OutFile allowCustom.py
             python allowCustom.py
@@ -305,14 +299,13 @@ jobs:
           b64=""
 
       - name: fix connection delay
-        continue-on-error: true
         if: ${{ env.delayFix == 'true' }}
         shell: bash
         run: |
-          sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/delay_fix.py -o delay_fix.py
+          python delay_fix.py
 
       - name: removeNewVersionNotif
-        continue-on-error: true
         if: env.removeNewVersionNotif == 'true'
         shell: bash
         run: | 
@@ -320,7 +313,6 @@ jobs:
           python remove_new_version_notif.py
 
       - name: hide-cm
-        continue-on-error: true
         if: env.hidecm == 'true'
         shell: bash
         run: |
@@ -328,15 +320,13 @@ jobs:
           python hidecm.py
 
       - name: hide settings menu
-        continue-on-error: true
         if: env.hideSettingsMenu == 'true'
         shell: bash
         run: |
-          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff -o hide_settings_menu.diff
-          git apply hide_settings_menu.diff
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.py -o hide_settings_menu.py
+          python hide_settings_menu.py
 
       - name: hide network setting
-        continue-on-error: true
         if: env.hideNetworkSetting == 'true'
         shell: bash
         run: |
@@ -363,6 +353,12 @@ jobs:
         run: |
           curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/silent_install.py -o silent_install.py
           python silent_install.py
+
+      - name: Validate customization
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/validate_customization.py -o validate_customization.py
+          python validate_customization.py --platform=sciter --server="${{ env.server }}" --key="${{ env.key }}" --api-server="${{ env.apiServer }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}" --download-link="${{ env.downloadLink }}"
 
       - name: Build rustdesk
         id: build
@@ -427,7 +423,7 @@ jobs:
             $signedFiles = Get-ChildItem ./Release -File | Where-Object { $_.Extension -in '.exe', '.dll' }
             Compress-Archive -Path $signedFiles.FullName -DestinationPath ./Release/signed_files.zip -CompressionLevel Fastest -Force
           } elseif ('${{ secrets.SIGN_BASE_URL }}' -and '${{ secrets.SIGN_API_KEY }}') {
-            curl.exe -X POST -F "file=@./Release/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./Release/signed_files.zip
+            curl.exe --fail --connect-timeout 30 --retry 3 --retry-delay 10 -X POST -F "file=@./Release/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./Release/signed_files.zip
           } else {
             Write-Host 'Signing skipped - no code signing certificate or signing service configured'
             Copy-Item ./Release/unsigned_files.zip ./Release/signed_files.zip -Force
@@ -441,10 +437,10 @@ jobs:
           Remove-Item ./Release/unsigned_files.zip
           Remove-Item ./Release/signed_files.zip
 
-      - name: Create custom.txt file
+      - name: Create custom_.txt file
         shell: bash
         run: |
-          echo -n "${{ env.custom }}" | cat > ./Release/custom.txt
+          echo -n "${{ env.custom }}" | cat > ./Release/custom_.txt
 
       - name: Build self-extracted executable
         shell: bash
@@ -485,7 +481,7 @@ jobs:
             $signedFiles = Get-ChildItem ./SignOutput -File | Where-Object { $_.Extension -eq '.exe' }
             Compress-Archive -Path $signedFiles.FullName -DestinationPath ./SignOutput/signed_files.zip -CompressionLevel Fastest -Force
           } elseif ('${{ secrets.SIGN_BASE_URL }}' -and '${{ secrets.SIGN_API_KEY }}') {
-            curl.exe -X POST -F "file=@./SignOutput/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
+            curl.exe --fail --connect-timeout 30 --retry 3 --retry-delay 10 -X POST -F "file=@./SignOutput/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
           } else {
             Write-Host 'Signing skipped - no code signing certificate or signing service configured'
             Copy-Item ./SignOutput/unsigned_files.zip ./SignOutput/signed_files.zip -Force
@@ -507,13 +503,15 @@ jobs:
         if: ${{ env.rdgen == 'true' }}
         shell: bash
         run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+          set -euo pipefail
+          curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
         shell: bash
         run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
+          set -euo pipefail
+          curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
 
   cleanup:
     needs: [build-for-windows-sciter]

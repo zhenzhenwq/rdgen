@@ -8,22 +8,22 @@ on:
           default: true
         target:
             description: 'Target'
-            required: true
+            required: false
             type: string
             default: 'windows-2022'
         configuration:
             description: 'Configuration'
-            required: true
+            required: false
             type: string
             default: 'Release'
         platform:
             description: 'Platform'
-            required: true
+            required: false
             type: string
             default: 'x64'
         target_version:
             description: 'TargetVersion'
-            required: true
+            required: false
             type: string
             default: 'Windows10'
 
@@ -67,7 +67,7 @@ jobs:
         run: |
           git clone https://github.com/rustdesk-org/RustDeskTempTopMostWindow RustDeskTempTopMostWindow
 
-        # Build. commit 53b548a5398624f7149a382000397993542ad796 is tag v0.3
+        # Build the RustDesk 1.4.9-compatible privacy helper revision.
       - name: Build the project
         uses: nick-fields/retry@v3
         with:
@@ -75,7 +75,7 @@ jobs:
           max_attempts: 3
           shell: pwsh
           command: |
-            cd RustDeskTempTopMostWindow && git checkout 53b548a5398624f7149a382000397993542ad796
+            cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90
             if ($env:privacylink_url-ne "false") {
               Invoke-WebRequest -Uri ${{ env.privacylink_url }}/get_png?filename=${{ env.privacylink_file }}"&"uuid=${{ env.privacylink_uuid }} -OutFile privacy.png
               Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/privacyScreen.py -OutFile privacyScreen.py

@@ -6,7 +6,7 @@ on:
       version:
         description: 'version to buld'
         required: true
-        default: '1.4.7'
+        default: '1.4.9'
         type: string
       zip_url:
         description: 'url to zip of json'
@@ -26,13 +26,12 @@ env:
   ANDROID_FLUTTER_VERSION: "3.24.5" 
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836"
   VERSION: "${{ inputs.version }}"
-  NDK_VERSION: "r27c"
+  NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
@@ -106,7 +105,7 @@ jobs:
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -156,7 +155,6 @@ jobs:
       
       - name: change appname to custom
         if: env.appname != 'rustdesk'
-        continue-on-error: true
         shell: bash
         run: |
           # ./Cargo.toml
@@ -205,22 +203,28 @@ jobs:
           sed -i -e 's|reg delete HKEY_CLASSES_ROOT\\\\{ext} /f|reg delete \\\"HKEY_CLASSES_ROOT\\\\{ext}\\\" /f|' ./src/platform/windows.rs
           
       - name: change company name
-        if: env.compname != 'Purslane Ltd'
-        continue-on-error: true
+        if: env.compname != 'Purslane Tech Pte. Ltd.'
         shell: bash
         run: |
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./res/msi/preprocess.py
+          sed -i -e 's|r"Purslane(?: Tech Pte\\.)? Ltd"|"${{ env.compname }}"|' ./res/msi/preprocess.py
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./libs/portable/Cargo.toml
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./res/msi/Package/License.rtf
+          sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./src/main.rs
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
           sed -i -e 's|PURSLANE|${{ env.compname }}|' ./res/msi/preprocess.py
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./res/msi/preprocess.py
-          sed -i -e 's|"Copyright © 2025 Purslane Ltd. All rights reserved."|"Copyright © 2025 ${{ env.compname }}. All rights reserved."|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./Cargo.toml
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./libs/portable/Cargo.toml
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./res/msi/Package/License.rtf
+          sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
              
       - name: change url to custom
         if: env.urlLink != 'https://rustdesk.com'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ env.urlLink }}|' ./build.py
@@ -234,7 +238,6 @@ jobs:
 
       - name: change download link to custom
         if: env.downloadLink != 'https://rustdesk.com/download'
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/desktop/pages/desktop_home_page.dart
@@ -242,7 +245,6 @@ jobs:
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
 
       - name: set server, key, and apiserver
-        continue-on-error: true
         shell: bash
         run: |
           sed -i -e 's|rs-ny.rustdesk.com|${{ env.server }}|' ./libs/hbb_common/src/config.rs
@@ -251,11 +253,11 @@ jobs:
           # ./flutter/pubspec.yaml
           #sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
-      - name: allow custom.txt
+      - name: allow custom_.txt
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py -OutFile allowCustom.py
@@ -387,20 +389,19 @@ jobs:
           PY
 
       - name: fix connection delay
-        continue-on-error: true
         if: ${{ env.delayFix == 'true' }}
-        shell: bash
+        shell: pwsh
         run: |
-          sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
+          Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/delay_fix.py -OutFile delay_fix.py
+          python delay_fix.py
 
       - name: add cycle monitors to toolbar
         if: env.cycleMonitor == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
-          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/cycle_monitor.py -OutFile cycle_monitor.py
             python cycle_monitor.py
@@ -410,15 +411,13 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
-          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/xoffline.py -OutFile xoffline.py
             python xoffline.py
 
       - name: removeNewVersionNotif
-        continue-on-error: true
         if: env.removeNewVersionNotif == 'true'
         shell: bash
         run: | 
@@ -430,9 +429,8 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
-          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hidecm.py -OutFile hidecm.py
             python hidecm.py
@@ -442,18 +440,18 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.diff -OutFile hide_settings_menu.diff
-            git apply hide_settings_menu.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_settings_menu.py -OutFile hide_settings_menu.py
+            python hide_settings_menu.py
 
       - name: hide network setting
         if: env.hideNetworkSetting == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/hide_network_setting.py -OutFile hide_network_setting.py
@@ -464,7 +462,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/runtime_features.py -OutFile runtime_features.py
@@ -479,7 +477,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_recent_sessions.py -OutFile remove_recent_sessions.py
@@ -490,7 +488,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/force_disable_file_transfer.py -OutFile force_disable_file_transfer.py
@@ -501,7 +499,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/silent_install.py -OutFile silent_install.py
@@ -512,7 +510,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
-          max_attempts: 3
+          max_attempts: 1
           shell: pwsh
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/incoming_compact.py -OutFile incoming_compact.py
@@ -537,6 +535,12 @@ jobs:
           flutter pub get
           flutter pub run flutter_launcher_icons
           cd ..
+
+      - name: Validate customization
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/validate_customization.py -OutFile validate_customization.py
+          python validate_customization.py --platform=windows --server="${{ env.server }}" --key="${{ env.key }}" --api-server="${{ env.apiServer }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}" --download-link="${{ env.downloadLink }}"
 
       - name: Build rustdesk
         run: |
@@ -646,7 +650,7 @@ jobs:
             $signedFiles = Get-ChildItem ./rustdesk -File | Where-Object { $_.Extension -in '.exe', '.dll' }
             Compress-Archive -Path $signedFiles.FullName -DestinationPath ./rustdesk/signed_files.zip -CompressionLevel Fastest -Force
           } elseif ('${{ secrets.SIGN_BASE_URL }}' -and '${{ secrets.SIGN_API_KEY }}') {
-            curl.exe -X POST -F "file=@./rustdesk/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./rustdesk/signed_files.zip
+            curl.exe --fail --connect-timeout 30 --retry 3 --retry-delay 10 -X POST -F "file=@./rustdesk/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./rustdesk/signed_files.zip
           } else {
             Write-Host 'Signing skipped - no code signing certificate or signing service configured'
             Copy-Item ./rustdesk/unsigned_files.zip ./rustdesk/signed_files.zip -Force
@@ -660,7 +664,7 @@ jobs:
           Remove-Item ./rustdesk/unsigned_files.zip
           Remove-Item ./rustdesk/signed_files.zip
 
-      - name: Create custom.txt file
+      - name: Create custom_.txt file
         shell: bash
         run: |
           echo -n "${{ env.custom }}" | cat > ./rustdesk/custom_.txt
@@ -722,7 +726,7 @@ jobs:
             $signedFiles = Get-ChildItem ./SignOutput -File | Where-Object { $_.Extension -in '.exe', '.msi' }
             Compress-Archive -Path $signedFiles.FullName -DestinationPath ./SignOutput/signed_files.zip -CompressionLevel Fastest -Force
           } elseif ('${{ secrets.SIGN_BASE_URL }}' -and '${{ secrets.SIGN_API_KEY }}') {
-            curl.exe -X POST -F "file=@./SignOutput/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
+            curl.exe --fail --connect-timeout 30 --retry 3 --retry-delay 10 -X POST -F "file=@./SignOutput/unsigned_files.zip" -H "X-API-KEY: ${{ secrets.SIGN_API_KEY }}" -m 900 "${{ secrets.SIGN_BASE_URL }}/sign/" -o ./SignOutput/signed_files.zip
           } else {
             Write-Host 'Signing skipped - no code signing certificate or signing service configured'
             Copy-Item ./SignOutput/unsigned_files.zip ./SignOutput/signed_files.zip -Force
@@ -749,23 +753,29 @@ jobs:
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            if [[ -f "./SignOutput/${{ env.filename }}.msi" ]]; then
+              curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            fi
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 10
           max_attempts: 3
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
+            set -euo pipefail
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
+            if [[ -f "./SignOutput/${{ env.filename }}.msi" ]]; then
+              curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client
+            fi
 
   cleanup:
     needs: [build-for-windows-flutter]

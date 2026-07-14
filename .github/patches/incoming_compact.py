@@ -15,10 +15,16 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def replace_once(text: str, old: str, new: str, label: str) -> str:
-    if old not in text:
-        raise SystemExit(f"Could not find {label}")
-    return text.replace(old, new, 1)
+def replace_once(text: str, old: str, new: str, label: str) -> tuple[str, bool]:
+    if new in text:
+        print(f"{label} is already patched.")
+        return text, False
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(
+            f"Could not safely patch {label}: expected 1 match, found {count}"
+        )
+    return text.replace(old, new, 1), True
 
 
 def patch_common(width: int, height: int) -> None:
@@ -26,8 +32,9 @@ def patch_common(width: int, height: int) -> None:
     text = read_text(path)
     old = """var imcomingOnlyHomeSize = Size(280, 300);\nSize getIncomingOnlyHomeSize() {\n  final magicWidth = isWindows ? 11.0 : 2.0;\n  final magicHeight = 10.0;\n  return imcomingOnlyHomeSize +\n      Offset(magicWidth, kDesktopRemoteTabBarHeight + magicHeight);\n}\n"""
     new = f"""const double kIncomingOnlyContentWidth = {width}.0;\nconst double kIncomingOnlyContentHeight = {height}.0;\nconst double kIncomingOnlyLeftPaneWidth = kIncomingOnlyContentWidth;\n\nvar imcomingOnlyHomeSize =\n    const Size(kIncomingOnlyContentWidth, kIncomingOnlyContentHeight);\n\nSize getIncomingOnlyHomeSize() {{\n  final magicWidth = isWindows ? 11.0 : 2.0;\n  final magicHeight = 10.0;\n  return imcomingOnlyHomeSize +\n      Offset(magicWidth, kDesktopRemoteTabBarHeight + magicHeight);\n}}\n"""
-    text = replace_once(text, old, new, "incoming home size block")
-    write_text(path, text)
+    text, changed = replace_once(text, old, new, "incoming home size block")
+    if changed:
+        write_text(path, text)
 
 
 def patch_main() -> None:
@@ -35,8 +42,9 @@ def patch_main() -> None:
     text = read_text(path)
     old = """  WindowOptions windowOptions = getHiddenTitleBarWindowOptions(\n      isMainWindow: true, alwaysOnTop: alwaysOnTop);\n"""
     new = """  WindowOptions windowOptions = getHiddenTitleBarWindowOptions(\n      isMainWindow: true,\n      size: bind.isIncomingOnly() ? getIncomingOnlyHomeSize() : null,\n      alwaysOnTop: alwaysOnTop);\n"""
-    text = replace_once(text, old, new, "main window options")
-    write_text(path, text)
+    text, changed = replace_once(text, old, new, "main window options")
+    if changed:
+        write_text(path, text)
 
 
 def patch_home_page() -> None:
@@ -48,10 +56,19 @@ def patch_home_page() -> None:
     new_width = "        width: isIncomingOnly ? kIncomingOnlyLeftPaneWidth : 200.0,\n"
     old_update = """  _updateWindowSize() {\n    RenderObject? renderObject = _childKey.currentContext?.findRenderObject();\n    if (renderObject == null) {\n      return;\n    }\n    if (renderObject is RenderBox) {\n      final size = renderObject.size;\n      if (size != imcomingOnlyHomeSize) {\n        imcomingOnlyHomeSize = size;\n        windowManager.setSize(getIncomingOnlyHomeSize());\n      }\n    }\n  }\n"""
     new_update = """  _updateWindowSize() {\n    windowManager.setSize(getIncomingOnlyHomeSize());\n  }\n"""
-    text = replace_once(text, old_children, new_children, "incoming home children block")
-    text = replace_once(text, old_width, new_width, "incoming home width")
-    text = replace_once(text, old_update, new_update, "incoming home resize handler")
-    write_text(path, text)
+    changed = False
+    text, updated = replace_once(
+        text, old_children, new_children, "incoming home children block"
+    )
+    changed |= updated
+    text, updated = replace_once(text, old_width, new_width, "incoming home width")
+    changed |= updated
+    text, updated = replace_once(
+        text, old_update, new_update, "incoming home resize handler"
+    )
+    changed |= updated
+    if changed:
+        write_text(path, text)
 
 
 def main() -> None:

@@ -1,7 +1,13 @@
 from pathlib import Path
 
 
-PATH = Path.cwd() / "flutter/lib/desktop/widgets/remote_toolbar.dart"
+ROOT = Path.cwd()
+PATH = ROOT / "flutter/lib/desktop/widgets/remote_toolbar.dart"
+COMMON_PATH = ROOT / "flutter/lib/common.dart"
+
+UPSTREAM_MAIN_BUTTON = "class _MainMonitorSwitchButton"
+UPSTREAM_MINIMIZED_BUTTON = "class _MinimizedMonitorSwitchButton"
+UPSTREAM_DEFAULT_MARKER = "Generator default for the cycle-monitor feature."
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
@@ -10,8 +16,45 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
+def enable_upstream_monitor_switch(text: str) -> bool:
+    if UPSTREAM_MAIN_BUTTON not in text or UPSTREAM_MINIMIZED_BUTTON not in text:
+        return False
+
+    common = COMMON_PATH.read_text(encoding="utf-8")
+    if UPSTREAM_DEFAULT_MARKER in common:
+        print("Built-in cycle monitor buttons are already enabled by default.")
+        return True
+
+    old = """bool mainGetLocalBoolOptionSync(String key) {
+  return option2bool(key, bind.mainGetLocalOption(key: key));
+}
+"""
+    new = """bool mainGetLocalBoolOptionSync(String key) {
+  final value = bind.mainGetLocalOption(key: key);
+  // Generator default for the cycle-monitor feature.
+  if (value.isEmpty &&
+      (key == kOptionAllowMonitorSwitchMainToolbar ||
+          key == kOptionAllowMonitorSwitchMinToolbar)) {
+    return true;
+  }
+  return option2bool(key, value);
+}
+"""
+    common = replace_once(
+        common,
+        old,
+        new,
+        "mainGetLocalBoolOptionSync() for the built-in monitor controls",
+    )
+    COMMON_PATH.write_text(common, encoding="utf-8")
+    print("Enabled RustDesk's built-in cycle monitor buttons by default.")
+    return True
+
+
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
+    if enable_upstream_monitor_switch(text):
+        return
     if "_CycleMonitorMenu" in text:
         print("Cycle monitor button is already present.")
         return

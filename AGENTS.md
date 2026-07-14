@@ -49,20 +49,17 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - If deploying source changes to `120.55.0.199`, do not assume `git pull` works there. Either install git deliberately, upload a controlled source snapshot, or rebuild/recreate the Docker service from a known copied tree.
 - The old project `D:\rustdesk_web客户端\rdgen-repo` remains read-only even if it contains useful reference fixes.
 
-## Current Git Caveats
+## Current Release State
 
-- Local HEAD at handoff is the latest local commit; confirm with `git log --oneline -n 8 --decorate`.
-- Local `origin/master` may be stale because fetch/push had network/proxy/credential friction.
-- Recent functional commits:
-  - `e94a851 add self-signed windows code signing`
-  - `3c382cc document windows signing test`
-  - `65b491a add android universal apk output`
-  - `d4c7f42 document android universal apk verification`
-  - latest `add new window handoff memory` commit
-- The Android universal APK workflow was proven by a live build, so the functional Android change is not theoretical.
-- A final documentation push may still be needed if GitHub rejects credentials in a new session.
+- The development baseline for the RustDesk `1.4.9` batch was `8ff0593`, matching `origin/master` when work resumed on 2026-07-13.
+- The batch changes the form and platform workflows, ports strict optional patch chains, and hardens Linux packaging, macOS signing, uploads, and build inputs.
+- Eleven new patch/test files under `.github/patches/` are part of the release unit. Do not omit untracked files when committing; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
+- No real GitHub Actions client compilation has been run for the `1.4.9` batch.
+- The batch has not been deployed to `120.55.0.199:8000`, and no live generator form has been submitted for it.
+- A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
+- Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
-## Recently Verified Outputs
+## Historical Verified Outputs
 
 - Windows self-signed signing test:
   - filename: `SignTest`

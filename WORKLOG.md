@@ -593,3 +593,68 @@ User constraint recorded:
 - Confirmed the Linux generator workflow did not yet apply the packaged default RustDesk fix diff as a dedicated step.
 - Added a workflow step in `.github/workflows/generator-linux.yml` to download and apply `.github/patches/rustdesk_default_linux.diff` before dependency setup and build.
 - This keeps the generator as the packaging layer while still carrying the earlier RustDesk capture/input/CM fixes into generated Linux builds.
+
+## 2026-07-13
+
+### RustDesk 1.4.9 Generator Adaptation
+
+- Updated the form and all platform generator workflow defaults to RustDesk `1.4.9`.
+- Ported the optional source customization scripts across RustDesk `1.4.7`, `1.4.8`, and `1.4.9`, keeping each selected patch strict instead of silently continuing after a mismatch.
+- Added dedicated patch helpers for Android custom config, Linux base fixes and package formats, connection-delay handling, settings-menu hiding, customization validation, and repeatable patch-chain smoke testing.
+- Added server-side version and platform capability validation, safer manual-setting parsing, build-script input validation, portable filename constraints, and Windows reserved-name rejection.
+- Updated the generator UI to hide and disable unsupported controls when the selected version or platform changes. Added an explicit `[hidden]` rule so layout CSS cannot override hidden state.
+- Verified the desktop and mobile form layouts with Playwright. Screenshots are kept under ignored `output/playwright/` runtime storage.
+
+### Linux Packaging And Workflow Reliability
+
+- Applied the RustDesk `1.4.9` Linux capture/input/connection-manager fixes through a dedicated version-aware helper.
+- Kept `.deb`, RPM, SUSE RPM, Arch, AppImage, and Flatpak customization consistent for the Beijing Linux option.
+- Stopped aarch64 and `master` jobs from attempting to upload an Arch package that is not produced.
+- Made AppImage output discovery use the actual generated versioned filename, including nightly builds.
+- Pinned `setuptools_scm<10`, aligned Flatpak x86 with Ubuntu 22.04, and customized `pacman_install` so Arch post-install actions use the renamed service.
+- Separated machine names from visible application/company/homepage metadata across native packages, AppImage, and Flatpak; collision names such as `RustDesk` no longer trigger a second replacement.
+- Replaced world-writable `/dev/uinput` permissions with `0660` plus `uaccess`, and removed the sudoers rules that allowed caller-controlled `LD_*` variables in privileged processes.
+- Made generator/API uploads fail on HTTP errors and use bounded connection, transfer, and retry windows.
+
+### macOS, Windows, Android, And Shared Workflows
+
+- Pinned NASM `2.16.03` ahead of Homebrew paths for both macOS runner architectures.
+- Packaged `custom_.txt` into the macOS app resources and Flutter assets before signing.
+- Changed P12 signing to sign the complete `.app` bundle once with `rcodesign`, clean the temporary certificate through a trap, and verify the result with deep strict `codesign` verification. The no-P12 path performs an ad-hoc deep re-sign.
+- Kept Android universal plus split APK output and made Android, Windows, macOS, Linux, and external Windows signing POST requests fail on HTTP errors.
+- Updated shared workflow actions, cache keys, and reusable-workflow input definitions; removed the unused undefined upload-tag input.
+
+### Verification And Release Boundary
+
+- Ran every Windows, Windows x86, Linux, macOS, and Android optional patch chain twice against RustDesk `1.4.7`, `1.4.8`, and `1.4.9` source trees.
+- Ran Linux AppImage, Flatpak, RPM, SUSE, and Arch customization helpers twice to verify repeatability.
+- Django suite passes with 29 tests and no system-check findings.
+- Twenty focused Linux packaging regression tests pass, including real-layout edge cases and repeatability coverage.
+- `actionlint`, Python AST parsing, workflow YAML parsing, workflow patch-reference checks, and `git diff --check` pass.
+- Runtime `data/` and `output/` content remains ignored and outside the release diff.
+- No real GitHub Actions compilation for this `1.4.9` batch has been run yet.
+- The deployed generator at `120.55.0.199:8000` has not been updated with this batch, and no live generator form was submitted.
+
+## 2026-07-14
+
+### Release Preflight Hardening
+
+- Independently re-audited the Linux native/AppImage/Flatpak paths and the complete release diff before staging.
+- Fixed same-file `mv` failures when the exact machine name is `rustdesk` in both native DEB layout and AppImage preparation.
+- Added the missing Python runtime to the Flatpak build container and made the native packaging helper compatible with the Ubuntu 18.04 container's Python 3.6.
+- Restricted Beijing Linux customization to the verified RustDesk `1.4.7`, `1.4.8`, and `1.4.9` versions in both Django and the dynamic UI.
+- Rejected RPM macro expansion and whitespace-invalid RPM homepage values at both form and helper boundaries.
+- Added a stable, legal, case-preserving `rdgen-<filename hex>` Linux URI scheme and synchronized the Rust runtime with desktop MIME registration.
+- Matched Linux service configuration copying and DEB purge cleanup to `directories-next` project-directory normalization, including segmented Unicode lowercase behavior and shell-quoted cleanup targets.
+- Made Flatpak application IDs case-preserving and collision-resistant, synchronized manifest/metainfo/bundle references, validated absolute homepage URLs, and added real removal coverage for duplicate `--device=all` entries.
+- Confirmed the Flatpak permission boundary: `--device=dri` remains, but `/dev/uinput` is not exposed; unattended Wayland input is therefore not promised for this package path.
+- Added regression coverage for exact default names, URL validation, AppImage YAML keywords, Flatpak case collisions and repeatability, udev migration, DEB purge paths, URI schemes, Python 3.6 parsing, and container prerequisites.
+
+### Final Local Verification
+
+- Django: 29 tests pass with no system-check findings.
+- Linux packaging: 20 tests pass.
+- Linux optional patch chain ran twice on clean real RustDesk `1.4.7`, `1.4.8`, and `1.4.9` worktrees.
+- Native Linux package helper ran twice on real `1.4.7`, `1.4.8`, and `1.4.9` packaging files; exact lowercase `rustdesk`, custom names, runtime config paths, and URI handlers were checked.
+- Python AST/YAML parsing, `actionlint`, workflow patch references, curl POST failure detection, secret scanning, ignored runtime directory checks, and `git diff --check` pass.
+- No real client compilation, Flatpak runtime installation, live generator submission, or deployment was triggered for this batch.

@@ -53,10 +53,8 @@ typedef struct {
     int index;
 } xcb_screen_iterator_t;
 
-extern void *shim_old_dlsym(void *handle, const char *symbol);
-extern void *shim_old_dlopen(const char *filename, int flags);
-__asm__(".symver shim_old_dlsym,dlsym@GLIBC_2.17");
-__asm__(".symver shim_old_dlopen,dlopen@GLIBC_2.17");
+#define shim_old_dlsym dlsym
+#define shim_old_dlopen dlopen
 
 typedef XDisplay *(*real_XOpenDisplay_fn)(const char *);
 typedef int (*real_XCloseDisplay_fn)(XDisplay *);

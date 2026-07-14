@@ -73,10 +73,8 @@ typedef void *(*real_shmat_fn)(int, const void *, int);
 typedef int (*real_shmdt_fn)(const void *);
 typedef int (*real_shmctl_fn)(int, int, struct shmid_ds *);
 
-extern void *shim_old_dlsym(void *handle, const char *symbol);
-extern void *shim_old_dlopen(const char *filename, int flags);
-__asm__(".symver shim_old_dlsym,dlsym@GLIBC_2.17");
-__asm__(".symver shim_old_dlopen,dlopen@GLIBC_2.17");
+#define shim_old_dlsym dlsym
+#define shim_old_dlopen dlopen
 
 typedef xcb_void_cookie_t (*real_xcb_shm_attach_fn)(xcb_connection_t *,
                                                     xcb_shm_seg_t, uint32_t,
