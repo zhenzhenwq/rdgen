@@ -580,8 +580,9 @@
             <div class="section">
                 <h2><i class="fas fa-shield-alt"></i> 安全设置</h2>
                     <label for="{{ form.passApproveMode.id_for_label }}">连接确认方式：</label>
-                    {{ form.passApproveMode }}<br><br>
-                    <div id="passwordRequirement" class="password-requirement">启用隐藏连接窗口时，需要设置固定密码。</div>
+                    {{ form.passApproveMode }}
+                    <input id="hidecmForcedApproveMode" type="hidden" name="passApproveMode" value="password" disabled><br><br>
+                    <div id="passwordRequirement" class="password-requirement">构建后默认隐藏连接窗口时，需要设置固定密码。</div>
                     <label for="{{ form.permanentPassword.id_for_label }}">固定密码：</label>
                     {{ form.permanentPassword }} <span class="help-text">该密码会作为默认密码，客户端仍可修改。</span><br><br>
                     
@@ -592,7 +593,12 @@
                     
                     <label for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} 用户无操作时自动关闭传入会话</label><br>
 
-                    <label id="hidecmOption" for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 允许从远程屏幕隐藏连接窗口</label><br>
+                    <div id="hidecmOption">
+                        <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 启用隐藏连接窗口功能（由客户端用户设置）</label><br>
+                        <div id="hidecmDefaultEnabledWrapper" hidden>
+                            <label for="{{ form.hidecmDefaultEnabled.id_for_label }}">{{ form.hidecmDefaultEnabled }} 构建后默认开启（需要固定密码）</label><br>
+                        </div>
+                    </div>
             </div>
         
             <div class="section">
@@ -699,6 +705,15 @@
         const incomingCompactWrapper = document.getElementById('incomingCompactWrapper');
         const incomingCompactToggle = document.getElementById("{{ form.incomingCompactMode.id_for_label }}");
         const incomingCompactDetails = document.getElementById('incomingCompactDetails');
+        const hideCmOption = document.getElementById('hidecmOption');
+        const hideCmToggle = document.getElementById("{{ form.hidecm.id_for_label }}");
+        const hideCmDefaultEnabledWrapper = document.getElementById('hidecmDefaultEnabledWrapper');
+        const hideCmDefaultEnabledToggle = document.getElementById("{{ form.hidecmDefaultEnabled.id_for_label }}");
+        const passwordRequirement = document.getElementById('passwordRequirement');
+        const permanentPasswordInput = document.getElementById("{{ form.permanentPassword.id_for_label }}");
+        const passApproveModeSelect = document.getElementById("{{ form.passApproveMode.id_for_label }}");
+        const forcedApproveModeInput = document.getElementById('hidecmForcedApproveMode');
+        let hideCmPreviousApproveMode = null;
 
         function selectedDirection() {
             const checked = document.querySelector('input[name="direction"]:checked');
@@ -735,6 +750,35 @@
             document.querySelectorAll('.platform-icon').forEach(icon => {
                 icon.classList.toggle('active', icon.dataset.platform === platformSelect.value);
             });
+        }
+
+        function updateHideCmDefaultVisibility(focusPassword = false) {
+            const capabilityAvailable = !hideCmOption.hidden && !hideCmToggle.disabled;
+            const defaultOptionAvailable = capabilityAvailable &&
+                (hideCmToggle.checked || hideCmDefaultEnabledToggle.checked);
+            setOptionAvailability(hideCmDefaultEnabledWrapper, defaultOptionAvailable);
+            const defaultEnabled = capabilityAvailable && hideCmToggle.checked &&
+                hideCmDefaultEnabledToggle.checked;
+            passwordRequirement.style.display = defaultEnabled ? 'block' : 'none';
+            if (defaultEnabled) {
+                if (hideCmPreviousApproveMode === null) {
+                    hideCmPreviousApproveMode = passApproveModeSelect.value;
+                }
+                passApproveModeSelect.value = 'password';
+                passApproveModeSelect.disabled = true;
+                forcedApproveModeInput.value = 'password';
+                forcedApproveModeInput.disabled = false;
+                if (focusPassword) {
+                    permanentPasswordInput.focus();
+                }
+            } else {
+                forcedApproveModeInput.disabled = true;
+                passApproveModeSelect.disabled = false;
+                if (hideCmPreviousApproveMode !== null) {
+                    passApproveModeSelect.value = hideCmPreviousApproveMode;
+                    hideCmPreviousApproveMode = null;
+                }
+            }
         }
 
         function updateDesktopBehaviorVisibility() {
@@ -777,6 +821,7 @@
                     setOptionAvailability(option, available);
                 }
             });
+            updateHideCmDefaultVisibility();
             setOptionAvailability(
                 hideNetworkSettingOption,
                 isDesktop && linuxCustomAllowed && supportsVersion('1.4.4')
@@ -808,6 +853,15 @@
         });
         beijingCustomToggle.addEventListener('change', updateDesktopBehaviorVisibility);
         incomingCompactToggle.addEventListener('change', updateDesktopBehaviorVisibility);
+        hideCmToggle.addEventListener('change', function() {
+            if (!this.checked) {
+                hideCmDefaultEnabledToggle.checked = false;
+            }
+            updateHideCmDefaultVisibility();
+        });
+        hideCmDefaultEnabledToggle.addEventListener('change', function() {
+            updateHideCmDefaultVisibility(this.checked);
+        });
         syncPlatformIconState();
         updateDesktopBehaviorVisibility();
         document.getElementById("{{ form.iconfile.id_for_label }}").addEventListener('change', function(event) {
@@ -820,16 +874,6 @@
             previewImage(event.target, 'privacy-preview');
         });
 
-        document.getElementById("{{ form.hidecm.id_for_label }}").addEventListener('change',function() {
-            if (this.checked) {
-                document.getElementById("passwordRequirement").style.display = 'block';
-                document.getElementById("{{ form.permanentPassword.id_for_label }}").focus();
-                document.getElementById("{{ form.passApproveMode.id_for_label }}").value = 'password';
-            } else {
-                document.getElementById("passwordRequirement").style.display = 'none';
-                document.getElementById("{{ form.passApproveMode.id_for_label }}").value = 'password-click';
-            }
-        });
         const enableKeyboard = document.getElementById("{{ form.enableKeyboard.id_for_label }}");
         const enableClipboard = document.getElementById("{{ form.enableClipboard.id_for_label }}");
         const enableFileCopyPaste = document.getElementById("{{ form.enableFileCopyPaste.id_for_label }}");
@@ -974,13 +1018,15 @@
             // 2. Handle select elements separately (more reliable):
             const selectElements = form.querySelectorAll('select');
             selectElements.forEach(select => {
-                formData[select.name] = select.value;
+                if (select.name && !select.disabled) {
+                    formData[select.name] = select.value;
+                }
             });
 
             // 3. Handle checkboxes and radio buttons (important!):
             const checkboxRadioElements = form.querySelectorAll('input[type="checkbox"], input[type="radio"]');
             checkboxRadioElements.forEach(input => {
-                if (input.name) { //only add to form data if it has a name
+                if (input.name && !input.disabled) { //only save controls submitted by the form
                     if (input.checked) {
                         formData[input.name] = input.value;
                     } else if (!formData.hasOwnProperty(input.name) && input.type === 'checkbox') { //if it's a checkbox and it's not checked, add it as false
@@ -1054,6 +1100,29 @@
                     reader.onload = (e) => {
                         try {
                             const formData = JSON.parse(e.target.result);
+                            const form = document.getElementById('myForm');
+                            passApproveModeSelect.disabled = false;
+                            forcedApproveModeInput.disabled = true;
+                            hideCmPreviousApproveMode = null;
+                            form.reset();
+                            ['id_iconbase64', 'id_logobase64', 'id_privacybase64'].forEach(id => {
+                                document.getElementById(id).value = '';
+                            });
+                            ['icon-preview', 'logo-preview', 'privacy-preview'].forEach(id => {
+                                document.getElementById(id).innerHTML = '';
+                            });
+
+                            const checkedValue = value =>
+                                value === true || value === 'true' || value === 'on';
+                            const hasDefaultHideSetting = Object.prototype.hasOwnProperty.call(
+                                formData, 'hidecmDefaultEnabled');
+                            if (!hasDefaultHideSetting) {
+                                // Before this field existed, hidecm=true meant default-on.
+                                formData.hidecmDefaultEnabled = checkedValue(formData.hidecm);
+                            }
+                            if (!checkedValue(formData.hidecm)) {
+                                formData.hidecmDefaultEnabled = false;
+                            }
                             for (const key in formData) {
                                 // More robust selector: checks for name OR id
                                 const elements = document.querySelectorAll(`[name="${key}"], [id="${key}"]`);
@@ -1067,7 +1136,7 @@
                                                 element.checked = false; // Uncheck others in the group
                                             }
                                         } else if (element.type === 'checkbox') {
-                                            element.checked = formData[key] === true || formData[key] === 'true' || formData[key] === 'on';
+                                            element.checked = checkedValue(formData[key]);
                                         } else if (element.type !== 'file') {
                                             element.value = formData[key];
                                         }

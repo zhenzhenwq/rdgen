@@ -194,7 +194,16 @@ class GenerateForm(forms.Form):
     enableRecording = forms.BooleanField(initial=True, required=False)
     enableBlockingInput = forms.BooleanField(initial=True, required=False)
     enableRemoteModi = forms.BooleanField(initial=True, required=False)
-    hidecm = forms.BooleanField(initial=False, required=False)
+    hidecm = forms.BooleanField(
+        label="启用隐藏连接窗口功能",
+        initial=False,
+        required=False,
+    )
+    hidecmDefaultEnabled = forms.BooleanField(
+        label="构建后默认开启隐藏连接窗口",
+        initial=False,
+        required=False,
+    )
     enablePrinter = forms.BooleanField(initial=True, required=False)
     enableCamera = forms.BooleanField(initial=True, required=False)
     enableTerminal = forms.BooleanField(initial=True, required=False)
@@ -265,10 +274,27 @@ class GenerateForm(forms.Form):
                     f'{label}要求 RustDesk {minimum_text} 或更高版本。',
                 )
 
-        if cleaned.get('hidecm') and not (
+        if cleaned.get('hidecmDefaultEnabled') and not cleaned.get('hidecm'):
+            self.add_error(
+                'hidecmDefaultEnabled',
+                '构建后默认隐藏前，必须先启用隐藏连接窗口功能。',
+            )
+        if cleaned.get('hidecmDefaultEnabled') and not (
             cleaned.get('permanentPassword') or ''
         ).strip():
-            self.add_error('permanentPassword', '启用隐藏连接窗口时必须设置固定密码。')
+            self.add_error(
+                'permanentPassword',
+                '构建后默认隐藏连接窗口时必须设置固定密码。',
+            )
+        if (
+            cleaned.get('hidecm')
+            and not cleaned.get('hidecmDefaultEnabled')
+            and cleaned.get('settings') == 'settingsN'
+        ):
+            self.add_error(
+                'settings',
+                '隐藏连接窗口由客户端用户设置时，必须保留设置入口。',
+            )
 
         if platform != 'windows' and (
             cleaned.get('privacyfile') or cleaned.get('privacybase64')

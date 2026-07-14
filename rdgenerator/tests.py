@@ -81,6 +81,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "enableCamera": "on",
             "enableTerminal": "on",
             "hidecm": "on",
+            "hidecmDefaultEnabled": "on",
             "removeWallpaper": "on",
             "defaultManual": "custom-option=Y",
             "overrideManual": "override-option=N",
@@ -129,6 +130,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "removeSetupServerTip",
             "silentInstallOnDoubleClick",
             "hidecm",
+            "hidecmDefaultEnabled",
             "copyIdPasswordButton",
             "manualTemporaryPassword",
             "showStartOnBootCheckbox",
@@ -169,10 +171,70 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(default_settings["direct-server"], "Y")
         self.assertEqual(default_settings["custom-option"], "Y")
         override_settings = custom_config["override-settings"]
-        self.assertEqual(override_settings["approve-mode"], "password")
-        self.assertEqual(override_settings["verification-method"], "use-permanent-password")
-        self.assertEqual(override_settings["allow-hide-cm"], "Y")
+        self.assertNotIn("approve-mode", override_settings)
+        self.assertNotIn("verification-method", override_settings)
+        self.assertNotIn("allow-hide-cm", override_settings)
         self.assertEqual(override_settings["override-option"], "N")
+
+    def test_hide_connection_window_capability_starts_disabled_without_password(self):
+        data = self._feature_payload(platform="windows")
+        data["hidecmDefaultEnabled"] = ""
+        data["permanentPassword"] = ""
+        data["permissionsDorO"] = "override"
+        data["settings"] = "settingsY"
+        data["overrideManual"] = "\n".join([
+            "approve-mode=click",
+            "verification-method=use-permanent-password",
+            "allow-hide-cm=Y",
+        ])
+
+        _, inputs_raw, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(inputs_raw["hidecm"], "true")
+        self.assertEqual(inputs_raw["hidecmDefaultEnabled"], "false")
+        self.assertNotIn("password", custom_config)
+        self.assertEqual(
+            custom_config["default-settings"]["approve-mode"],
+            "password-click",
+        )
+        self.assertEqual(
+            custom_config["default-settings"]["verification-method"],
+            "use-both-passwords",
+        )
+        self.assertEqual(
+            custom_config["default-settings"]["allow-hide-cm"],
+            "N",
+        )
+        self.assertNotIn("approve-mode", custom_config["override-settings"])
+        self.assertNotIn("verification-method", custom_config["override-settings"])
+        self.assertNotIn("allow-hide-cm", custom_config["override-settings"])
+
+    def test_default_hidden_connection_window_remains_user_configurable(self):
+        data = self._feature_payload(platform="windows")
+        data["permissionsDorO"] = "override"
+        data["overrideManual"] = "\n".join([
+            "approve-mode=click",
+            "verification-method=use-both-passwords",
+            "allow-hide-cm=N",
+        ])
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(
+            custom_config["default-settings"]["approve-mode"],
+            "password",
+        )
+        self.assertEqual(
+            custom_config["default-settings"]["verification-method"],
+            "use-permanent-password",
+        )
+        self.assertEqual(
+            custom_config["default-settings"]["allow-hide-cm"],
+            "Y",
+        )
+        self.assertNotIn("approve-mode", custom_config["override-settings"])
+        self.assertNotIn("verification-method", custom_config["override-settings"])
+        self.assertNotIn("allow-hide-cm", custom_config["override-settings"])
 
     def test_company_name_is_sed_escaped_in_workflow_input(self):
         data = self._feature_payload(platform="windows")
@@ -219,6 +281,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "removeRecentSessions",
             "beijingCustom",
             "hidecm",
+            "hidecmDefaultEnabled",
             "hideSettingsMenu",
         ]
         for key in expected_false_flags:
@@ -258,6 +321,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "hideNetworkSetting",
             "removeSetupServerTip",
             "hidecm",
+            "hidecmDefaultEnabled",
             "copyIdPasswordButton",
             "manualTemporaryPassword",
             "incomingCompactMode",
@@ -283,16 +347,39 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_default_version_is_1_4_9(self):
         self.assertEqual(GenerateForm().fields["version"].initial, "1.4.9")
 
-    def test_hide_connection_window_requires_permanent_password(self):
+    def test_hide_connection_window_capability_allows_empty_permanent_password(self):
+        data = self._feature_payload()
+        data["hidecmDefaultEnabled"] = ""
+        data["permanentPassword"] = ""
+        data["settings"] = "settingsY"
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_hide_connection_window_capability_requires_settings_access(self):
+        data = self._feature_payload()
+        data["hidecmDefaultEnabled"] = ""
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("settings", form.errors)
+
+    def test_default_hidden_connection_window_requires_permanent_password(self):
         data = self._feature_payload()
         data["permanentPassword"] = ""
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("permanentPassword", form.errors)
 
+    def test_default_hidden_connection_window_requires_capability(self):
+        data = self._feature_payload()
+        data["hidecm"] = ""
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("hidecmDefaultEnabled", form.errors)
+
     def test_manual_settings_allow_blank_lines_and_equals_in_value(self):
         data = self._feature_payload()
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["defaultManual"] = "\ntoken=part=two\n"
         data["overrideManual"] = ""
         form = GenerateForm(data=data)
@@ -301,6 +388,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_invalid_manual_setting_is_a_form_error(self):
         data = self._feature_payload()
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["defaultManual"] = "missing-separator"
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
@@ -309,6 +397,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_android_rejects_logo(self):
         data = self._feature_payload(platform="android")
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["logobase64"] = "data:image/png;base64,AA=="
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
@@ -317,6 +406,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_privacy_image_is_windows_64_only(self):
         data = self._feature_payload(platform="macos")
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["privacybase64"] = "data:image/png;base64,AA=="
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
@@ -325,6 +415,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_windows_x86_rejects_flutter_only_options(self):
         data = self._feature_payload(platform="windows-x86")
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["cycleMonitor"] = "on"
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
@@ -333,6 +424,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_android_rejects_desktop_settings_menu_option(self):
         data = self._feature_payload(platform="android")
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("hideSettingsMenu", form.errors)
@@ -468,6 +560,7 @@ class GeneratorFeaturePayloadTests(TestCase):
     def test_rejects_invalid_android_app_id(self):
         data = self._feature_payload(platform="android")
         data["hidecm"] = ""
+        data["hidecmDefaultEnabled"] = ""
         data["hideSettingsMenu"] = ""
         data["androidappid"] = "invalid-app-id"
         form = GenerateForm(data=data)

@@ -59,6 +59,9 @@ def generator_view(request):
             cycleMonitor = form.cleaned_data['cycleMonitor'] and platform in flutter_desktop_platforms and linuxCustomAllowed
             xOffline = form.cleaned_data['xOffline'] and platform in (flutter_desktop_platforms | {'android'}) and linuxCustomAllowed
             hidecm = form.cleaned_data['hidecm'] and platform in desktop_platforms and linuxCustomAllowed
+            hidecmDefaultEnabled = (
+                form.cleaned_data['hidecmDefaultEnabled'] and hidecm
+            )
             removeNewVersionNotif = form.cleaned_data['removeNewVersionNotif'] and linuxCustomAllowed
             hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and platform in desktop_platforms and linuxCustomAllowed
             removeRecentSessions = form.cleaned_data['removeRecentSessions'] and platform in desktop_platforms and linuxCustomAllowed
@@ -232,7 +235,7 @@ def generator_view(request):
             decodedCustom['enable-lan-discovery'] = 'N' if denyLan else 'Y'
             #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
             decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
-            effectiveApproveMode = 'password' if hidecm else passApproveMode
+            effectiveApproveMode = 'password' if hidecmDefaultEnabled else passApproveMode
             effectiveEnableFileTransfer = enableFileTransfer and not forceDisableFileTransfer
             if permissionsDorO == "default":
                 decodedCustom['default-settings']['access-mode'] = permissionsType
@@ -247,9 +250,9 @@ def generator_view(request):
                 decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
                 decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
                 decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-                decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
+                decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecmDefaultEnabled else 'use-both-passwords'
                 decodedCustom['default-settings']['approve-mode'] = effectiveApproveMode
-                decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+                decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecmDefaultEnabled else 'N'
                 decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
                 decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
                 decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
@@ -267,18 +270,13 @@ def generator_view(request):
                 decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
                 decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
                 decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
+                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecmDefaultEnabled else 'use-both-passwords'
                 decodedCustom['override-settings']['approve-mode'] = effectiveApproveMode
-                decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+                decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecmDefaultEnabled else 'N'
                 decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
                 decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
                 decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
                 decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
-
-            if hidecm:
-                decodedCustom['override-settings']['approve-mode'] = 'password'
-                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password'
-                decodedCustom['override-settings']['allow-hide-cm'] = 'Y'
 
             if linuxCustomAllowed:
                 for line in defaultManual.splitlines():
@@ -292,6 +290,24 @@ def generator_view(request):
                         continue
                     k, _separator, value = line.partition('=')
                     decodedCustom['override-settings'][k.strip()] = value.strip()
+
+            hidecm_settings = (
+                'approve-mode',
+                'verification-method',
+                'allow-hide-cm',
+            )
+            if hidecm:
+                for key_name in hidecm_settings:
+                    decodedCustom['override-settings'].pop(key_name, None)
+                decodedCustom['default-settings'].update({
+                    'approve-mode': 'password' if hidecmDefaultEnabled else passApproveMode,
+                    'verification-method': (
+                        'use-permanent-password'
+                        if hidecmDefaultEnabled
+                        else 'use-both-passwords'
+                    ),
+                    'allow-hide-cm': 'Y' if hidecmDefaultEnabled else 'N',
+                })
 
             if not linuxCustomAllowed:
                 decodedCustom = {}
@@ -365,6 +381,7 @@ def generator_view(request):
                 "removeSetupServerTip": 'true' if removeSetupServerTip else 'false',
                 "silentInstallOnDoubleClick": 'true' if silentInstallOnDoubleClick else 'false',
                 "hidecm": 'true' if hidecm else 'false',
+                "hidecmDefaultEnabled": 'true' if hidecmDefaultEnabled else 'false',
                 "copyIdPasswordButton": 'true' if copyIdPasswordButton else 'false',
                 "manualTemporaryPassword": 'true' if manualTemporaryPassword else 'false',
                 "showStartOnBootCheckbox": 'true' if showStartOnBootCheckbox else 'false',
