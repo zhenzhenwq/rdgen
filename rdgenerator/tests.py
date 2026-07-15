@@ -33,13 +33,14 @@ class GeneratorFeaturePayloadTests(TestCase):
         data = {
             "platform": platform,
             "version": "1.4.9",
+            "formSchemaVersion": "2",
             "delayFix": "on",
             "beijingCustom": "on",
             "exename": "AllFeatures",
             "appname": "WuYouDesk",
             "direction": direction,
             "installation": "installationN",
-            "settings": "settingsN",
+            "settings": "settingsY",
             "hideNetworkSetting": "on",
             "defaultViewStyle": "adaptive",
             "removeSetupServerTip": "on",
@@ -152,7 +153,7 @@ class GeneratorFeaturePayloadTests(TestCase):
 
         self.assertEqual(custom_config["conn-type"], "incoming")
         self.assertEqual(custom_config["disable-installation"], "Y")
-        self.assertEqual(custom_config["disable-settings"], "Y")
+        self.assertNotIn("disable-settings", custom_config)
         self.assertEqual(custom_config["hide-network-setting"], "Y")
         self.assertEqual(custom_config["custom-rendezvous-server"], "10.0.0.1")
         self.assertEqual(custom_config["relay-server"], "10.0.0.1")
@@ -235,6 +236,22 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertNotIn("approve-mode", custom_config["override-settings"])
         self.assertNotIn("verification-method", custom_config["override-settings"])
         self.assertNotIn("allow-hide-cm", custom_config["override-settings"])
+
+    def test_legacy_hide_connection_window_post_keeps_default_enabled(self):
+        data = self._feature_payload(platform="windows")
+        data.pop("formSchemaVersion")
+        data.pop("hidecmDefaultEnabled")
+        data["settings"] = "settingsN"
+
+        _, inputs_raw, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(inputs_raw["hidecm"], "true")
+        self.assertEqual(inputs_raw["hidecmDefaultEnabled"], "true")
+        self.assertEqual(custom_config["disable-settings"], "Y")
+        self.assertEqual(
+            custom_config["default-settings"]["allow-hide-cm"],
+            "Y",
+        )
 
     def test_company_name_is_sed_escaped_in_workflow_input(self):
         data = self._feature_payload(platform="windows")
@@ -355,9 +372,28 @@ class GeneratorFeaturePayloadTests(TestCase):
         form = GenerateForm(data=data)
         self.assertTrue(form.is_valid(), form.errors)
 
+    def test_new_form_missing_default_checkbox_means_default_disabled(self):
+        data = self._feature_payload()
+        data.pop("hidecmDefaultEnabled")
+        data["permanentPassword"] = ""
+        form = GenerateForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["hidecmDefaultEnabled"])
+
+    def test_unknown_form_schema_does_not_use_legacy_hide_defaults(self):
+        data = self._feature_payload()
+        data["formSchemaVersion"] = "3"
+        data.pop("hidecmDefaultEnabled")
+        data["settings"] = "settingsN"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("settings", form.errors)
+        self.assertFalse(form.cleaned_data["hidecmDefaultEnabled"])
+
     def test_hide_connection_window_capability_requires_settings_access(self):
         data = self._feature_payload()
         data["hidecmDefaultEnabled"] = ""
+        data["settings"] = "settingsN"
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("settings", form.errors)
@@ -368,6 +404,13 @@ class GeneratorFeaturePayloadTests(TestCase):
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("permanentPassword", form.errors)
+
+    def test_default_hidden_connection_window_requires_settings_access(self):
+        data = self._feature_payload()
+        data["settings"] = "settingsN"
+        form = GenerateForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("settings", form.errors)
 
     def test_default_hidden_connection_window_requires_capability(self):
         data = self._feature_payload()

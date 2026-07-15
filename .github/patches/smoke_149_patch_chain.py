@@ -76,6 +76,40 @@ CHAINS = {
 }
 
 
+def validate_platform_result(platform: str, source: Path) -> None:
+    if platform == "android":
+        return
+    flutter_settings = (
+        source / "flutter/lib/desktop/pages/desktop_setting_page.dart"
+    ).read_text(encoding="utf-8")
+    flutter_model = (source / "flutter/lib/models/server_model.dart").read_text(
+        encoding="utf-8"
+    )
+    if "key: 'allow-hide-cm', value: b ? 'Y' : 'N'" not in flutter_settings:
+        raise SystemExit("Flutter hide connection window toggle does not persist N")
+    reset_marker = "key: 'allow-hide-cm', value: 'N'"
+    if flutter_model.count(reset_marker) != 2:
+        raise SystemExit("Flutter hide connection window resets do not persist N")
+
+    if platform != "windows-x86":
+        return
+    sciter_settings = (source / "src/ui/index.tis").read_text(encoding="utf-8")
+    markers = (
+        "<li #allow-hide-cm ",
+        "var can_hide_cm = mode == 'password' &&",
+        "function resetHideCmIfUnavailable()",
+        "if (me.id == 'allow-hide-cm')",
+        "handler.set_option('allow-hide-cm', 'N');",
+        "'allow-hide-cm', enabled ? 'N' : 'Y');",
+    )
+    missing = [marker for marker in markers if marker not in sciter_settings]
+    if missing:
+        raise SystemExit(
+            "Sciter hide connection window controls are incomplete: "
+            + ", ".join(missing)
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform", choices=CHAINS, required=True)
@@ -94,6 +128,7 @@ def main() -> None:
             command = [sys.executable, str(patches / script_name), *script_args]
             print(f"[{args.platform} pass {pass_number}] {script_name}", flush=True)
             subprocess.run(command, cwd=source, check=True)
+        validate_platform_result(args.platform, source)
 
 
 if __name__ == "__main__":

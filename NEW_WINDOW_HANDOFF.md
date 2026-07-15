@@ -27,6 +27,7 @@ The batch includes:
 - Windows x64, Windows x86, Linux, macOS, and Android patch-chain compatibility.
 - Strict patch failures instead of `continue-on-error` for selected customizations.
 - Version/platform capability checks in Django and matching dynamic UI visibility.
+- Hidden-connection-window capability is separate from its default state. New forms keep the settings entry available, legacy POSTs retain their old default-on meaning, and Windows x86 exposes the same user toggle through Sciter. Flutter and Sciter write explicit `Y`/`N` overrides so users can disable a build default even when the app name remains `RustDesk`.
 - Safer build inputs, manual settings, portable artifact names, Windows reserved-name checks, and bounded name lengths.
 - Linux native packages, AppImage, and Flatpak customization and upload reliability fixes.
 - Beijing Linux customization is accepted only for the verified `1.4.7`, `1.4.8`, and `1.4.9` tags; the UI and Django validation both enforce this boundary.
@@ -54,20 +55,23 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 ## Repository State
 
 - Development baseline: `8ff0593`, which matched `origin/master` when this batch resumed.
-- After the release commit is created and pushed, treat the commit containing this handoff as the authoritative batch state.
+- Core release commit: `8e33770` (`Adapt generator for RustDesk 1.4.9`).
+- First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
+- Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
 
 - The optional patch chains for Windows, Windows x86, Linux, macOS, and Android were each run twice against RustDesk `1.4.7`, `1.4.8`, and `1.4.9` sources.
 - Linux AppImage, Flatpak, RPM, SUSE, Arch, URI-scheme, service-config, and DEB purge customizations passed repeatability checks against real RustDesk `1.4.7`, `1.4.8`, and `1.4.9` file layouts.
-- Django: 29 tests pass; system checks report no issues.
+- Django: 38 tests pass; system checks report no issues. Coverage includes new-form unchecked semantics, legacy POST migration, unknown schema handling, and settings-entry requirements for both hidden-window default states.
+- Windows x86 patch chains ran twice on real RustDesk `1.4.7`, `1.4.8`, and `1.4.9` sources after adding the Sciter `allow-hide-cm` control.
 - Linux packaging customization: 20 focused regression tests pass. They cover Python 3.6 compatibility in the Ubuntu 18.04 native container, exact `rustdesk` name handling, RPM metadata rejection, AppImage YAML quoting, Flatpak identity/metainfo/device permissions, URI protocol consistency, runtime configuration paths, udev migration, and repeatability.
 - `actionlint`: no findings.
 - Python AST and workflow YAML parsing: pass.
 - Workflow patch references: no missing concrete files.
 - Every workflow curl POST now uses HTTP failure detection.
 - `git diff --check`: no whitespace errors; Git only reports the repository's existing LF-to-CRLF checkout warnings.
-- Playwright desktop/mobile and platform switching checks passed.
+- Playwright desktop/mobile and platform switching checks passed. A focused follow-up also verified capability-only/default-on transitions, forced password submission, and old/current JSON import behavior with no page errors.
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
 
@@ -81,9 +85,11 @@ Important Linux/Flatpak boundaries:
 
 ## Not Yet Verified Or Deployed
 
-- No real GitHub Actions client compilation has been run for this `1.4.9` batch.
+- Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
+- No real Linux, macOS, or Android client compilation has been verified for this batch.
+- Docker image runs `29317047756` and `29325337747` failed at `Login to Docker Hub` with `Username and password required`; image build/push steps never ran. Check `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` before expecting the automatic image workflow to succeed.
 - The live generator at `120.55.0.199:8000` has not been deployed from this batch.
-- No live generator form has been submitted for this batch.
+- This continuation did not submit the live generator form or dispatch a client workflow.
 - macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
@@ -93,7 +99,7 @@ Important Linux/Flatpak boundaries:
 2. Confirm the eleven new patch and test files are tracked in the release commit.
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
-5. Treat a real Actions build and live deployment as separate, explicit follow-up work.
+5. Treat additional Actions builds, Docker credential repair, and live deployment as separate, explicit follow-up work.
 
 ## Deployment Notes
 

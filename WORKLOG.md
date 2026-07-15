@@ -658,3 +658,24 @@ User constraint recorded:
 - Native Linux package helper ran twice on real `1.4.7`, `1.4.8`, and `1.4.9` packaging files; exact lowercase `rustdesk`, custom names, runtime config paths, and URI handlers were checked.
 - Python AST/YAML parsing, `actionlint`, workflow patch references, curl POST failure detection, secret scanning, ignored runtime directory checks, and `git diff --check` pass.
 - No real client compilation, Flatpak runtime installation, live generator submission, or deployment was triggered for this batch.
+
+## 2026-07-15
+
+### Hidden Connection Window Compatibility Follow-Up
+
+- Confirmed the core `1.4.9` release commit `8e33770` and the first capability-state follow-up `cd2c358` were already on `origin/master` after the interrupted session resumed.
+- Kept build-time hidden-window capability separate from its default state while requiring new submissions to preserve the client settings entry.
+- Added form schema versioning so old pages and direct POST clients that only send `hidecm=on` retain the former default-on behavior; an unchecked new checkbox remains default-off.
+- Added the `allow-hide-cm` control to the Sciter password menu, including authentication-mode gating, fixed-option handling, reset behavior, strict anchors, and idempotence. This makes capability-only mode usable on Windows x86.
+- Made both Flutter and Sciter persist explicit `N` values when users disable hidden-window behavior or switch to an incompatible authentication mode. Empty values would otherwise fall back to a build default of `Y` for the default `RustDesk` application name.
+- Sciter reads the hidden-window state when a new connection-manager process starts; an already-open Sciter connection-manager window does not respond live to a setting change.
+
+### Follow-Up Verification And Remote State
+
+- Django: 38 tests pass with no system-check findings.
+- Linux packaging: 20 tests continue to pass.
+- Windows x86 patch chains ran twice against real RustDesk `1.4.7`, `1.4.8`, and `1.4.9` sources with the Sciter result markers verified after every pass.
+- Focused Playwright checks passed for capability-only/default-on transitions, password-mode submission, legacy/current JSON import behavior, and JavaScript page errors.
+- Successful Windows `workflow_dispatch` runs exist for `8e33770` (`29318081070`) and `cd2c358` (`29326063260`). They were not caused by push; public metadata cannot distinguish UI dispatch from generator/API dispatch.
+- Automatic Docker runs `29317047756` and `29325337747` both failed before build at Docker Hub login because the username/password inputs were unavailable. No Docker image was built or pushed by those runs.
+- This continuation did not dispatch a client build, submit the live generator form, repair repository secrets/variables, or deploy the generator.

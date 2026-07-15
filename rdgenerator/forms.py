@@ -36,6 +36,7 @@ WINDOWS_RESERVED_NAME = re.compile(
 )
 MAX_BUILD_NAME_UTF8_BYTES = 200
 BEIJING_LINUX_VERSIONS = {"1.4.7", "1.4.8", "1.4.9"}
+FORM_SCHEMA_VERSION = "2"
 
 
 def validate_portable_name(value):
@@ -76,6 +77,11 @@ def version_at_least(value, minimum):
 
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
+    formSchemaVersion = forms.CharField(
+        initial=FORM_SCHEMA_VERSION,
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64 位'),('windows-x86','Windows 32 位'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
     version = forms.ChoiceField(
@@ -235,6 +241,13 @@ class GenerateForm(forms.Form):
         cleaned = super().clean()
         platform = cleaned.get('platform')
         version = cleaned.get('version')
+        legacy_hidecm_submission = (
+            cleaned.get('hidecm')
+            and 'hidecmDefaultEnabled' not in self.data
+            and 'formSchemaVersion' not in self.data
+        )
+        if legacy_hidecm_submission:
+            cleaned['hidecmDefaultEnabled'] = True
 
         if platform == 'linux' and cleaned.get('beijingCustom'):
             if version not in BEIJING_LINUX_VERSIONS:
@@ -288,12 +301,12 @@ class GenerateForm(forms.Form):
             )
         if (
             cleaned.get('hidecm')
-            and not cleaned.get('hidecmDefaultEnabled')
             and cleaned.get('settings') == 'settingsN'
+            and not legacy_hidecm_submission
         ):
             self.add_error(
                 'settings',
-                '隐藏连接窗口由客户端用户设置时，必须保留设置入口。',
+                '启用隐藏连接窗口功能时必须保留设置入口。',
             )
 
         if platform != 'windows' and (
