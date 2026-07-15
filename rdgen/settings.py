@@ -28,7 +28,8 @@ GHBRANCH = os.environ.get("GHBRANCH",'master')
 ZIP_PASSWORD = os.environ.get("ZIP_PASSWORD",'insecure')
 PROTOCOL = os.environ.get("PROTOCOL", 'https')
 REPONAME = os.environ.get("REPONAME", 'rdgen')
-SH_SECRET = os.environ.get('SH_SECRET', 'secret')
+SH_SECRET = os.environ.get('SH_SECRET', '')
+API_SHARED_SECRET = os.environ.get('API_SHARED_SECRET', '')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -38,8 +39,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEBUG_ENV = os.environ.get("DEBUG", "False")
 DEBUG = DEBUG_ENV.lower() in ['true', '1', 't']
 
-ALLOWED_HOSTS = ['*']
-#CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split()
+def env_list(name, default=''):
+    return [
+        value.strip()
+        for value in os.environ.get(name, default).split(',')
+        if value.strip()
+    ]
+
+
+def env_bool(name, default='False'):
+    return os.environ.get(name, default).lower() in ('true', '1', 't')
+
+
+ALLOWED_HOSTS = env_list(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,[::1],testserver',
+)
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 
 # Application definition
 
@@ -57,7 +73,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -137,3 +153,29 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = None
+
+# Authentication and session defaults. Set HTTPS_ENABLED=True only after the
+# site is served through a trusted HTTPS reverse proxy.
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
+
+SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', '28800'))
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+HTTPS_ENABLED = env_bool('HTTPS_ENABLED')
+SESSION_COOKIE_SECURE = HTTPS_ENABLED
+CSRF_COOKIE_SECURE = HTTPS_ENABLED
+SECURE_SSL_REDIRECT = HTTPS_ENABLED
+SECURE_REDIRECT_EXEMPT = [r'^healthz$']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0')) if HTTPS_ENABLED else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = HTTPS_ENABLED and env_bool(
+    'SECURE_HSTS_INCLUDE_SUBDOMAINS'
+)
+SECURE_HSTS_PRELOAD = HTTPS_ENABLED and env_bool('SECURE_HSTS_PRELOAD')
+SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -88,6 +88,10 @@ jobs:
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
 
+      - name: Set rdgen status URL
+        if: ${{ env.rdgen == 'true' }}
+        run: echo "STATUS_URL=${{ secrets.GENURL }}/updategh?signature=${{ env.status_signature }}" >> $GITHUB_ENV
+
       - name: Finalize and Cleanup zip/json
         if: always() # Run even if previous steps fail
         continue-on-error: true
@@ -95,7 +99,7 @@ jobs:
         with:
           url: "${{ secrets.GENURL }}/cleanzip"
           method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
+          customHeaders: '{"Content-Type": "application/json", "Authorization": "Bearer ${{ env.token }}"}'
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
@@ -312,10 +316,11 @@ jobs:
           mkdir -p ./rustdesk/data/flutter_assets/assets
 
           # Download icon using curl with additional SSL options
-          curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+          curl --fail --location --tlsv1.2 --proto '=https' \
             -H "User-Agent: Mozilla/5.0" \
+            -H "Authorization: Bearer ${{ env.token }}" \
             "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}" \
-            -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
+            -o ./res/icon.png || wget --https-only --header="Authorization: Bearer ${{ env.token }}" -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
             
           # Backup existing files (if they exist)
           [ -f "./res/32x32.png" ] && mv ./res/32x32.png ./res/32x32.png.bak
@@ -646,11 +651,12 @@ jobs:
           test -n "$APP_BUNDLE"
           ASSETS_DIR="$APP_BUNDLE/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
           test -d "$ASSETS_DIR"
-          curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+          curl --fail --location --tlsv1.2 --proto '=https' \
             -H "User-Agent: Mozilla/5.0" \
+            -H "Authorization: Bearer ${{ env.token }}" \
             "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}" \
             -o "$ASSETS_DIR/logo.png" || \
-          wget --no-check-certificate \
+          wget --https-only --header="Authorization: Bearer ${{ env.token }}" \
             -O "$ASSETS_DIR/logo.png" \
             "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
           test -s "$ASSETS_DIR/logo.png"

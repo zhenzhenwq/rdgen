@@ -104,7 +104,7 @@ jobs:
       - name: Set rdgen value
         if: ${{ env.rdgen == 'true' }}
         run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh?signature=${{ env.status_signature }}" >> $GITHUB_ENV
 
       - name: Set rdgen value
         if: ${{ env.rdgen == 'false' }}
@@ -242,7 +242,7 @@ jobs:
             mv ./res/icon.ico ./res/icon.ico.bak
             mv ./res/icon.png ./res/icon.png.bak
             mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-            wget -O ./res/icon.png ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }}
+            wget --header="Authorization: Bearer ${{ env.token }}" -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
             mv ./res/32x32.png ./res/32x32.png.bak
             mv ./res/64x64.png ./res/64x64.png.bak
             mv ./res/128x128.png ./res/128x128.png.bak
@@ -612,7 +612,7 @@ jobs:
             export CARGO_INCREMENTAL=0
             export DEB_ARCH=${{ matrix.job.deb_arch }}
             if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.logolink_url }}" != "false" ]]; then
-              wget -O ./flutter/assets/logo.png ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }}
+              wget --header="Authorization: Bearer ${{ env.token }}" -O ./flutter/assets/logo.png "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
             fi
             if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.iconlink_url }}" != "false" ]]; then
               mv ./flutter/assets/icon.svg ./flutter/assets/icon.svg.bak
@@ -797,7 +797,7 @@ jobs:
             mv ./res/icon.ico ./res/icon.ico.bak
             mv ./res/icon.png ./res/icon.png.bak
             mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-            wget -O ./res/icon.png ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }}
+            wget --header="Authorization: Bearer ${{ env.token }}" -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
             mv ./res/32x32.png ./res/32x32.png.bak
             mv ./res/64x64.png ./res/64x64.png.bak
             mv ./res/128x128.png ./res/128x128.png.bak
@@ -1032,13 +1032,13 @@ jobs:
         with:
           url: "${{ secrets.GENURL }}/cleanzip"
           method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
+          customHeaders: '{"Content-Type": "application/json", "Authorization": "Bearer ${{ env.token }}"}'
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Set rdgen value
         if: ${{ env.rdgen == 'true' }}
         run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh?signature=${{ env.status_signature }}" >> $GITHUB_ENV
 
       - name: Set rdgen value
         if: ${{ env.rdgen == 'false' }}

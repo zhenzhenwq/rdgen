@@ -1,0 +1,60 @@
+{% extends "base_account.html" %}
+
+{% block title %}用户管理 | RustDesk 生成器{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <h1>用户管理</h1>
+    <a class="button page-heading__action" href="{% url 'users:create' %}">创建账号</a>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>用户名</th>
+                <th>邮箱 / 姓名</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th>最近登录</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for managed_user in users %}
+                <tr>
+                    <td><strong>{{ managed_user.username }}</strong></td>
+                    <td>
+                        {% if managed_user.email %}{{ managed_user.email }}{% endif %}
+                        {% if managed_user.get_full_name %}<br>{{ managed_user.get_full_name }}{% endif %}
+                        {% if not managed_user.email and not managed_user.get_full_name %}-{% endif %}
+                    </td>
+                    <td>{% if managed_user.is_superuser %}超级管理员{% elif managed_user.is_staff %}管理员{% else %}普通用户{% endif %}</td>
+                    <td>
+                        <span class="status{% if not managed_user.is_active %} status--off{% endif %}">
+                            {% if managed_user.is_active %}正常{% else %}已停用{% endif %}
+                        </span>
+                    </td>
+                    <td>{{ managed_user.last_login|date:"Y-m-d H:i"|default:"-" }}</td>
+                    <td>{{ managed_user.date_joined|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <div class="row-actions">
+                            <a class="button button--secondary button--small" href="{% url 'users:edit' managed_user.pk %}">编辑</a>
+                            <a class="button button--secondary button--small" href="{% url 'users:password' managed_user.pk %}">重置密码</a>
+                            <form class="inline-form" method="post" action="{% url 'users:toggle' managed_user.pk %}">
+                                {% csrf_token %}
+                                <button class="button {% if managed_user.is_active %}button--danger{% else %}button--secondary{% endif %} button--small" type="submit"{% if managed_user.pk == request.user.pk %} disabled title="不能停用当前账号"{% endif %}>
+                                    {% if managed_user.is_active %}停用{% else %}启用{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7">暂无账号。</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

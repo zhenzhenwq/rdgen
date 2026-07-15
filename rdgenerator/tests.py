@@ -7,9 +7,11 @@ from uuid import UUID
 
 import pyzipper
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from .forms import GenerateForm
+from .models import GithubRun
 
 
 @override_settings(
@@ -23,6 +25,11 @@ from .forms import GenerateForm
 class GeneratorFeaturePayloadTests(TestCase):
     def setUp(self):
         self.created_secret_zips = []
+        self.user = get_user_model().objects.create_user(
+            username="generator-test-user",
+            password="test-password",
+        )
+        self.client.force_login(self.user)
 
     def tearDown(self):
         for path in self.created_secret_zips:
@@ -109,6 +116,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             response = self.client.post("/generator", data=data)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(GithubRun.objects.get().owner, self.user)
         post_payload = post_mock.call_args.kwargs["json"]
         zip_url = json.loads(post_payload["inputs"]["zip_url"])
         zip_path = Path("temp_zips") / zip_url["file"]

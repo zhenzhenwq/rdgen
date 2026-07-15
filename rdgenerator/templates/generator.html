@@ -44,6 +44,60 @@
             padding: 32px 18px 56px;
         }
 
+        .app-header {
+            margin: -32px -18px 28px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .app-header__inner {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            width: min(1180px, calc(100% - 32px));
+            min-height: 64px;
+            margin: 0 auto;
+        }
+
+        .app-brand {
+            color: var(--text);
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .app-nav, .app-account {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .app-account { margin-left: auto; }
+        .app-username { color: var(--muted); font-size: 14px; font-weight: 700; }
+        .inline-form { display: inline; margin: 0; }
+        .button--secondary.button--small {
+            min-height: 34px;
+            padding: 6px 10px;
+            border: 1px solid var(--line-strong);
+            background: #fff;
+            color: var(--blue-strong);
+            box-shadow: none;
+            font-size: 13px;
+        }
+
+        @media (max-width: 760px) {
+            .app-header__inner {
+                align-items: flex-start;
+                flex-wrap: wrap;
+                gap: 10px 16px;
+                padding: 13px 0;
+            }
+
+            .app-account {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+
         .platform {
             display: grid;
             grid-template-columns: 1fr;
@@ -244,17 +298,19 @@
         }
 
         .save-load-section-container {
-            position: fixed;
-            top: 18px;
-            left: 18px;
+            position: sticky;
+            top: 12px;
+            margin: 0 auto 18px;
             background-color: transparent;
-            padding: 0px;
+            padding: 0 20px;
             border-radius: 8px;
             z-index: 100;
-            max-width: 310px;
+            max-width: 1200px;
         }
 
         .save-load-section-container .section {
+            width: min(310px, 100%);
+            margin-left: auto;
             padding: 14px;
             box-shadow: 0 14px 32px rgba(22, 81, 152, 0.16);
         }
@@ -421,10 +477,6 @@
         }
 
         @media (max-width: 900px) {
-            body {
-                padding-top: 92px;
-            }
-
             .container {
                 grid-template-columns: 1fr;
                 padding: 10px 12px;
@@ -435,9 +487,12 @@
             }
 
             .save-load-section-container {
-                right: 12px;
-                left: 12px;
-                max-width: none;
+                top: 8px;
+                padding: 0 12px;
+            }
+
+            .save-load-section-container .section {
+                width: 100%;
             }
 
             .desktop-behavior-grid,
@@ -448,8 +503,10 @@
       </style>
 </head>
 <body>
+    {% include "includes/app_header.html" %}
     <h1><i class="fas fa-cogs"></i> RustDesk 自定义客户端生成器</h1>
     <form id="myForm" action="/generator" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
         {{ form.formSchemaVersion }}
         {% if form.errors %}
             <div class="errorlist" role="alert">

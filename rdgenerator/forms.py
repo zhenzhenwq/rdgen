@@ -1,8 +1,126 @@
 import re
 
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
 from django.core.validators import RegexValidator, URLValidator
 from PIL import Image
+
+
+User = get_user_model()
+
+
+class UsernameAuthenticationForm(AuthenticationForm):
+    error_messages = {
+        "invalid_login": "用户名或密码不正确。",
+        "inactive": "用户名或密码不正确。",
+    }
+
+    username = forms.CharField(
+        label="用户名",
+        error_messages={"required": "请输入用户名。"},
+        widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "username"}),
+    )
+    password = forms.CharField(
+        label="密码",
+        strip=False,
+        error_messages={"required": "请输入密码。"},
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+
+
+class ManagedUserCreationForm(UserCreationForm):
+    email = forms.EmailField(label="邮箱", required=False)
+    first_name = forms.CharField(label="名", max_length=150, required=False)
+    last_name = forms.CharField(label="姓", max_length=150, required=False)
+    is_staff = forms.BooleanField(label="管理员", required=False)
+    is_active = forms.BooleanField(label="允许登录", required=False, initial=True)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "email",
+            "last_name",
+            "first_name",
+            "is_staff",
+            "is_active",
+        )
+
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.actor = actor
+        self.fields["username"].label = "用户名"
+        self.fields["password1"].label = "密码"
+        self.fields["password2"].label = "确认密码"
+        if not actor or not actor.is_superuser:
+            self.fields.pop("is_staff", None)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if not self.actor or not self.actor.is_superuser:
+            user.is_staff = False
+        if commit:
+            user.save()
+        return user
+
+
+class ManagedUserEditForm(forms.ModelForm):
+    email = forms.EmailField(label="邮箱", required=False)
+    first_name = forms.CharField(label="名", max_length=150, required=False)
+    last_name = forms.CharField(label="姓", max_length=150, required=False)
+    is_staff = forms.BooleanField(label="管理员", required=False)
+    is_active = forms.BooleanField(label="允许登录", required=False)
+
+    class Meta:
+        model = User
+        fields = (
+            "username",
+            "email",
+            "last_name",
+            "first_name",
+            "is_staff",
+            "is_active",
+        )
+        labels = {"username": "用户名"}
+
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.actor = actor
+        if not actor or not actor.is_superuser:
+            self.fields.pop("is_staff", None)
+
+    def clean_is_active(self):
+        is_active = self.cleaned_data["is_active"]
+        if self.instance.pk == getattr(self.actor, "pk", None) and not is_active:
+            raise forms.ValidationError("不能停用当前登录账号。")
+        if self.instance.is_superuser and not is_active:
+            has_another_superuser = User.objects.filter(
+                is_superuser=True,
+                is_active=True,
+            ).exclude(pk=self.instance.pk).exists()
+            if not has_another_superuser:
+                raise forms.ValidationError("不能停用最后一个可用的超级管理员。")
+        return is_active
+
+    def clean_is_staff(self):
+        is_staff = self.cleaned_data["is_staff"]
+        if self.instance.is_superuser and not is_staff:
+            raise forms.ValidationError("超级管理员必须保留管理员权限。")
+        return is_staff
+
+
+class ManagedSetPasswordForm(SetPasswordForm):
+    new_password1 = forms.CharField(
+        label="新密码",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    new_password2 = forms.CharField(
+        label="确认新密码",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
 
 
 SAFE_PACKAGE_NAME = RegexValidator(

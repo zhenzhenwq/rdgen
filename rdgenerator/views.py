@@ -1,8 +1,16 @@
 import io
+import hashlib
+from datetime import timedelta
 from pathlib import Path
+from django.contrib.auth.decorators import login_required
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.core.files.base import ContentFile
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+from django.utils import timezone
 import os
 import secrets
 import re
@@ -12,11 +20,123 @@ import json
 import uuid
 import pyzipper
 from django.conf import settings as _settings
-from django.db.models import Q
 from .forms import GenerateForm
 from .models import GithubRun
 from PIL import Image
-from urllib.parse import quote
+
+
+ZIP_DOWNLOAD_MAX_AGE = 6 * 60 * 60
+ZIP_DOWNLOAD_SALT = "rdgenerator.get_zip"
+STATUS_UPDATE_MAX_AGE = 24 * 60 * 60
+STATUS_UPDATE_SALT = "rdgenerator.update_status"
+CALLBACK_TOKEN_MAX_AGE = timedelta(hours=24)
+
+
+def _canonical_run_uuid(value):
+    try:
+        canonical = str(uuid.UUID(value))
+    except (AttributeError, TypeError, ValueError):
+        raise Http404("Build not found")
+    if value != canonical:
+        raise Http404("Build not found")
+    return canonical
+
+
+def _user_run_or_404(request, run_uuid):
+    run_uuid = _canonical_run_uuid(run_uuid)
+    return get_object_or_404(GithubRun, uuid=run_uuid, owner=request.user)
+
+
+def _safe_output_filename(value):
+    if (
+        not value
+        or len(value) > 255
+        or value in {".", ".."}
+        or os.path.basename(value) != value
+        or any(char in value for char in ('/', '\\', '"', ';', '\r', '\n'))
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise Http404("Generated file not found")
+    return value
+
+
+def _callback_token_hash(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _request_token(request):
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if separator and scheme.lower() == "bearer":
+        return token.strip()
+    return ""
+
+
+def _machine_run(request, raw_uuid):
+    try:
+        run_uuid = _canonical_run_uuid(raw_uuid)
+    except Http404:
+        return None, HttpResponse("Build not found", status=404)
+
+    token = _request_token(request)
+    if not token:
+        return None, HttpResponse("Unauthorized", status=401)
+
+    try:
+        run = GithubRun.objects.get(uuid=run_uuid)
+    except GithubRun.DoesNotExist:
+        return None, HttpResponse("Build not found", status=404)
+    if timezone.now() - run.created_at > CALLBACK_TOKEN_MAX_AGE:
+        return None, HttpResponse("Unauthorized", status=401)
+
+    supplied_hash = _callback_token_hash(token)
+    if not run.callback_token_hash or not secrets.compare_digest(
+        supplied_hash,
+        run.callback_token_hash,
+    ):
+        return None, HttpResponse("Unauthorized", status=401)
+    return run, None
+
+
+def _status_run(request, raw_uuid):
+    if _request_token(request):
+        return _machine_run(request, raw_uuid)
+    try:
+        run_uuid = _canonical_run_uuid(raw_uuid)
+    except Http404:
+        return None, HttpResponse("Build not found", status=404)
+    try:
+        signed = signing.loads(
+            request.GET.get("signature", ""),
+            salt=STATUS_UPDATE_SALT,
+            max_age=STATUS_UPDATE_MAX_AGE,
+        )
+    except (BadSignature, SignatureExpired):
+        return None, HttpResponse("Unauthorized", status=401)
+    if not isinstance(signed, dict) or signed.get("uuid") != run_uuid:
+        return None, HttpResponse("Unauthorized", status=401)
+    try:
+        return GithubRun.objects.get(uuid=run_uuid), None
+    except GithubRun.DoesNotExist:
+        return None, HttpResponse("Build not found", status=404)
+
+
+def _shared_api_authorized(request):
+    token = _request_token(request)
+    expected = _settings.API_SHARED_SECRET
+    return bool(token and expected and secrets.compare_digest(token, expected))
+
+
+def _generated_file_or_404(run_uuid, filename):
+    output_dir = (Path("exe") / run_uuid).resolve()
+    file_path = (output_dir / filename).resolve()
+    try:
+        file_path.relative_to(output_dir)
+    except ValueError:
+        raise Http404("Generated file not found")
+    if not file_path.is_file():
+        raise Http404("Generated file not found")
+    return file_path
 
 def list_generated_files(run_uuid):
     output_dir = os.path.join('exe', run_uuid)
@@ -33,6 +153,7 @@ def list_generated_files(run_uuid):
         name.lower(),
     ))
 
+@login_required
 def generator_view(request):
     if request.method == 'POST':
         form = GenerateForm(request.POST, request.FILES)
@@ -198,6 +319,8 @@ def generator_view(request):
                 privacylink_url = "false"
                 privacylink_uuid = "false"
                 privacylink_file = "false"
+
+            callback_token = secrets.token_urlsafe(32)
 
             ###create the custom.txt json here and send in as inputs below
             decodedCustom = {}
@@ -396,12 +519,17 @@ def generator_view(request):
                 "removeRecentSessions": 'true' if removeRecentSessions else 'false',
                 "compname": compname,
                 "androidappid":androidappid,
-                "filename":filename
+                "filename":filename,
+                "token": callback_token,
+                "status_signature": signing.dumps(
+                    {"uuid": myuuid},
+                    salt=STATUS_UPDATE_SALT,
+                ),
             }
 
             Path("temp_zips").mkdir(parents=True, exist_ok=True)
             temp_json_path = os.path.join("temp_zips", f"data_{uuid.uuid4()}.json")
-            zip_filename = f"secrets_{uuid.uuid4()}.zip"
+            zip_filename = f"secrets_{myuuid}_{uuid.uuid4()}.zip"
             zip_path = os.path.join("temp_zips", zip_filename)
 
             with open(temp_json_path, "w", encoding="utf-8") as f:
@@ -417,6 +545,10 @@ def generator_view(request):
             zipJson = {}
             zipJson['url'] = full_url
             zipJson['file'] = zip_filename
+            zipJson['signature'] = signing.dumps(
+                {'filename': zip_filename},
+                salt=ZIP_DOWNLOAD_SALT,
+            )
 
             zip_url = json.dumps(zipJson)
 
@@ -437,7 +569,9 @@ def generator_view(request):
             }
             new_github_run = GithubRun(
                 uuid=myuuid,
-                status="Starting generator...please wait"
+                status="Starting generator...please wait",
+                owner=request.user,
+                callback_token_hash=_callback_token_hash(callback_token),
             )
             try:
                 response = requests.post(url, json=data, headers=headers)
@@ -468,14 +602,13 @@ def generator_view(request):
     return render(request, 'generator.html', {'form': form})
 
 
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Q
-
+@login_required
+@require_GET
 def check_for_file(request):
     filename = request.GET.get('filename')
-    uuid = request.GET.get('uuid')
+    run_uuid = request.GET.get('uuid')
     platform = request.GET.get('platform')
-    gh_run = get_object_or_404(GithubRun, uuid=uuid)
+    gh_run = _user_run_or_404(request, run_uuid)
     current_status = (gh_run.status or '').lower()
     if gh_run.github_run_id:
         github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
@@ -504,36 +637,37 @@ def check_for_file(request):
     if current_status == "success":
         return render(request, 'generated.html', {
             'filename': filename, 
-            'uuid': uuid, 
+            'uuid': run_uuid,
             'platform': platform,
-            'files': list_generated_files(uuid)
+            'files': list_generated_files(run_uuid)
         })
         
     elif current_status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
         return render(request, 'failure.html', {
             'log_url': github_log_url, 
             'filename': filename, 
-            'uuid': uuid, 
+            'uuid': run_uuid,
             'platform': platform,
             'status': gh_run.status,
-            'files': list_generated_files(uuid)
+            'files': list_generated_files(run_uuid)
         })
         
     else:
         return render(request, 'waiting.html', {
             'filename': filename, 
-            'uuid': uuid, 
+            'uuid': run_uuid,
             'status': gh_run.status, 
             'platform': platform, 
             'log_url': github_log_url
         })
 
+@login_required
+@require_GET
 def download(request):
-    filename = request.GET['filename']
-    uuid = request.GET['uuid']
-    file_path = os.path.join('exe', uuid, filename)
-    if not os.path.isfile(file_path):
-        raise Http404("Generated file not found")
+    filename = _safe_output_filename(request.GET.get('filename'))
+    run_uuid = request.GET.get('uuid')
+    _user_run_or_404(request, run_uuid)
+    file_path = _generated_file_or_404(run_uuid, filename)
     with open(file_path, 'rb') as file:
         content = file.read()
     response = HttpResponse(content, headers={
@@ -542,32 +676,49 @@ def download(request):
     })
     return response
 
+@require_GET
 def get_png(request):
-    filename = request.GET['filename']
-    uuid = request.GET['uuid']
-    #filename = filename+".exe"
-    file_path = os.path.join('png',uuid,filename)
-    with open(file_path, 'rb') as file:
-        response = HttpResponse(file, headers={
-            'Content-Type': 'application/vnd.microsoft.portable-executable',
-            'Content-Disposition': f'attachment; filename="{filename}"'
+    filename = _safe_output_filename(request.GET.get('filename'))
+    run_uuid = request.GET.get('uuid')
+    run, error = _machine_run(request, run_uuid)
+    if error:
+        return error
+    png_root = (Path("png") / run.uuid).resolve()
+    file_path = (png_root / filename).resolve()
+    try:
+        file_path.relative_to(png_root)
+    except ValueError:
+        raise Http404("Image not found")
+    if not file_path.is_file():
+        raise Http404("Image not found")
+    with open(file_path, "rb") as file:
+        return HttpResponse(file.read(), headers={
+            "Content-Type": "image/png",
+            "Content-Disposition": f'inline; filename="{filename}"',
         })
 
-    return response
 
-def create_github_run(myuuid):
-    new_github_run = GithubRun(
-        uuid=myuuid,
-        status="Starting generator...please wait"
-    )
-    new_github_run.save()
-
+@csrf_exempt
+@require_POST
 def update_github_run(request):
-    data = json.loads(request.body)
-    myuuid = data.get('uuid')
-    mystatus = data.get('status')
-    GithubRun.objects.filter(Q(uuid=myuuid)).update(status=mystatus)
-    return HttpResponse('')
+    try:
+        data = json.loads(request.body or b"{}")
+    except (TypeError, ValueError):
+        return HttpResponse("Invalid JSON", status=400)
+    myuuid = data.get("uuid")
+    mystatus = str(data.get("status") or "").strip().lower()
+    allowed_statuses = {
+        "in_progress", "queued", "success", "failure", "cancelled",
+        "timed_out", "skipped", "action_required",
+    }
+    if mystatus not in allowed_statuses:
+        return HttpResponse("Invalid status", status=400)
+    run, error = _status_run(request, myuuid)
+    if error:
+        return error
+    run.status = mystatus
+    run.save(update_fields=["status"])
+    return HttpResponse("")
 
 def resize_and_encode_icon(imagefile):
     maxWidth = 200
@@ -608,10 +759,16 @@ def resize_and_encode_icon(imagefile):
     #print(resized64)
     return resized64
  
-#the following is used when accessed from an external source, like the rustdesk api server
+@csrf_exempt
+@require_POST
 def startgh(request):
     #print(request)
-    data_ = json.loads(request.body)
+    if not _shared_api_authorized(request):
+        return HttpResponse("Unauthorized", status=401)
+    try:
+        data_ = json.loads(request.body or b"{}")
+    except (TypeError, ValueError):
+        return HttpResponse("Invalid JSON", status=400)
     ####from here run the github action, we need user, repo, access token.
     url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-'+data_.get('platform')+'.yml/dispatches'  
     data = {
@@ -665,32 +822,52 @@ def save_png(file, uuid, domain, name):
     #return "%s/%s" % (domain, file_save_path)
     return domain, uuid, name
 
+@csrf_exempt
+@require_POST
 def save_custom_client(request):
-    file = request.FILES['file']
-    myuuid = request.POST.get('uuid')
-    file_save_path = "exe/%s/%s" % (myuuid, file.name)
-    Path("exe/%s" % myuuid).mkdir(parents=True, exist_ok=True)
+    file = request.FILES.get("file")
+    myuuid = request.POST.get("uuid")
+    if file is None or not myuuid:
+        return HttpResponse("Missing file or UUID", status=400)
+    run, error = _machine_run(request, myuuid)
+    if error:
+        return error
+    filename = _safe_output_filename(file.name)
+    output_root = (Path("exe") / run.uuid).resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    file_save_path = (output_root / filename).resolve()
+    try:
+        file_save_path.relative_to(output_root)
+    except ValueError:
+        raise Http404("Generated file not found")
     with open(file_save_path, "wb+") as f:
         for chunk in file.chunks():
             f.write(chunk)
 
-    GithubRun.objects.filter(Q(uuid=myuuid)).update(status="success")
+    run.status = "success"
+    run.save(update_fields=["status"])
     return HttpResponse("File saved successfully!")
 
+@csrf_exempt
+@require_POST
 def cleanup_secrets(request):
     # Pass the UUID as a query param or in JSON body
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body or b"{}")
+    except (TypeError, ValueError):
+        return HttpResponse("Invalid JSON", status=400)
     my_uuid = data.get('uuid')
-    
     if not my_uuid:
         return HttpResponse("Missing UUID", status=400)
-
+    run, error = _machine_run(request, my_uuid)
+    if error:
+        return error
     # 1. Find the files in your temp directory matching the UUID
     temp_dir = os.path.join('temp_zips')
     
     # We look for any file starting with 'secrets_' and containing the uuid
     for filename in os.listdir(temp_dir):
-        if my_uuid in filename and filename.endswith('.zip'):
+        if filename.startswith(f"secrets_{run.uuid}_") and filename.endswith('.zip'):
             file_path = os.path.join(temp_dir, filename)
             try:
                 os.remove(file_path)
@@ -700,14 +877,32 @@ def cleanup_secrets(request):
 
     return HttpResponse("Cleanup successful", status=200)
 
+@require_GET
 def get_zip(request):
-    filename = request.GET['filename']
-    #filename = filename+".exe"
-    file_path = os.path.join('temp_zips',filename)
-    with open(file_path, 'rb') as file:
-        response = HttpResponse(file, headers={
-            'Content-Type': 'application/vnd.microsoft.portable-executable',
-            'Content-Disposition': f'attachment; filename="{filename}"'
+    filename = _safe_output_filename(request.GET.get("filename"))
+    signature = request.GET.get("signature", "")
+    try:
+        signed = signing.loads(
+            signature,
+            salt=ZIP_DOWNLOAD_SALT,
+            max_age=ZIP_DOWNLOAD_MAX_AGE,
+        )
+    except (BadSignature, SignatureExpired):
+        return HttpResponse("Invalid or expired download link", status=403)
+    if signed.get("filename") != filename:
+        return HttpResponse("Invalid download link", status=403)
+    if not filename.startswith("secrets_") or not filename.endswith(".zip"):
+        return HttpResponse("Invalid download link", status=403)
+    temp_root = Path("temp_zips").resolve()
+    file_path = (temp_root / filename).resolve()
+    try:
+        file_path.relative_to(temp_root)
+    except ValueError:
+        raise Http404("Archive not found")
+    if not file_path.is_file():
+        raise Http404("Archive not found")
+    with open(file_path, "rb") as file:
+        return HttpResponse(file.read(), headers={
+            "Content-Type": "application/zip",
+            "Content-Disposition": f'attachment; filename="{filename}"',
         })
-
-    return response

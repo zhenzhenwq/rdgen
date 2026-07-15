@@ -89,7 +89,7 @@ jobs:
         with:
           url: "${{ secrets.GENURL }}/cleanzip"
           method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
+          customHeaders: '{"Content-Type": "application/json", "Authorization": "Bearer ${{ env.token }}"}'
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
@@ -102,7 +102,7 @@ jobs:
       - name: Set rdgen value
         if: ${{ env.rdgen == 'true' }}
         run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $env:GITHUB_ENV
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh?signature=${{ env.status_signature }}" >> $env:GITHUB_ENV
 
       - name: Set rdgen value
         if: ${{ env.rdgen == 'false' }}
@@ -275,7 +275,7 @@ jobs:
           max_attempts: 3
           shell: pwsh
           command: |
-            Invoke-WebRequest -Uri ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }} -OutFile ./res/icon.png 
+            Invoke-WebRequest -Headers @{ Authorization = "Bearer $env:token" } -Uri "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}" -OutFile ./res/icon.png
             mv ./res/32x32.png ./res/32x32.png.bak
             mv ./res/64x64.png ./res/64x64.png.bak
             mv ./res/128x128.png ./res/128x128.png.bak

@@ -1,0 +1,29 @@
+{% extends "base_account.html" %}
+
+{% block title %}登录 | RustDesk 生成器{% endblock %}
+{% block header %}{% endblock %}
+
+{% block content %}
+<section class="panel form-panel form-panel--center login-panel">
+    <h1>登录 RustDesk 生成器</h1>
+    <p class="form-panel__subtitle">请输入管理员分配给你的账号。</p>
+    <form method="post" action="{% url 'users:login' %}">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <ul class="errorlist"><li>用户名或密码不正确。</li></ul>
+        {% endif %}
+        <div class="field">
+            {{ form.username.label_tag }}
+            {{ form.username }}
+            {{ form.username.errors }}
+        </div>
+        <div class="field">
+            {{ form.password.label_tag }}
+            {{ form.password }}
+            {{ form.password.errors }}
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="button" type="submit">登录</button>
+    </form>
+</section>
+{% endblock %}
