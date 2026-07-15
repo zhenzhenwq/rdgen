@@ -8,7 +8,7 @@ This is the current durable handoff for the RustDesk generator work.
 - Branch: `master`
 - User fork/build repository: `https://github.com/zhenzhenwq/rdgen.git`
 - Upstream: `https://github.com/bryangerlach/rdgen.git`
-- Deployed generator: `http://120.55.0.199:8000/`
+- Deployed generator: `https://120.55.0.199/`
 - Old reference project: `D:\rustdesk_web客户端\rdgen-repo`
 
 The old reference project is strictly read-only. Do not edit, format, move, delete, clean, or generate files inside it.
@@ -57,7 +57,8 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Development baseline: `8ff0593`, which matched `origin/master` when this batch resumed.
 - Core release commit: `8e33770` (`Adapt generator for RustDesk 1.4.9`).
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
-- Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`). This is the application source currently deployed on the generator server.
+- Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
+- Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`). This is the application source currently deployed on the generator server.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -75,7 +76,9 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Playwright desktop/mobile and platform switching checks passed. A focused follow-up also verified capability-only/default-on transitions, forced password submission, and old/current JSON import behavior with no page errors.
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
-- The live generator was deployed from exact commit archive `23d1cf3`. Container-internal, host-loopback, server-hairpin, and independent public GET checks all returned HTTP 200 with form schema `2`, `settingsY`, and RustDesk `1.4.9` fingerprints.
+- Authentication and task security add Django sessions/CSRF, administrator-created accounts, strict per-user task ownership, callback bearer tokens, signed expiring downloads, and POST-only logout. Public registration is intentionally absent.
+- Django `5.2.16`: 67 tests pass. The candidate image passed the same suite, production security check, HTTPS cookie checks, and a migration rehearsal against an online copy of the production database.
+- The live generator was deployed from tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`. Anonymous generator access redirects to `/login/`; authenticated generator and `/users/` access, POST logout, HTTPS cookies, and mobile/desktop layouts were verified without submitting the generator form.
 
 Important Linux/Flatpak boundaries:
 
@@ -87,20 +90,22 @@ Important Linux/Flatpak boundaries:
 
 ## Live Deployment
 
-- URL: `http://120.55.0.199:8000/`
-- Application source commit: `23d1cf3941b2ad57a8c383af9806053884c66e2b`
-- Deployment ID: `20260715-020154-23d1cf3941b2`
-- Live image: `sha256:36169d635fb2936ecf723b3076a47e4db6564d59f1197c4387ea0cb74ead561b`
-- Live container at verification: `e795637a48fee39243879c0a0bcd3d8ba85309ce2a9a8bc28c72efa12844ea48`, `running`, `healthy`, restart count `0`.
-- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` stayed unchanged and mode `600`; SQLite `quick_check` passed and its size remained `135168` bytes.
-- Root-only rollback material is under `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and `rdgen-rollback:20260715-020154-23d1cf3941b2`.
+- URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
+- Application source commit: `13408fbc11eb6561a9128bb1a57dc48c059a5c90`; application tree: `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`.
+- Deployment ID: `20260715-174900-d90b5bd`.
+- Live image: `sha256:16f1ef12baa5b21a5e66fdf5eeff2053a206937ed35d793c2ac3b7ef75a2173e`.
+- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints.
+- Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
+- The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migration `0003` and SQLite `quick_check` passed with all 16 historical task rows retained.
+- Root-only rollback material is under `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and `rdgen-rollback:20260715-174900-d90b5bd`. The prior rollback set remains present too.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
 
 ## Not Yet Verified
 
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
 - No real Linux, macOS, or Android client compilation has been verified for this batch.
-- Docker image runs `29317047756` and `29325337747` failed at `Login to Docker Hub` with `Username and password required`; image build/push steps never ran. Check `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` before expecting the automatic image workflow to succeed.
+- Docker image runs, including auth push run `29406597406`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
@@ -114,7 +119,7 @@ Important Linux/Flatpak boundaries:
 
 ## Deployment Notes
 
-The deployed host directory is `/opt/rdgen`; the Docker service is `rdgen-rdgen-1` on host port `8000`. The host is CentOS 9 with Docker `29.6.1` and Compose `v5.2.0`; `/opt/rdgen` is a controlled source snapshot rather than a Git checkout.
+The deployed host directory is `/opt/rdgen`; the Docker service is `rdgen-rdgen-1` on loopback port `8000`, behind Nginx on public ports 80/443. The host is CentOS 9 with Docker `29.6.1` and Compose `v5.2.0`; `/opt/rdgen` is a controlled source snapshot rather than a Git checkout.
 
 For a future deployment, preserve `.env`, `exe`, `png`, `temp_zips`, and `data`. Inspect the server first, upload a fixed-commit source archive, build and preflight a candidate while the old container remains live, then rebuild/recreate the Docker service and verify the live URL. Do not perform a blind destructive sync or remove the current rollback material before the next deployment is verified.
 

@@ -690,3 +690,16 @@ User constraint recorded:
 - Container-internal, host-loopback, server-hairpin, and independent public GET checks all returned the new form schema `2`, `settingsY` migration behavior, and RustDesk `1.4.9` default. No generator form POST was made.
 - `.env`, `data`, `exe`, `png`, `temp_zips`, and `data/db.sqlite3` retained their original inodes. The `.env` hash stayed unchanged, SQLite `quick_check` returned `ok`, and the database remained `135168` bytes.
 - Rollback material remains at `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and image tag `rdgen-rollback:20260715-020154-23d1cf3941b2`.
+
+### Authenticated User Management And HTTPS Deployment
+
+- Added Django login/session/CSRF protection, administrator-created user management, password change/reset, disable controls, and POST-only logout. There is no public registration.
+- Bound generated tasks to their owner, added strict UUID/path checks, per-task callback bearer tokens, signed expiring ZIP downloads, and authenticated workflow callbacks.
+- Verified 67/67 tests under Django `5.2.16`, parsed all 13 workflow YAML files, and passed system, migration-drift, compile, Compose, secret-scan, and whitespace checks.
+- Committed the application as `13408fbc11eb6561a9128bb1a57dc48c059a5c90` (`Add authenticated user management`) with tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`.
+- Obtained a trusted Let's Encrypt short-lived IPv4 certificate for `120.55.0.199`, configured Nginx on 80/443, enabled 5/minute login rate limiting, closed public port 8000, and enabled twice-daily certificate renewal checks. Staging issuance and renewal dry-run both succeeded.
+- Updated GitHub Actions secret `GENURL` to `https://120.55.0.199`, drained all active generator workflows, and deployed under ID `20260715-174900-d90b5bd` without submitting a live generator form.
+- Built and tested candidate image `sha256:16f1ef12baa5b21a5e66fdf5eeff2053a206937ed35d793c2ac3b7ef75a2173e`. A copy of the production database migrated with all 16 task rows preserved before the live switch.
+- Live verification passed for HTTPS trust, HTTP redirect, HSTS, secure session/CSRF cookies, anonymous redirects, admin login, user management, POST logout, invalid-host rejection, login 429 responses, database integrity, container health, zero restarts, and clean live logs.
+- Production rollback material is `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and image tag `rdgen-rollback:20260715-174900-d90b5bd`.
+- Automatic Docker workflow run `29406597406` still failed at `Login to Docker Hub`; this did not affect the directly built and verified production image.

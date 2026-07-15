@@ -43,9 +43,10 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Do not store plaintext server passwords, GitHub tokens, PFX passwords, or API bearer tokens in repository files.
 - Credentials were provided in chat during previous work, but repository memory files intentionally omit the secret values.
 - Code signing certificate material is outside the repo at `D:\rustdesk-生成器\codesign\`; treat the PFX and password file as sensitive.
-- Generator server is reachable at `http://120.55.0.199:8000/`.
+- Generator server is reachable at `https://120.55.0.199/`; HTTP port 80 redirects to HTTPS.
 - The deployed generator directory on `120.55.0.199` is `/opt/rdgen`, but that server currently does not have `git` installed.
-- The live Docker service is `rdgen-rdgen-1`, published on host port `8000`.
+- The live Docker service is `rdgen-rdgen-1`. Container port `8000` is bound only to `127.0.0.1`; Nginx owns public ports 80/443 and applies login rate limiting.
+- Let's Encrypt issues the trusted IP certificate. `rdgen-certbot-renew.timer` checks renewal twice daily and reloads Nginx after successful renewal.
 - If deploying source changes to `120.55.0.199`, do not assume `git pull` works there. Either install git deliberately, upload a controlled source snapshot, or rebuild/recreate the Docker service from a known copied tree.
 - The old project `D:\rustdesk_web客户端\rdgen-repo` remains read-only even if it contains useful reference fixes.
 
@@ -57,18 +58,19 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- Application source commit `23d1cf3941b2ad57a8c383af9806053884c66e2b` is deployed at `120.55.0.199:8000`; no live generator form was submitted and no client workflow was dispatched during deployment.
+- Authenticated user management and callback hardening are in application commit `13408fbc11eb6561a9128bb1a57dc48c059a5c90` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`). This application commit is deployed at `https://120.55.0.199/`; no live generator form was submitted and no client workflow was dispatched during deployment.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260715-020154-23d1cf3941b2`.
-- Verified live image: `sha256:36169d635fb2936ecf723b3076a47e4db6564d59f1197c4387ea0cb74ead561b`.
-- The service was verified `running`, `healthy`, and restart count `0` from container-internal, host-loopback, server-hairpin, and independent public GET requests.
-- Strong page fingerprints are hidden `formSchemaVersion=2`, `formData.settings = 'settingsY';`, and default RustDesk `1.4.9`.
-- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` hash/mode and SQLite size/integrity were unchanged.
-- Keep `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and image tag `rdgen-rollback:20260715-020154-23d1cf3941b2` until a later deployment is independently verified.
+- Deployment ID: `20260715-174900-d90b5bd`.
+- Verified live image: `sha256:16f1ef12baa5b21a5e66fdf5eeff2053a206937ed35d793c2ac3b7ef75a2173e`.
+- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 67 tests inside the candidate image.
+- Anonymous generator access redirects to `/login/`. The production `admin` superuser exists; its password is intentionally absent from repository memory.
+- HTTPS uses a trusted Let's Encrypt IPv4 certificate, HTTP redirects to HTTPS, HSTS is initially 300 seconds, invalid hosts return 400, and login rate limiting returns 429 after the configured burst.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. SQLite migration `rdgenerator.0003_githubrun_owner` applied successfully and `quick_check` returned `ok`.
+- Keep `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and image tag `rdgen-rollback:20260715-174900-d90b5bd` for rollback. Retain the older `20260715-020154-23d1cf3941b2` rollback set as an additional fallback for now.
 
 ## Historical Verified Outputs
 
