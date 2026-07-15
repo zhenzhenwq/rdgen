@@ -57,6 +57,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Development baseline: `8ff0593`, which matched `origin/master` when this batch resumed.
 - Core release commit: `8e33770` (`Adapt generator for RustDesk 1.4.9`).
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
+- Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`). This is the application source currently deployed on the generator server.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -74,6 +75,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Playwright desktop/mobile and platform switching checks passed. A focused follow-up also verified capability-only/default-on transitions, forced password submission, and old/current JSON import behavior with no page errors.
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
+- The live generator was deployed from exact commit archive `23d1cf3`. Container-internal, host-loopback, server-hairpin, and independent public GET checks all returned HTTP 200 with form schema `2`, `settingsY`, and RustDesk `1.4.9` fingerprints.
 
 Important Linux/Flatpak boundaries:
 
@@ -83,13 +85,22 @@ Important Linux/Flatpak boundaries:
 - Flatpak uses a case-preserving hex-derived `com.rdgen.app_<hex>` ID and keeps manifest ID, desktop rename, metainfo component/launchable, and `build-bundle` ref synchronized. `--device=dri` remains and `--device=all` is removed.
 - Consequently, Flatpak must not be advertised as supporting `/dev/uinput`-based unattended Wayland input. X11 remains the expected path; a real X11/Wayland portal smoke test is still required before making a stronger runtime claim.
 
-## Not Yet Verified Or Deployed
+## Live Deployment
+
+- URL: `http://120.55.0.199:8000/`
+- Application source commit: `23d1cf3941b2ad57a8c383af9806053884c66e2b`
+- Deployment ID: `20260715-020154-23d1cf3941b2`
+- Live image: `sha256:36169d635fb2936ecf723b3076a47e4db6564d59f1197c4387ea0cb74ead561b`
+- Live container at verification: `e795637a48fee39243879c0a0bcd3d8ba85309ce2a9a8bc28c72efa12844ea48`, `running`, `healthy`, restart count `0`.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` stayed unchanged and mode `600`; SQLite `quick_check` passed and its size remained `135168` bytes.
+- Root-only rollback material is under `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and `rdgen-rollback:20260715-020154-23d1cf3941b2`.
+- No live generator form was submitted and no client workflow was dispatched during deployment.
+
+## Not Yet Verified
 
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
 - No real Linux, macOS, or Android client compilation has been verified for this batch.
 - Docker image runs `29317047756` and `29325337747` failed at `Login to Docker Hub` with `Username and password required`; image build/push steps never ran. Check `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` before expecting the automatic image workflow to succeed.
-- The live generator at `120.55.0.199:8000` has not been deployed from this batch.
-- This continuation did not submit the live generator form or dispatch a client workflow.
 - macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
@@ -99,12 +110,12 @@ Important Linux/Flatpak boundaries:
 2. Confirm the eleven new patch and test files are tracked in the release commit.
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
-5. Treat additional Actions builds, Docker credential repair, and live deployment as separate, explicit follow-up work.
+5. Treat additional client builds and Docker credential repair as separate, explicit follow-up work. The live generator deployment is complete.
 
 ## Deployment Notes
 
-The deployed host directory is `/opt/rdgen`; the Docker service is `rdgen-rdgen-1` on host port `8000`. The host directory was not a Git checkout and the server did not have Git installed during the last inspection.
+The deployed host directory is `/opt/rdgen`; the Docker service is `rdgen-rdgen-1` on host port `8000`. The host is CentOS 9 with Docker `29.6.1` and Compose `v5.2.0`; `/opt/rdgen` is a controlled source snapshot rather than a Git checkout.
 
-For a future deployment, preserve `.env`, `exe`, `png`, `temp_zips`, and `data`. Inspect the server first, upload a controlled source tree, rebuild/recreate the Docker service, and verify the live URL. Do not perform a blind destructive sync.
+For a future deployment, preserve `.env`, `exe`, `png`, `temp_zips`, and `data`. Inspect the server first, upload a fixed-commit source archive, build and preflight a candidate while the old container remains live, then rebuild/recreate the Docker service and verify the live URL. Do not perform a blind destructive sync or remove the current rollback material before the next deployment is verified.
 
 Historical work, previous real Windows signing and Android universal APK verification, and RustDesk server network investigation remain documented in `WORKLOG.md`.

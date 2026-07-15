@@ -678,4 +678,15 @@ User constraint recorded:
 - Focused Playwright checks passed for capability-only/default-on transitions, password-mode submission, legacy/current JSON import behavior, and JavaScript page errors.
 - Successful Windows `workflow_dispatch` runs exist for `8e33770` (`29318081070`) and `cd2c358` (`29326063260`). They were not caused by push; public metadata cannot distinguish UI dispatch from generator/API dispatch.
 - Automatic Docker runs `29317047756` and `29325337747` both failed before build at Docker Hub login because the username/password inputs were unavailable. No Docker image was built or pushed by those runs.
-- This continuation did not dispatch a client build, submit the live generator form, repair repository secrets/variables, or deploy the generator.
+- This continuation did not dispatch a client build, submit the live generator form, or repair repository secrets/variables.
+
+### Live Generator Deployment
+
+- Pushed the compatibility fix as `23d1cf3` (`Fix hide window capability compatibility`) and deployed that exact source archive to `http://120.55.0.199:8000/`.
+- The server-side build used the uploaded archive SHA-256 `aab0c37012c105a2250bf7b2e9d28deb879a700456eb32957fe8ef0fb3bc782c`; the automatic Docker Hub workflow remained blocked at login and was not needed for this local source build.
+- Before switching production, saved the old source, root-only `.env`, an online SQLite backup, and the old image under deployment ID `20260715-020154-23d1cf3941b2`.
+- Built candidate image `sha256:36169d635fb2936ecf723b3076a47e4db6564d59f1197c4387ea0cb74ead561b` while the old container stayed live. The image test suite and a temporary-database instance on `127.0.0.1:18000` passed before production was touched.
+- Production container `e795637a48fee39243879c0a0bcd3d8ba85309ce2a9a8bc28c72efa12844ea48` started at `2026-07-15T02:13:55Z` and verified as `running`, `healthy`, and restart count `0`.
+- Container-internal, host-loopback, server-hairpin, and independent public GET checks all returned the new form schema `2`, `settingsY` migration behavior, and RustDesk `1.4.9` default. No generator form POST was made.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and `data/db.sqlite3` retained their original inodes. The `.env` hash stayed unchanged, SQLite `quick_check` returned `ok`, and the database remained `135168` bytes.
+- Rollback material remains at `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and image tag `rdgen-rollback:20260715-020154-23d1cf3941b2`.

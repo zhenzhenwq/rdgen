@@ -52,14 +52,23 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 ## Current Release State
 
 - The development baseline for the RustDesk `1.4.9` batch was `8ff0593`, matching `origin/master` when work resumed on 2026-07-13.
-- The core batch was committed as `8e33770`; `cd2c358` then separated hidden-window capability from its default state. Use the latest `master` commit for subsequent fixes.
+- The core batch was committed as `8e33770`; `cd2c358` separated hidden-window capability from its default state, and `23d1cf3` completed the compatibility follow-up. Use the latest `master` commit for subsequent fixes.
 - The batch changes the form and platform workflows, ports strict optional patch chains, and hardens Linux packaging, macOS signing, uploads, and build inputs.
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- The batch has not been deployed to `120.55.0.199:8000`, and no live generator form has been submitted for it.
+- Application source commit `23d1cf3941b2ad57a8c383af9806053884c66e2b` is deployed at `120.55.0.199:8000`; no live generator form was submitted and no client workflow was dispatched during deployment.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
+
+## Current Deployment State
+
+- Deployment ID: `20260715-020154-23d1cf3941b2`.
+- Verified live image: `sha256:36169d635fb2936ecf723b3076a47e4db6564d59f1197c4387ea0cb74ead561b`.
+- The service was verified `running`, `healthy`, and restart count `0` from container-internal, host-loopback, server-hairpin, and independent public GET requests.
+- Strong page fingerprints are hidden `formSchemaVersion=2`, `formData.settings = 'settingsY';`, and default RustDesk `1.4.9`.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` hash/mode and SQLite size/integrity were unchanged.
+- Keep `/opt/rdgen-backups/20260715-020154-23d1cf3941b2`, `/opt/rdgen-previous-20260715-020154-23d1cf3941b2`, and image tag `rdgen-rollback:20260715-020154-23d1cf3941b2` until a later deployment is independently verified.
 
 ## Historical Verified Outputs
 
