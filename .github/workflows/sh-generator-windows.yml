@@ -351,10 +351,14 @@ jobs:
 
       - name: removeNewVersionNotif
         if: env.removeNewVersionNotif == 'true'
-        shell: bash
-        run: | 
-          wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
-          python remove_new_version_notif.py
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py -OutFile remove_new_version_notif.py
+            python remove_new_version_notif.py
 
       - name: hide-cm
         if: env.hidecm == 'true'
