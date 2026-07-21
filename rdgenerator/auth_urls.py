@@ -32,4 +32,5 @@ urlpatterns = [
     path("users/<int:user_id>/edit/", account_views.user_edit, name="edit"),
     path("users/<int:user_id>/password/", account_views.user_password, name="password"),
     path("users/<int:user_id>/toggle/", account_views.user_toggle, name="toggle"),
+    path("users/<int:user_id>/delete/", account_views.user_delete, name="delete"),
 ]

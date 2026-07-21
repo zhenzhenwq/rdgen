@@ -1,16 +1,27 @@
 <header class="app-header">
     <div class="app-header__inner">
-        <a class="app-brand" href="/">RustDesk 生成器</a>
+        <a class="app-brand" href="/" aria-label="RustDesk 生成器首页">
+            <span class="brand-mark" aria-hidden="true">RD</span>
+            <span class="brand-copy"><span>RustDesk</span><small>生成器控制台</small></span>
+        </a>
         <nav class="app-nav" aria-label="主导航">
-            <a href="/">生成器</a>
-            {% if request.user.is_staff %}<a href="{% url 'users:list' %}">用户管理</a>{% endif %}
+            <span class="nav-label">工作区</span>
+            <a href="/"{% if request.path == '/' or request.path == '/generator' %} aria-current="page"{% endif %}>
+                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>客户端生成</span>
+            </a>
+            {% if request.user.is_staff %}
+                <a href="{% url 'users:list' %}"{% if request.path|slice:':7' == '/users/' %} aria-current="page"{% endif %}>
+                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>用户管理</span>
+                </a>
+            {% endif %}
         </nav>
         <div class="app-account">
-            <span class="app-username">{{ request.user.username }}</span>
-            <a href="{% url 'users:password_change' %}">修改密码</a>
+            <span class="account-avatar" aria-hidden="true">{{ request.user.username|first|upper }}</span>
+            <span class="account-copy"><span class="app-username">{{ request.user.username }}</span><span class="account-role">{% if request.user.is_superuser %}超级管理员{% elif request.user.is_staff %}管理员{% else %}成员{% endif %}</span></span>
+            <a class="account-action" href="{% url 'users:password_change' %}" title="修改密码" aria-label="修改密码"><i class="fa-solid fa-key" aria-hidden="true"></i></a>
             <form class="inline-form" method="post" action="{% url 'users:logout' %}">
                 {% csrf_token %}
-                <button class="button button--secondary button--small" type="submit">退出</button>
+                <button class="logout-button" type="submit" title="退出登录" aria-label="退出登录"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i></button>
             </form>
         </div>
     </div>

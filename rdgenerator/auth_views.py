@@ -136,6 +136,34 @@ def user_toggle(request, user_id):
     return redirect(reverse("users:list"))
 
 
+@staff_required
+@require_http_methods(["GET", "POST"])
+def user_delete(request, user_id):
+    user = _managed_user_or_403(request.user, user_id)
+    if user.pk == request.user.pk:
+        messages.error(request, "不能删除当前登录账号。")
+        return redirect("users:list")
+    if user.is_superuser:
+        has_another_superuser = User.objects.filter(
+            is_superuser=True,
+        ).exclude(pk=user.pk).exists()
+        if not has_another_superuser:
+            messages.error(request, "不能删除系统中的最后一个超级管理员。")
+            return redirect("users:list")
+
+    if request.method == "POST":
+        username = user.username
+        user.delete()
+        messages.success(request, f"账号 {username} 已删除。")
+        return redirect("users:list")
+
+    return render(
+        request,
+        "users/user_confirm_delete.html",
+        {"managed_user": user},
+    )
+
+
 @login_required
 def password_changed(request):
     return render(request, "accounts/password_change_done.html")

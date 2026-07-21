@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RustDesk 自定义客户端生成器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --page: #f5f9ff;
@@ -283,54 +285,25 @@
 
         .checkbox-group label {
             display: flex;
-            align-items: center;
-            min-height: 36px;
+            align-items: flex-start;
+            gap: 8px;
+            min-height: 42px;
+            margin: 0;
             background: rgba(231, 241, 255, 0.7);
             border: 1px solid var(--line);
             border-radius: 6px;
-            padding: 8px 10px;
+            padding: 10px 11px;
+        }
+
+        .checkbox-group label input {
+            flex: 0 0 auto;
+            margin: 2px 0 0;
         }
 
         .preview-image {
             max-width: 100%;
             max-height: 100px;
             margin-top: 10px;
-        }
-
-        .save-load-section-container {
-            position: sticky;
-            top: 12px;
-            margin: 0 auto 18px;
-            background-color: transparent;
-            padding: 0 20px;
-            border-radius: 8px;
-            z-index: 100;
-            max-width: 1200px;
-        }
-
-        .save-load-section-container .section {
-            width: min(310px, 100%);
-            margin-left: auto;
-            padding: 14px;
-            box-shadow: 0 14px 32px rgba(22, 81, 152, 0.16);
-        }
-
-        #saveLoadTitle {
-            cursor: pointer;
-            margin: 0;
-            font-size: 15px;
-            color: var(--blue-strong);
-            white-space: nowrap;
-        }
-
-        .save-load-section {
-            display: none;
-            margin-top: 12px;
-        }
-
-        .save-load-section button {
-            width: 100%;
-            margin-top: 8px;
         }
 
         .error {
@@ -393,12 +366,33 @@
 
         .desktop-behavior-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px 16px;
+            gap: 12px;
         }
 
         .desktop-behavior-field {
             min-width: 0;
+        }
+
+        .desktop-behavior-field--primary {
+            display: grid;
+            grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+            align-items: center;
+            gap: 16px;
+        }
+
+        .desktop-behavior-field--primary > label {
+            margin-bottom: 0;
+        }
+
+        .desktop-behavior-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+        }
+
+        .desktop-behavior-options > .desktop-behavior-toggle {
+            flex: 1 1 calc(50% - 8px);
+            min-width: min(100%, 280px);
         }
 
         .desktop-behavior-field > label {
@@ -416,11 +410,11 @@
 
         .desktop-behavior-toggle {
             display: flex;
-            align-items: center;
-            gap: 6px;
+            align-items: flex-start;
+            gap: 8px;
             min-height: 42px;
             margin-bottom: 0;
-            padding: 8px 10px;
+            padding: 10px 11px;
             background: rgba(231, 241, 255, 0.66);
             border: 1px solid var(--line);
             border-radius: 6px;
@@ -430,7 +424,7 @@
         }
 
         .desktop-behavior-toggle input {
-            margin-right: 0;
+            margin: 2px 0 0;
             flex: 0 0 auto;
         }
 
@@ -486,34 +480,339 @@
                 padding: 0 12px;
             }
 
-            .save-load-section-container {
-                top: 8px;
-                padding: 0 12px;
-            }
-
-            .save-load-section-container .section {
-                width: 100%;
-            }
-
-            .desktop-behavior-grid,
+            .desktop-behavior-field--primary,
             .desktop-behavior-size {
                 grid-template-columns: 1fr;
             }
+
+            .desktop-behavior-field--primary {
+                gap: 6px;
+            }
+
+        }
+
+        /* Console skin: preserve the existing form hooks while giving the builder a calmer workbench layout. */
+        .workspace-page {
+            min-height: 100vh;
+            padding: 0 0 64px;
+            background: var(--canvas, #f3f6fb);
+            color: var(--ink, #172033);
+            font-family: Manrope, 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+        }
+        .workspace-page::before {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background-image: linear-gradient(rgba(50,119,246,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(50,119,246,.035) 1px, transparent 1px);
+            background-size: 32px 32px;
+            content: '';
+            pointer-events: none;
+        }
+        .workspace-page .app-header {
+            position: fixed;
+            inset: 0 auto 0 0;
+            z-index: 20;
+            width: 248px;
+            height: auto;
+            margin: 0;
+            border: 0;
+            border-right: 1px solid rgba(255,255,255,.06);
+            border-radius: 0;
+            background: #111a2d;
+            box-shadow: none;
+        }
+        .workspace-page .app-header__inner {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            width: auto;
+            min-height: 100vh;
+            padding: 28px 18px 20px;
+            gap: 0;
+        }
+        .workspace-page .app-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 2px 10px 30px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .workspace-page .brand-mark {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            place-items: center;
+            border: 1px solid rgba(140,211,255,.5);
+            border-radius: 10px;
+            background: linear-gradient(145deg,#3283ff,#1e4fd1);
+            color: #fff;
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+        }
+        .workspace-page .brand-copy { display: flex; flex-direction: column; gap: 1px; }
+        .workspace-page .brand-copy small { color: #91a0bb; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+        .workspace-page .app-nav { display: grid; gap: 6px; align-items: stretch; }
+        .workspace-page .nav-label { margin: 0 10px 8px; color: #61718e; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+        .workspace-page .app-nav a { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; color: #91a0bb; font-size: 13px; font-weight: 700; }
+        .workspace-page .app-nav a i { width: 18px; color: #6f83a6; text-align: center; }
+        .workspace-page .app-nav a:hover, .workspace-page .app-nav a[aria-current="page"] { border-color: rgba(111,163,255,.16); background: #1d2a44; color: #fff; }
+        .workspace-page .app-account { display: grid; grid-template-columns: 36px minmax(0,1fr) 32px 32px; gap: 8px; align-items: center; margin-top: auto; padding: 16px 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
+        .workspace-page .account-avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: #273a5c; color: #b9d2ff; font-size: 12px; font-weight: 800; }
+        .workspace-page .account-copy { min-width: 0; }
+        .workspace-page .app-username { display: block; overflow: hidden; color: #fff; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        .workspace-page .account-role { display: block; color: #91a0bb; font-size: 10px; }
+        .workspace-page .account-action, .workspace-page .logout-button { display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #91a0bb; box-shadow: none; cursor: pointer; }
+        .workspace-page .account-action:hover, .workspace-page .logout-button:hover { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.08); color: #fff; box-shadow: none; transform: none; }
+        .workspace-page .inline-form { display: contents; margin: 0; }
+        .workspace-title {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: min(1800px, calc(100% - 248px));
+            margin: 0 0 24px 248px;
+            padding: 42px 36px 0;
+            color: #172033;
+            text-align: left;
+            font-size: 30px;
+            line-height: 1.2;
+            letter-spacing: -.04em;
+        }
+        .workspace-title .eyebrow { color: #1d56d8; font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+        .workspace-title i { color: #3277f6; margin-right: 8px; }
+        .workspace-page #myForm { width: min(1800px, calc(100% - 248px)); margin-left: 248px; }
+        .workspace-page .builder-shell { margin: 0 36px; }
+        .workspace-page .builder-nav {
+            position: sticky;
+            top: 12px;
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 7px;
+            border: 1px solid #dce5f0;
+            border-radius: 8px;
+            background: rgba(255,255,255,.96);
+            box-shadow: 0 10px 26px rgba(25,43,76,.08);
+            backdrop-filter: blur(12px);
+        }
+        .workspace-page .builder-nav__links { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+        .workspace-page .builder-nav__links::-webkit-scrollbar { display: none; }
+        .workspace-page .builder-nav__links a {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 36px;
+            padding: 0 11px;
+            border-radius: 6px;
+            color: #66758d;
+            font-size: 12px;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+        .workspace-page .builder-nav__links a:hover,
+        .workspace-page .builder-nav__links a[aria-current="location"] { background: #edf3ff; color: #1d56d8; }
+        .workspace-page .builder-nav__links i { color: #8796ad; }
+        .workspace-page .builder-nav__tools { display: flex; flex: 0 0 auto; gap: 6px; margin-left: auto; }
+        .workspace-page .builder-nav__tools button {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid #d6e0ed;
+            border-radius: 6px;
+            background: #fff;
+            color: #42526a;
+            box-shadow: none;
+            font-size: 12px;
+        }
+        .workspace-page .builder-nav__tools button:hover { border-color: #9eb8e3; background: #f7faff; color: #1d56d8; transform: none; }
+        .workspace-page .builder-canvas {
+            overflow: clip;
+            border: 1px solid #dce5f0;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 18px 40px rgba(25,43,76,.07);
+        }
+        .workspace-page .builder-section {
+            display: grid;
+            grid-template-columns: 150px minmax(0,1fr);
+            gap: 30px;
+            padding: 30px;
+            border-bottom: 1px solid #e7edf5;
+            scroll-margin-top: 76px;
+        }
+        .workspace-page .builder-section[hidden] { display: none !important; }
+        .workspace-page .builder-section__header { align-self: start; }
+        .workspace-page .builder-section__index { display: block; margin-bottom: 8px; color: #8b98ac; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700; }
+        .workspace-page .builder-section__header h2 { margin: 0; color: #172033; font-size: 17px; line-height: 1.35; }
+        .workspace-page .builder-section__content { min-width: 0; }
+        .workspace-page .platform, .workspace-page .container { width: auto; max-width: none; margin: 0; padding: 0; gap: 26px; }
+        .workspace-page .platform.workspace-toolbar { display: grid; gap: 18px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+        .workspace-page .platform-icons { display: grid; grid-template-columns: repeat(5, minmax(92px,1fr)); gap: 8px; margin: 0; }
+        .workspace-page .platform-icon {
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            grid-template-rows: auto auto;
+            align-items: center;
+            width: 100%;
+            min-width: 0;
+            min-height: 64px;
+            padding: 9px 11px;
+            border: 1px solid #dce5f0;
+            border-radius: 7px;
+            background: #f8faff;
+            color: #697891;
+            box-shadow: none;
+            text-align: left;
+        }
+        .workspace-page .platform-icon i { grid-row: 1 / 3; color: #7e8ba0; font-size: 23px; text-align: center; }
+        .workspace-page .platform-icon span { overflow: hidden; color: inherit; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        .workspace-page .platform-icon small { color: #929eb0; font-size: 10px; font-weight: 650; }
+        .workspace-page .platform-icon:hover,
+        .workspace-page .platform-icon.active { border-color: #8eb5ff; background: #eaf1ff; color: #1d56d8; transform: none; }
+        .workspace-page .platform-icon.active i { color: #3277f6; }
+        .workspace-page #id_platform { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+        .workspace-page .container.form-grid { grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; }
+        .workspace-page .section { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+        .workspace-page .section + .section { padding-left: 26px; border-left: 1px solid #e7edf5; }
+        .workspace-page .container.form-grid > .section--full { grid-column: 1 / -1; margin-top: 2px; padding: 22px 0 0; border-top: 1px solid #e7edf5; border-left: 0; }
+        .workspace-page .section-subtitle { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; color: #26354d; font-size: 14px; }
+        .workspace-page .section-subtitle i { color: #3277f6; }
+        .workspace-page .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; gap: 16px; }
+        .workspace-page .field-block { min-width: 0; }
+        .workspace-page .field-block--full { grid-column: 1 / -1; }
+        .workspace-page .field-block > label { margin-bottom: 7px; }
+        .workspace-page .field-block > .field-label { display: block; margin-bottom: 7px; color: #526079; font-size: 12px; font-weight: 700; }
+        .workspace-page .field-block > input,
+        .workspace-page .field-block > select,
+        .workspace-page .field-block > textarea { margin-bottom: 0; }
+        .workspace-page #basicCustomFields > .field-grid:has(#androidAppIdField[hidden]) > .field-block:first-child { grid-column: 1 / -1; }
+        .workspace-page #build-basic .container.form-grid:has(> .section:nth-child(2)[hidden]) > .section:first-child { grid-column: 1 / -1; }
+        .workspace-page .toggle-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 8px; }
+        .workspace-page .target-toggle-grid { grid-template-columns: 1fr; }
+        .workspace-page .option-toggle {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            min-height: 42px;
+            margin: 0;
+            padding: 10px 11px;
+            border: 1px solid #e2e8f2;
+            border-radius: 6px;
+            background: #f8faff;
+            color: #526079;
+            line-height: 1.45;
+        }
+        .workspace-page .option-toggle input { flex: 0 0 auto; margin: 2px 0 0; }
+        .workspace-page .option-stack { display: grid; gap: 8px; }
+        .workspace-page .option-stack .option-toggle { width: 100%; }
+        .workspace-page .option-toggle:has(input:checked),
+        .workspace-page .checkbox-group label:has(input:checked),
+        .workspace-page .desktop-behavior-toggle:has(input:checked) { border-color: #b8cdf5; background: #edf3ff; color: #244d9f; }
+        .workspace-page .option-toggle:has(input:disabled),
+        .workspace-page .checkbox-group label:has(input:disabled),
+        .workspace-page .desktop-behavior-toggle:has(input:disabled) { opacity: .58; cursor: not-allowed; }
+        .workspace-page input[type="checkbox"], .workspace-page input[type="radio"] { accent-color: #2567e8; }
+        .workspace-page .upload-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+        .workspace-page .upload-field { flex: 1 1 280px; min-width: 0; padding: 14px; border: 1px dashed #cbd6e5; border-radius: 7px; background: #f8faff; }
+        .workspace-page .upload-field input[type="file"] { max-width: 100%; min-width: 0; margin: 8px 0 0; background: #fff; }
+        .workspace-page .preview-slot:empty { display: none; }
+        .workspace-page .preview-slot img { display: block; max-width: 100%; max-height: 72px; margin-top: 10px; }
+        .workspace-page .brand-options { margin: 18px 0 0; }
+        .workspace-page .permissions-heading { margin: 0 0 18px; }
+        .workspace-page .permissions-heading + .checkbox-group { margin-top: 0; }
+        .workspace-page .manual-settings { margin-top: 14px; }
+        .workspace-page .advanced-manual-section .manual-settings { margin-top: 0; }
+        .workspace-page .advanced-toggle-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .workspace-page .advanced-toggle-grid > .option-toggle { flex: 1 1 calc(50% - 4px); min-width: min(100%,220px); }
+        .workspace-page .manual-settings textarea { min-height: 132px; resize: vertical; }
+        .workspace-page .form-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: #1d56d8; font-size: 12px; font-weight: 750; }
+        .workspace-page .form-link:hover { color: #1746ac; text-decoration: underline; }
+        .workspace-page .capability-note { display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; border: 1px solid #c9d9f6; border-radius: 6px; background: #f3f7ff; color: #425b85; font-size: 12px; line-height: 1.55; }
+        .workspace-page .capability-note i { margin-top: 3px; color: #3277f6; }
+        .workspace-page #id_direction { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin: 0; padding: 0; }
+        .workspace-page #id_direction > div label { display: flex; align-items: center; min-height: 40px; margin: 0; padding: 8px 10px; border: 1px solid #e2e8f2; border-radius: 6px; background: #f8faff; }
+        .workspace-page label { color: #526079; font-size: 12px; font-weight: 700; }
+        .workspace-page input[type="text"], .workspace-page input[type="password"], .workspace-page input[type="number"], .workspace-page select, .workspace-page textarea { min-height: 42px; padding: 9px 11px; border: 1px solid #cbd6e5; border-radius: 7px; background: #fff; color: #172033; }
+        .workspace-page input[type="text"]:focus, .workspace-page input[type="password"]:focus, .workspace-page input[type="number"]:focus, .workspace-page select:focus, .workspace-page textarea:focus { border-color: #3277f6; box-shadow: 0 0 0 4px rgba(50,119,246,.12); }
+        .workspace-page input[type="file"] { border-color: #cbd6e5; background: #f8faff; }
+        .workspace-page .checkbox-group { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+        .workspace-page .checkbox-group label, .workspace-page .desktop-behavior-toggle { border-color: #e2e8f2; background: #f8faff; color: #526079; }
+        .workspace-page .help-text { display: block; margin: 6px 0 0; border: 0; background: transparent; color: #7d8aa1; padding: 0; font-size: 11px; }
+        .workspace-page .action-bar { position: static; margin: 0; padding: 0; background: #f8faff; }
+        .workspace-page .action-bar .section { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 30px; border-top: 0; }
+        .workspace-page .action-bar button { min-width: 250px; border-radius: 8px; }
+        .workspace-page .build-summary { color: #526079; font-size: 12px; font-weight: 750; }
+        .workspace-page .errorlist { display: grid; width: auto; max-width: none; margin: 0 36px 16px; justify-content: stretch; align-items: start; gap: 4px; padding: 13px 15px; border-color: #f2c2c9; border-radius: 8px; background: #ffeaed; color: #c23b4b; }
+        .workspace-page .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+        @media (max-width: 1120px) {
+            .workspace-page .app-header { position: static; width: auto; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+            .workspace-page .app-header__inner { display: grid; grid-template-columns: 1fr auto; min-height: 0; padding: 14px 16px; }
+            .workspace-page .app-brand { padding: 0; }
+            .workspace-page .app-nav { grid-column: 1 / -1; grid-row: 2; display: flex; overflow-x: auto; gap: 5px; padding-top: 8px; }
+            .workspace-page .nav-label { display: none; }
+            .workspace-page .app-nav a { min-height: 36px; padding: 0 10px; white-space: nowrap; }
+            .workspace-page .app-account { grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; grid-template-columns: 30px auto; }
+            .workspace-page .account-copy, .workspace-page .account-action { display: none; }
+            .workspace-page .account-avatar { width: 30px; height: 30px; }
+            .workspace-page .logout-button { width: 30px; height: 30px; }
+            .workspace-title, .workspace-page #myForm { width: auto; margin-left: 0; }
+            .workspace-title { margin: 0 18px 20px; padding: 28px 0 0; font-size: 26px; }
+            .workspace-title > span:last-child { font-size: 22px; line-height: 1.3; }
+            .workspace-page .platform, .workspace-page .container { margin-inline: 0; }
+            .workspace-page .container.form-grid { grid-template-columns: 1fr; }
+            .workspace-page .action-bar { position: static; }
+            .workspace-page .action-bar .section { justify-content: stretch; }
+            .workspace-page .action-bar button { width: 100%; min-width: 0; }
+            .workspace-page .builder-shell { margin-inline: 18px; }
+            .workspace-page .builder-section { grid-template-columns: 1fr; gap: 18px; padding: 24px; }
+            .workspace-page .builder-section__header { display: flex; align-items: baseline; gap: 10px; }
+            .workspace-page .builder-section__index { margin: 0; }
+            .workspace-page .section + .section { padding: 22px 0 0; border-top: 1px solid #e7edf5; border-left: 0; }
+            .workspace-page .platform-icons { grid-template-columns: repeat(5,minmax(80px,1fr)); overflow-x: auto; }
+        }
+        @media (max-width: 560px) {
+            .workspace-title { margin-inline: 12px; font-size: 24px; }
+            .workspace-title > span:last-child { font-size: 21px; }
+            .workspace-page .platform, .workspace-page .container { margin-inline: 0; }
+            .workspace-page .builder-shell { margin-inline: 12px; }
+            .workspace-page .builder-nav { top: 6px; gap: 6px; padding: 5px; }
+            .workspace-page .builder-nav__links a { padding-inline: 9px; }
+            .workspace-page .builder-nav__tools button { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+            .workspace-page .builder-nav__tools button span { display: none; }
+            .workspace-page .builder-section { padding: 20px 16px; }
+            .workspace-page .field-grid, .workspace-page .toggle-grid, .workspace-page .checkbox-group { grid-template-columns: 1fr; }
+            .workspace-page .checkbox-group > label:last-child { grid-column: auto; }
+            .workspace-page .platform-icons { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; overflow: visible; padding-bottom: 3px; }
+            .workspace-page .platform-icon { grid-template-columns: 1fr; grid-template-rows: 24px auto auto; justify-items: center; min-height: 76px; padding: 8px 5px; text-align: center; }
+            .workspace-page .platform-icon i { grid-row: auto; }
+            .workspace-page .platform-icon span { overflow: visible; font-size: 11px; text-overflow: clip; }
+            .workspace-page #id_direction { grid-template-columns: 1fr; }
+            .workspace-page .desktop-behavior-field--primary, .workspace-page .desktop-behavior-size { grid-template-columns: 1fr; }
+            .workspace-page .action-bar .section { align-items: stretch; flex-direction: column; padding: 16px; }
+        }
+
+        @media (min-width: 561px) {
+            .workspace-page .checkbox-group > label:last-child:nth-child(3n + 1) { grid-column: 2; }
         }
       </style>
 </head>
-<body>
+<body class="workspace-page">
     {% include "includes/app_header.html" %}
-    <h1><i class="fas fa-cogs"></i> RustDesk 自定义客户端生成器</h1>
+    <h1 class="workspace-title"><span class="eyebrow">BUILD WORKSPACE</span><span><i class="fas fa-cogs"></i> RustDesk 自定义客户端生成器</span></h1>
     <form id="myForm" action="/generator" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {{ form.formSchemaVersion }}
         {% if form.errors %}
-            <div class="errorlist" role="alert">
+            <div class="errorlist" role="alert" tabindex="-1">
                 <strong>请修正以下内容：</strong>
                 {% for field in form %}
                     {% for error in field.errors %}
-                        <div>{{ field.label|default:field.name }}：{{ error }}</div>
+                        <div data-error-field="{{ field.name }}">{{ field.label|default:field.name }}：{{ error }}</div>
                     {% endfor %}
                 {% endfor %}
                 {% for error in form.non_field_errors %}
@@ -521,211 +820,341 @@
                 {% endfor %}
             </div>
         {% endif %}
-        <div class="save-load-section-container">
-            <div class="section">
-                <h2 id="saveLoadTitle">保存 / 导入配置 <i class="fas fa-chevron-down"></i></h2>
-                <div class="save-load-section">  
-                    <button type="button" onclick="saveFormData()">保存配置</button>
-                    <input type="file" id="fileInput" style="display:none;" accept=".json">
-                    <button type="button" onclick="loadFormData()">导入配置</button>
+        <div class="builder-shell">
+            <nav class="builder-nav" aria-label="配置分区">
+                <div class="builder-nav__links">
+                    <a href="#build-target" data-section-link><i class="fas fa-desktop" aria-hidden="true"></i> 构建目标</a>
+                    <a href="#build-basic" data-section-link><i class="fas fa-sliders-h" aria-hidden="true"></i> 基础与服务器</a>
+                    <a href="#build-security" data-section-link><i class="fas fa-shield-alt" aria-hidden="true"></i> 安全</a>
+                    <a href="#build-brand" data-section-link><i class="fas fa-paint-brush" aria-hidden="true"></i> 品牌</a>
+                    <a href="#build-permissions" data-section-link><i class="fas fa-lock" aria-hidden="true"></i> 权限</a>
+                    <a href="#build-advanced" data-section-link><i class="fas fa-code" aria-hidden="true"></i> 高级</a>
                 </div>
-            </div>
-        </div>
-        <div class="platform">
-            <h2><i class="fas fa-desktop"></i> 选择生成平台</h2>
-                <div class="platform-icons">
-                    <span class="fa-stack fa-lg">
-                        <i class="fab fa-windows  fa-stack-2x platform-icon active" data-platform="windows"></i>
-                        <strong class="fa-stack-1x text-64">64</strong>
-                    </span>
-                    <span class="fa-stack fa-lg">
-                        <i class="fab fa-windows  fa-stack-2x platform-icon" data-platform="windows-x86"></i>
-                        <strong class="fa-stack-1x text-32">32</strong>
-                    </span>
-                    <i class="fab fa-linux platform-icon" data-platform="linux"></i>
-                    <i class="fab fa-android platform-icon" data-platform="android"></i>
-                    <i class="fab fa-apple platform-icon" data-platform="macos"></i>
+                <div class="builder-nav__tools">
+                    <button type="button" onclick="saveFormData()" title="保存配置" aria-label="保存配置"><i class="fas fa-download" aria-hidden="true"></i><span>保存</span></button>
+                    <input type="file" id="fileInput" class="visually-hidden" accept=".json">
+                    <button type="button" onclick="loadFormData()" title="导入配置" aria-label="导入配置"><i class="fas fa-upload" aria-hidden="true"></i><span>导入</span></button>
                 </div>
-                {{ form.platform }}
-                <label for="{{ form.version.id_for_label }}">RustDesk 版本：</label>
-                {{ form.version }}
-                {% if form.version.help_text %}
-                    <span class="help-text">{{ form.version.help_text }}</span>
-                {% endif %}
-                <label id="delayFixOption" for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复使用第三方 API 时的连接延迟</label>
-                <label id="beijingCustomOption" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京 Linux 定制</label>
-            </div>
-        </div>
-        <div class="container">   
-            <div class="section">
-                <h2><i class="fas fa-sliders-h"></i> 基础信息</h2>
-                    <label for="{{ form.exename.id_for_label }}">配置名称（仅限英文、数字、下划线或连字符，不能包含空格）：</label>
-                    {{ form.exename }}<span id="filenameError" class="error"></span><br><br>
-                    <div id="basicCustomFields" class="linux-custom-content">
-                    <label for="{{ form.appname.id_for_label }}">自定义应用名称（留空则使用默认名称）：</label>
-                    {{ form.appname }}<br><br>
-                    <label for="{{ form.direction.id_for_label }}">连接类型：</label>
-                    {{ form.direction }}<br><br>
-                    <label for="{{ form.installation.id_for_label }}">安装能力：</label>
-                    {{ form.installation }}<br><br>
-                    <label for="{{ form.settings.id_for_label }}">设置入口：</label>
-                    {{ form.settings }}<br><br>
-                    <div id="desktopBehaviorSection" class="desktop-behavior-section">
-                        <h3><i class="fas fa-window-maximize"></i> 桌面端行为</h3>
-                        <div class="desktop-behavior-grid">
-                            <div class="desktop-behavior-field">
-                                <label for="{{ form.defaultViewStyle.id_for_label }}">默认显示方式：</label>
-                                {{ form.defaultViewStyle }}
+            </nav>
+
+            <div class="builder-canvas">
+                <section id="build-target" class="builder-section">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">01</span>
+                        <h2>构建目标</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="platform workspace-toolbar">
+                            <div class="platform-icons" aria-label="生成平台">
+                                <button type="button" class="platform-icon active" data-platform="windows" aria-pressed="true"><i class="fab fa-windows" aria-hidden="true"></i><span>Windows</span><small>64 位</small></button>
+                                <button type="button" class="platform-icon" data-platform="windows-x86" aria-pressed="false"><i class="fab fa-windows" aria-hidden="true"></i><span>Windows</span><small>32 位</small></button>
+                                <button type="button" class="platform-icon" data-platform="linux" aria-pressed="false"><i class="fab fa-linux" aria-hidden="true"></i><span>Linux</span><small>桌面端</small></button>
+                                <button type="button" class="platform-icon" data-platform="android" aria-pressed="false"><i class="fab fa-android" aria-hidden="true"></i><span>Android</span><small>移动端</small></button>
+                                <button type="button" class="platform-icon" data-platform="macos" aria-pressed="false"><i class="fab fa-apple" aria-hidden="true"></i><span>macOS</span><small>桌面端</small></button>
                             </div>
-                            <label class="desktop-behavior-toggle" for="{{ form.removeSetupServerTip.id_for_label }}">
-                                {{ form.removeSetupServerTip }} 隐藏底部“自建服务器”提示
-                            </label>
-                            <label id="hideNetworkSettingOption" class="desktop-behavior-toggle" for="{{ form.hideNetworkSetting.id_for_label }}">
-                                {{ form.hideNetworkSetting }} 隐藏设置里的“网络”入口
-                            </label>
-                            <label id="silentInstallOption" class="desktop-behavior-toggle" for="{{ form.silentInstallOnDoubleClick.id_for_label }}">
-                                {{ form.silentInstallOnDoubleClick }} Windows 安装包双击后静默安装
-                            </label>
-                            <label id="copyIdPasswordButtonOption" class="desktop-behavior-toggle" for="{{ form.copyIdPasswordButton.id_for_label }}">
-                                {{ form.copyIdPasswordButton }} ID 旁增加复制按钮
-                            </label>
-                            <label id="manualTemporaryPasswordOption" class="desktop-behavior-toggle" for="{{ form.manualTemporaryPassword.id_for_label }}">
-                                {{ form.manualTemporaryPassword }} 允许手动设置临时密码
-                            </label>
-                            <label id="startOnBootOption" class="desktop-behavior-toggle" for="{{ form.showStartOnBootCheckbox.id_for_label }}">
-                                {{ form.showStartOnBootCheckbox }} 显示开机自启选项
-                            </label>
-                            <div id="incomingCompactWrapper" class="desktop-behavior-compact-field">
-                                <label class="desktop-behavior-toggle" for="{{ form.incomingCompactMode.id_for_label }}">
-                                    {{ form.incomingCompactMode }} 仅被控紧凑布局
-                                </label>
-                                <span class="help-text">仅在连接类型为“仅允许被控”的 Windows 64 位、Linux、macOS 生成包中生效。</span>
-                                <div id="incomingCompactDetails" class="desktop-behavior-size" hidden>
-                                    <div class="desktop-behavior-field">
-                                        <label for="{{ form.incomingContentWidth.id_for_label }}">窗口内容宽度：</label>
-                                        {{ form.incomingContentWidth }}
+                            <label class="visually-hidden" for="{{ form.platform.id_for_label }}">生成平台</label>
+                            {{ form.platform }}
+                            <div class="field-grid">
+                                <div class="field-block">
+                                    <label for="{{ form.version.id_for_label }}">RustDesk 版本</label>
+                                    {{ form.version }}
+                                    {% if form.version.help_text %}<span class="help-text">{{ form.version.help_text }}</span>{% endif %}
+                                </div>
+                                <div class="field-block">
+                                    <span class="field-label">附加选项</span>
+                                    <div class="toggle-grid target-toggle-grid">
+                                        <label id="delayFixOption" class="option-toggle" for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复第三方 API 连接延迟</label>
+                                        <label id="beijingCustomOption" class="option-toggle" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京 Linux 定制</label>
                                     </div>
-                                    <div class="desktop-behavior-field">
-                                        <label for="{{ form.incomingContentHeight.id_for_label }}">窗口内容高度：</label>
-                                        {{ form.incomingContentHeight }}
+                                </div>
+                            </div>
+                            <div id="linuxCapabilityNotice" class="capability-note" hidden>
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <span>标准 Linux 构建仅使用配置名称；需要服务器、品牌和权限定制时，请开启“北京 Linux 定制”。</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="build-basic" class="builder-section">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">02</span>
+                        <h2>基础与服务器</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="container form-grid">
+                            <div class="section">
+                                <h3 class="section-subtitle"><i class="fas fa-sliders-h" aria-hidden="true"></i> 基础信息</h3>
+                                <div class="field-grid">
+                                    <div class="field-block field-block--full">
+                                        <label for="{{ form.exename.id_for_label }}">配置名称</label>
+                                        {{ form.exename }}
+                                        <span class="help-text">仅限英文、数字、下划线或连字符，不能包含空格。</span>
+                                        <span id="filenameError" class="error"></span>
+                                    </div>
+                                    <div id="basicCustomFields" class="field-block field-block--full linux-custom-content">
+                                        <div class="field-grid">
+                                            <div class="field-block">
+                                                <label for="{{ form.appname.id_for_label }}">应用名称</label>
+                                                {{ form.appname }}
+                                                <span class="help-text">留空则使用 RustDesk 默认名称。</span>
+                                            </div>
+                                            <div id="androidAppIdField" class="field-block">
+                                                <label for="{{ form.androidappid.id_for_label }}">Android App ID</label>
+                                                {{ form.androidappid }}
+                                                <span class="help-text">仅 Android 构建使用，留空即为默认 ID。</span>
+                                            </div>
+                                            <div class="field-block field-block--full">
+                                                <label for="{{ form.direction.id_for_label }}">连接类型</label>
+                                                {{ form.direction }}
+                                            </div>
+                                            <div class="field-block">
+                                                <label for="{{ form.installation.id_for_label }}">安装能力</label>
+                                                {{ form.installation }}
+                                            </div>
+                                            <div class="field-block">
+                                                <label for="{{ form.settings.id_for_label }}">设置入口</label>
+                                                {{ form.settings }}
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="section linux-custom-content">
+                                <h3 class="section-subtitle"><i class="fas fa-server" aria-hidden="true"></i> 自定义服务器</h3>
+                                <div class="field-grid">
+                                    <div class="field-block">
+                                        <label for="{{ form.serverIP.id_for_label }}">服务器地址</label>
+                                        {{ form.serverIP }}
+                                    </div>
+                                    <div class="field-block">
+                                        <label for="{{ form.key.id_for_label }}">服务器密钥</label>
+                                        {{ form.key }}
+                                    </div>
+                                    <div class="field-block field-block--full">
+                                        <label for="{{ form.apiServer.id_for_label }}">API 地址</label>
+                                        {{ form.apiServer }}
+                                    </div>
+                                    <div class="field-block field-block--full">
+                                        <label for="{{ form.urlLink.id_for_label }}">站内链接地址</label>
+                                        {{ form.urlLink }}
+                                        <span class="help-text">替换客户端中的 https://rustdesk.com。</span>
+                                    </div>
+                                    <div class="field-block field-block--full">
+                                        <label for="{{ form.downloadLink.id_for_label }}">更新下载地址</label>
+                                        {{ form.downloadLink }}
+                                        <span class="help-text">替换客户端中的 https://rustdesk.com/download。</span>
+                                    </div>
+                                    <div class="field-block field-block--full">
+                                        <label for="{{ form.compname.id_for_label }}">版权公司名称</label>
+                                        {{ form.compname }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="desktopBehaviorSection" class="section section--full desktop-behavior-section linux-custom-content">
+                                <h3 class="section-subtitle"><i class="fas fa-window-maximize" aria-hidden="true"></i> 桌面端行为</h3>
+                                <div class="desktop-behavior-grid">
+                                    <div class="desktop-behavior-field desktop-behavior-field--primary">
+                                        <label for="{{ form.defaultViewStyle.id_for_label }}">默认显示方式</label>
+                                        {{ form.defaultViewStyle }}
+                                    </div>
+                                    <div class="desktop-behavior-options">
+                                        <label class="desktop-behavior-toggle" for="{{ form.removeSetupServerTip.id_for_label }}">
+                                            {{ form.removeSetupServerTip }} 隐藏底部“自建服务器”提示
+                                        </label>
+                                        <label id="hideNetworkSettingOption" class="desktop-behavior-toggle" for="{{ form.hideNetworkSetting.id_for_label }}">
+                                            {{ form.hideNetworkSetting }} 隐藏设置里的“网络”入口
+                                        </label>
+                                        <label id="silentInstallOption" class="desktop-behavior-toggle" for="{{ form.silentInstallOnDoubleClick.id_for_label }}">
+                                            {{ form.silentInstallOnDoubleClick }} Windows 安装包双击后静默安装
+                                        </label>
+                                        <label id="copyIdPasswordButtonOption" class="desktop-behavior-toggle" for="{{ form.copyIdPasswordButton.id_for_label }}">
+                                            {{ form.copyIdPasswordButton }} ID 旁增加复制按钮
+                                        </label>
+                                        <label id="manualTemporaryPasswordOption" class="desktop-behavior-toggle" for="{{ form.manualTemporaryPassword.id_for_label }}">
+                                            {{ form.manualTemporaryPassword }} 允许手动设置临时密码
+                                        </label>
+                                        <label id="startOnBootOption" class="desktop-behavior-toggle" for="{{ form.showStartOnBootCheckbox.id_for_label }}">
+                                            {{ form.showStartOnBootCheckbox }} 显示开机自启选项
+                                        </label>
+                                    </div>
+                                    <div id="incomingCompactWrapper" class="desktop-behavior-compact-field">
+                                        <label class="desktop-behavior-toggle" for="{{ form.incomingCompactMode.id_for_label }}">
+                                            {{ form.incomingCompactMode }} 仅被控紧凑布局
+                                        </label>
+                                        <span class="help-text">用于仅允许被控的 Windows 64 位、Linux 和 macOS 客户端。</span>
+                                        <div id="incomingCompactDetails" class="desktop-behavior-size" hidden>
+                                            <div class="desktop-behavior-field">
+                                                <label for="{{ form.incomingContentWidth.id_for_label }}">窗口内容宽度</label>
+                                                {{ form.incomingContentWidth }}
+                                            </div>
+                                            <div class="desktop-behavior-field">
+                                                <label for="{{ form.incomingContentHeight.id_for_label }}">窗口内容高度</label>
+                                                {{ form.incomingContentHeight }}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div><br><br>
-                    <label for="{{ form.androidappid.id_for_label }}">自定义 Android App ID（留空则使用默认 ID）：</label>
-                    {{ form.androidappid }}<br><br>
                     </div>
-            </div>
+                </section>
 
-            <div class="section linux-custom-content">
-                <h2><i class="fas fa-server"></i> 自定义服务器</h2>
-                    <label for="{{ form.serverIP.id_for_label }}">服务器地址：</label>
-                    {{ form.serverIP }}<br><br>
-                    <label for="{{ form.key.id_for_label }}">服务器密钥：</label>
-                    {{ form.key }}<br><br>
-                    <label for="{{ form.apiServer.id_for_label }}">API 地址：</label>
-                    {{ form.apiServer }}<br><br>
-                    <label for="{{ form.urlLink.id_for_label }}">站内链接地址（替换 https://rustdesk.com）：</label>
-                    {{ form.urlLink }}<br><br>
-                    <label for="{{ form.downloadLink.id_for_label }}">更新下载地址（替换 https://rustdesk.com/download）：</label>
-                    {{ form.downloadLink }}<br><br>
-                    <label for="{{ form.compname.id_for_label }}">版权公司名称（替换 Purslane Tech Pte. Ltd.）：</label>
-                    {{ form.compname }}<br><br>
-            </div>
-        </div>
-        <div class="container linux-custom-content">
-            <div class="section">
-                <h2><i class="fas fa-shield-alt"></i> 安全设置</h2>
-                    <label for="{{ form.passApproveMode.id_for_label }}">连接确认方式：</label>
-                    {{ form.passApproveMode }}
-                    <input id="hidecmForcedApproveMode" type="hidden" name="passApproveMode" value="password" disabled><br><br>
-                    <div id="passwordRequirement" class="password-requirement">构建后默认隐藏连接窗口时，需要设置固定密码。</div>
-                    <label for="{{ form.permanentPassword.id_for_label }}">固定密码：</label>
-                    {{ form.permanentPassword }} <span class="help-text">该密码会作为默认密码，客户端仍可修改。</span><br><br>
-                    
-                    
-                    <label for="{{ form.denyLan.id_for_label }}">{{ form.denyLan }} 禁用局域网发现</label><br>
-                    
-                    <label for="{{ form.enableDirectIP.id_for_label }}">{{ form.enableDirectIP }} 启用直接 IP 访问</label><br>
-                    
-                    <label for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} 用户无操作时自动关闭传入会话</label><br>
-
-                    <div id="hidecmOption">
-                        <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 启用隐藏连接窗口功能（由客户端用户设置）</label><br>
-                        <div id="hidecmDefaultEnabledWrapper" hidden>
-                            <label for="{{ form.hidecmDefaultEnabled.id_for_label }}">{{ form.hidecmDefaultEnabled }} 构建后默认开启（需要固定密码）</label><br>
+                <section id="build-security" class="builder-section linux-custom-content">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">03</span>
+                        <h2>安全</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="field-grid">
+                            <div class="field-block">
+                                <label for="{{ form.passApproveMode.id_for_label }}">连接确认方式</label>
+                                {{ form.passApproveMode }}
+                                <input id="hidecmForcedApproveMode" type="hidden" name="passApproveMode" value="password" disabled>
+                            </div>
+                            <div class="field-block">
+                                <label for="{{ form.permanentPassword.id_for_label }}">固定密码</label>
+                                {{ form.permanentPassword }}
+                                <span class="help-text">作为客户端默认密码，客户端用户仍可修改。</span>
+                                <div id="passwordRequirement" class="password-requirement">默认隐藏连接窗口时必须设置固定密码。</div>
+                            </div>
+                            <div class="toggle-grid field-block--full">
+                                <label class="option-toggle" for="{{ form.denyLan.id_for_label }}">{{ form.denyLan }} 禁用局域网发现</label>
+                                <label class="option-toggle" for="{{ form.enableDirectIP.id_for_label }}">{{ form.enableDirectIP }} 启用直接 IP 访问</label>
+                                <label class="option-toggle" for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} 无操作时自动关闭传入会话</label>
+                                <div id="hidecmOption" class="option-stack">
+                                    <label class="option-toggle" for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} 启用隐藏连接窗口功能</label>
+                                    <div id="hidecmDefaultEnabledWrapper" hidden>
+                                        <label class="option-toggle" for="{{ form.hidecmDefaultEnabled.id_for_label }}">{{ form.hidecmDefaultEnabled }} 构建后默认开启</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-            </div>
-        
-            <div class="section">
-                <h2><i class="fas fa-paint-brush"></i> 品牌外观</h2>
-                    {{ form.iconbase64.as_hidden }}
-                    {{ form.logobase64.as_hidden }}
-                    {{ form.privacybase64.as_hidden }}
-                    <label for="{{ form.iconfile.id_for_label }}">自定义应用图标（PNG）</label>
-                    {{ form.iconfile }}<br><br>
-                    <!-- <input type="file" name="iconfile" id="iconfile" accept="image/png"> -->
-                    <div id="icon-preview"></div><br><br>
-                    <div id="logoOption">
-                        <label for="{{ form.logofile.id_for_label }}">自定义应用 Logo（PNG）</label>
-                        {{ form.logofile }}<br><br>
-                        <div id="logo-preview"></div><br><br>
-                    </div>
-                    <div id="privacyOption">
-                        <label for="{{ form.privacyfile.id_for_label }}">自定义隐私屏幕（PNG）</label>
-                        {{ form.privacyfile }}<br><br>
-                        <div id="privacy-preview"></div><br><br>
-                    </div>
-                    <label for="{{ form.theme.id_for_label }}">主题：</label>
-                    {{ form.theme }} {{ form.themeDorO }} <span class="help-text">默认表示客户端可修改，强制覆盖表示永久锁定该主题。</span><br><br>
-            </div>
-        </div>
-        <div class="container linux-custom-content">
-            <div class="section">
-                <h2><i class="fas fa-lock"></i> 权限设置</h2>
-                    <p class="help-text">以下权限可作为默认值，也可强制覆盖为不可修改。</p>
-                    {{ form.permissionsDorO }}
-                    <label for="{{ form.permissionsType.id_for_label }}">权限类型：</label>
-                    {{ form.permissionsType }}<br><br>
-                    <div class="checkbox-group">
-                        <label for="{{ form.enableKeyboard.id_for_label }}">{{ form.enableKeyboard }} 键盘/鼠标</label>
-                        <label for="{{ form.enableClipboard.id_for_label }}">{{ form.enableClipboard }} 剪贴板</label>
-                        <label for="{{ form.enableFileCopyPaste.id_for_label }}">{{ form.enableFileCopyPaste }} 文件复制粘贴</label>
-                        <label for="{{ form.enableFileTransfer.id_for_label }}">{{ form.enableFileTransfer }} 文件传输</label>
-                        <label for="{{ form.enableAudio.id_for_label }}">{{ form.enableAudio }} 音频</label>
-                        <label for="{{ form.enableTCP.id_for_label }}">{{ form.enableTCP }} TCP 隧道</label>
-                        <label for="{{ form.enableRemoteRestart.id_for_label }}">{{ form.enableRemoteRestart }} 远程重启</label>
-                        <label for="{{ form.enableRecording.id_for_label }}">{{ form.enableRecording }} 会话录制</label>
-                        <label for="{{ form.enableBlockingInput.id_for_label }}">{{ form.enableBlockingInput }} 阻止本地输入</label>
-                        <label for="{{ form.enableRemoteModi.id_for_label }}">{{ form.enableRemoteModi }} 远程修改配置</label>
-                        <label for="{{ form.enablePrinter.id_for_label }}">{{ form.enablePrinter }} 远程打印机</label>
-                        <label for="{{ form.enableCamera.id_for_label }}">{{ form.enableCamera }} 远程摄像头</label>
-                        <label for="{{ form.enableTerminal.id_for_label }}">{{ form.enableTerminal }} 远程终端</label>
-                    </div><br>
-                <h2><i class="fas fa-code"></i> 代码增强</h2>
-                    <label id="cycleMonitorOption" for="{{ form.cycleMonitor.id_for_label }}">{{ form.cycleMonitor }} 在最小化工具栏添加显示器切换按钮</label><br>
-                    <label id="xOfflineOption" for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} 地址簿离线设备显示 X 标记</label><br>
-                    <label id="removeNewVersionNotifOption" for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} 移除新版本通知</label><br>
-                    <label id="hideSettingsMenuOption" for="{{ form.hideSettingsMenu.id_for_label }}">{{ form.hideSettingsMenu }} 隐藏主界面右上角三点菜单</label><br>
-                    <label id="removeRecentSessionsOption" for="{{ form.removeRecentSessions.id_for_label }}">{{ form.removeRecentSessions }} 移除最近访问记录</label><br>
-                    <label id="forceDisableFileTransferOption" for="{{ form.forceDisableFileTransfer.id_for_label }}">{{ form.forceDisableFileTransfer }} 从源码强制禁用文件传输</label><br>
-            </div>
+                </section>
 
-            <div class="section">
-                <h2><i class="fas fa-cog"></i> 其他设置</h2>
-                    <label for="{{ form.removeWallpaper.id_for_label }}">{{ form.removeWallpaper }} 传入会话期间移除壁纸</label><br>
-                    <a href="https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/">查看默认/覆盖配置项列表</a>
-                    <label for="{{ form.defaultManual.id_for_label }}">默认设置</label><br>
-                    {{ form.defaultManual }}<br><br>
-                    <label for="{{ form.overrideManual.id_for_label }}">覆盖设置</label><br>
-                    {{ form.overrideManual }}<br><br>
-            </div>
-        </div>
-        <div class="platform">
-            <div class="section form-actions">
-                <button type="submit"><i class="fas fa-rocket"></i> 生成自定义客户端</button>
+                <section id="build-brand" class="builder-section linux-custom-content">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">04</span>
+                        <h2>品牌</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        {{ form.iconbase64.as_hidden }}
+                        {{ form.logobase64.as_hidden }}
+                        {{ form.privacybase64.as_hidden }}
+                        <div class="upload-grid">
+                            <div class="upload-field">
+                                <label for="{{ form.iconfile.id_for_label }}">应用图标（PNG）</label>
+                                {{ form.iconfile }}
+                                <div id="icon-preview" class="preview-slot"></div>
+                            </div>
+                            <div id="logoOption" class="upload-field">
+                                <label for="{{ form.logofile.id_for_label }}">应用 Logo（PNG）</label>
+                                {{ form.logofile }}
+                                <div id="logo-preview" class="preview-slot"></div>
+                            </div>
+                            <div id="privacyOption" class="upload-field">
+                                <label for="{{ form.privacyfile.id_for_label }}">隐私屏幕（PNG）</label>
+                                {{ form.privacyfile }}
+                                <div id="privacy-preview" class="preview-slot"></div>
+                            </div>
+                        </div>
+                        <div class="field-grid brand-options">
+                            <div class="field-block">
+                                <label for="{{ form.theme.id_for_label }}">主题</label>
+                                {{ form.theme }}
+                            </div>
+                            <div class="field-block">
+                                <label for="{{ form.themeDorO.id_for_label }}">主题策略</label>
+                                {{ form.themeDorO }}
+                                <span class="help-text">默认允许客户端修改，强制覆盖则锁定主题。</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="build-permissions" class="builder-section linux-custom-content">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">05</span>
+                        <h2>权限</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="field-grid permissions-heading">
+                            <div class="field-block">
+                                <label for="{{ form.permissionsDorO.id_for_label }}">权限策略</label>
+                                {{ form.permissionsDorO }}
+                            </div>
+                            <div class="field-block">
+                                <label for="{{ form.permissionsType.id_for_label }}">权限类型</label>
+                                {{ form.permissionsType }}
+                            </div>
+                        </div>
+                        <div class="checkbox-group">
+                            <label for="{{ form.enableKeyboard.id_for_label }}">{{ form.enableKeyboard }} 键盘/鼠标</label>
+                            <label for="{{ form.enableClipboard.id_for_label }}">{{ form.enableClipboard }} 剪贴板</label>
+                            <label for="{{ form.enableFileCopyPaste.id_for_label }}">{{ form.enableFileCopyPaste }} 文件复制粘贴</label>
+                            <label for="{{ form.enableFileTransfer.id_for_label }}">{{ form.enableFileTransfer }} 文件传输</label>
+                            <label for="{{ form.enableAudio.id_for_label }}">{{ form.enableAudio }} 音频</label>
+                            <label for="{{ form.enableTCP.id_for_label }}">{{ form.enableTCP }} TCP 隧道</label>
+                            <label for="{{ form.enableRemoteRestart.id_for_label }}">{{ form.enableRemoteRestart }} 远程重启</label>
+                            <label for="{{ form.enableRecording.id_for_label }}">{{ form.enableRecording }} 会话录制</label>
+                            <label for="{{ form.enableBlockingInput.id_for_label }}">{{ form.enableBlockingInput }} 阻止本地输入</label>
+                            <label for="{{ form.enableRemoteModi.id_for_label }}">{{ form.enableRemoteModi }} 远程修改配置</label>
+                            <label for="{{ form.enablePrinter.id_for_label }}">{{ form.enablePrinter }} 远程打印机</label>
+                            <label for="{{ form.enableCamera.id_for_label }}">{{ form.enableCamera }} 远程摄像头</label>
+                            <label for="{{ form.enableTerminal.id_for_label }}">{{ form.enableTerminal }} 远程终端</label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="build-advanced" class="builder-section linux-custom-content">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">06</span>
+                        <h2>高级</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="container form-grid">
+                            <div class="section">
+                                <h3 class="section-subtitle"><i class="fas fa-code" aria-hidden="true"></i> 代码增强</h3>
+                                <div class="toggle-grid advanced-toggle-grid">
+                                    <label id="cycleMonitorOption" class="option-toggle" for="{{ form.cycleMonitor.id_for_label }}">{{ form.cycleMonitor }} 添加显示器切换按钮</label>
+                                    <label id="xOfflineOption" class="option-toggle" for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} 离线设备显示 X 标记</label>
+                                    <label id="removeNewVersionNotifOption" class="option-toggle" for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} 移除新版本通知</label>
+                                    <label id="hideSettingsMenuOption" class="option-toggle" for="{{ form.hideSettingsMenu.id_for_label }}">{{ form.hideSettingsMenu }} 隐藏右上角三点菜单</label>
+                                    <label id="removeRecentSessionsOption" class="option-toggle" for="{{ form.removeRecentSessions.id_for_label }}">{{ form.removeRecentSessions }} 移除最近访问记录</label>
+                                    <label id="forceDisableFileTransferOption" class="option-toggle" for="{{ form.forceDisableFileTransfer.id_for_label }}">{{ form.forceDisableFileTransfer }} 从源码禁用文件传输</label>
+                                </div>
+                            </div>
+                            <div class="section">
+                                <h3 class="section-subtitle"><i class="fas fa-cog" aria-hidden="true"></i> 其他设置</h3>
+                                <label class="option-toggle" for="{{ form.removeWallpaper.id_for_label }}">{{ form.removeWallpaper }} 传入会话期间移除壁纸</label>
+                                <a class="form-link" href="https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/" target="_blank" rel="noopener noreferrer">查看默认/覆盖配置项列表 <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
+                            </div>
+                            <div class="section section--full advanced-manual-section">
+                                <h3 class="section-subtitle"><i class="fas fa-sliders-h" aria-hidden="true"></i> 手动配置</h3>
+                                <div class="field-grid manual-settings">
+                                    <div class="field-block">
+                                        <label for="{{ form.defaultManual.id_for_label }}">默认设置</label>
+                                        {{ form.defaultManual }}
+                                    </div>
+                                    <div class="field-block">
+                                        <label for="{{ form.overrideManual.id_for_label }}">覆盖设置</label>
+                                        {{ form.overrideManual }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="platform action-bar">
+                    <div class="section form-actions">
+                        <span id="buildSummary" class="build-summary">Windows 64 位 · 1.4.9</span>
+                        <button type="submit"><i class="fas fa-rocket" aria-hidden="true"></i> 生成自定义客户端</button>
+                    </div>
+                </div>
             </div>
         </div>
     </form>
@@ -740,7 +1169,9 @@
         const beijingCustomOption = document.getElementById('beijingCustomOption');
         const beijingCustomToggle = document.getElementById("{{ form.beijingCustom.id_for_label }}");
         const delayFixOption = document.getElementById('delayFixOption');
+        const linuxCapabilityNotice = document.getElementById('linuxCapabilityNotice');
         const linuxCustomContent = document.querySelectorAll('.linux-custom-content');
+        const androidAppIdField = document.getElementById('androidAppIdField');
         const desktopBehaviorSection = document.getElementById('desktopBehaviorSection');
         const silentInstallOption = document.getElementById('silentInstallOption');
         const linuxGatedOptions = [
@@ -772,6 +1203,102 @@
         const passApproveModeSelect = document.getElementById("{{ form.passApproveMode.id_for_label }}");
         const forcedApproveModeInput = document.getElementById('hidecmForcedApproveMode');
         let hideCmPreviousApproveMode = null;
+        platformSelect.tabIndex = -1;
+
+        const generatorForm = document.getElementById('myForm');
+        const sectionLinks = Array.from(document.querySelectorAll('[data-section-link]'));
+        const platformLabels = new Map([
+            ['windows', 'Windows 64 位'],
+            ['windows-x86', 'Windows 32 位'],
+            ['linux', 'Linux'],
+            ['android', 'Android'],
+            ['macos', 'macOS'],
+        ]);
+        const exenameInput = document.getElementById("{{ form.exename.id_for_label }}");
+
+        function syncSectionNavigation() {
+            sectionLinks.forEach(link => {
+                const section = document.querySelector(link.hash);
+                link.hidden = !section || section.hidden;
+            });
+            const currentLink = sectionLinks.find(link => link.getAttribute('aria-current') === 'location');
+            if (!currentLink || currentLink.hidden) {
+                sectionLinks.forEach(link => link.removeAttribute('aria-current'));
+                sectionLinks.find(link => !link.hidden)?.setAttribute('aria-current', 'location');
+            }
+        }
+
+        function updateBuildSummary() {
+            const parts = [platformLabels.get(platformSelect.value) || platformSelect.value];
+            if (versionSelect.value) {
+                parts.push(versionSelect.value === 'master' ? 'Master' : versionSelect.value);
+            }
+            if (exenameInput?.value.trim()) {
+                parts.push(exenameInput.value.trim());
+            }
+            document.getElementById('buildSummary').textContent = parts.join(' · ');
+        }
+
+        function focusFirstFormError() {
+            const errorFields = Array.from(document.querySelectorAll('[data-error-field]'));
+            if (!errorFields.length || !generatorForm) {
+                return;
+            }
+            let firstField = null;
+            errorFields.forEach(error => {
+                const namedField = generatorForm.elements.namedItem(error.dataset.errorField);
+                const field = namedField && typeof namedField.focus === 'function'
+                    ? namedField
+                    : namedField?.[0];
+                if (field) {
+                    field.setAttribute('aria-invalid', 'true');
+                    firstField ||= field;
+                }
+            });
+            if (firstField && !firstField.disabled && !firstField.closest('[hidden]')) {
+                firstField.closest('.builder-section')?.scrollIntoView({block: 'start'});
+                firstField.focus({preventScroll: true});
+            } else {
+                const errorSummary = document.querySelector('.errorlist');
+                errorSummary?.scrollIntoView({block: 'start'});
+                errorSummary?.focus({preventScroll: true});
+            }
+        }
+
+        if ('IntersectionObserver' in window) {
+            const sectionObserver = new IntersectionObserver(entries => {
+                const visible = entries
+                    .filter(entry => entry.isIntersecting && !entry.target.hidden)
+                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+                if (!visible) {
+                    return;
+                }
+                sectionLinks.forEach(link => {
+                    if (link.hash === `#${visible.target.id}`) {
+                        link.setAttribute('aria-current', 'location');
+                        const linkRail = link.parentElement;
+                        linkRail.scrollTo({
+                            left: link.offsetLeft - (linkRail.clientWidth - link.offsetWidth) / 2,
+                            behavior: 'smooth',
+                        });
+                    } else {
+                        link.removeAttribute('aria-current');
+                    }
+                });
+            }, {rootMargin: '-18% 0px -64% 0px', threshold: [0, 0.1, 0.4]});
+            document.querySelectorAll('.builder-section').forEach(section => sectionObserver.observe(section));
+        }
+        sectionLinks.forEach(link => {
+            link.addEventListener('click', event => {
+                const section = document.querySelector(link.hash);
+                if (!section || section.hidden) {
+                    return;
+                }
+                event.preventDefault();
+                section.scrollIntoView({behavior: 'smooth', block: 'start'});
+                history.replaceState(null, '', link.hash);
+            });
+        });
 
         function selectedDirection() {
             const checked = document.querySelector('input[name="direction"]:checked');
@@ -804,9 +1331,29 @@
             });
         }
 
+        function setSectionAvailability(element, available) {
+            if (!element) {
+                return;
+            }
+            element.hidden = !available;
+            element.querySelectorAll('input, select, textarea, button').forEach(control => {
+                if (!available) {
+                    if (control.dataset.platformGatedDisabled === undefined) {
+                        control.dataset.platformGatedDisabled = String(control.disabled);
+                    }
+                    control.disabled = true;
+                } else if (control.dataset.platformGatedDisabled !== undefined) {
+                    control.disabled = control.dataset.platformGatedDisabled === 'true';
+                    delete control.dataset.platformGatedDisabled;
+                }
+            });
+        }
+
         function syncPlatformIconState() {
             document.querySelectorAll('.platform-icon').forEach(icon => {
-                icon.classList.toggle('active', icon.dataset.platform === platformSelect.value);
+                const selected = icon.dataset.platform === platformSelect.value;
+                icon.classList.toggle('active', selected);
+                icon.setAttribute('aria-pressed', String(selected));
             });
         }
 
@@ -851,6 +1398,11 @@
             const linuxCustomAllowed = platformSelect.value !== 'linux' || beijingCustomEnabled;
             const supportsLogo = platformSelect.value !== 'windows-x86' && platformSelect.value !== 'android';
             const supportsPrivacy = platformSelect.value === 'windows';
+            linuxCustomContent.forEach(element => {
+                setSectionAvailability(element, linuxCustomAllowed);
+            });
+            linuxCapabilityNotice.hidden = linuxCustomAllowed;
+            setOptionAvailability(androidAppIdField, linuxCustomAllowed && platformSelect.value === 'android');
             setOptionAvailability(logoOption, supportsLogo);
             setOptionAvailability(privacyOption, supportsPrivacy);
             logoBase64Input.disabled = !supportsLogo;
@@ -858,10 +1410,7 @@
             beijingCustomOption.hidden = !supportsBeijingCustom;
             beijingCustomToggle.disabled = !supportsBeijingCustom;
             setOptionAvailability(delayFixOption, linuxCustomAllowed);
-            linuxCustomContent.forEach(element => {
-                element.hidden = !linuxCustomAllowed;
-            });
-            desktopBehaviorSection.hidden = !isDesktop || !linuxCustomAllowed;
+            setSectionAvailability(desktopBehaviorSection, isDesktop && linuxCustomAllowed);
             setOptionAvailability(silentInstallOption, isWindowsBuild);
             linuxGatedOptions.forEach(option => {
                 if (option) {
@@ -892,6 +1441,11 @@
                 linuxCustomAllowed && supportsVersion('1.4.2');
             setOptionAvailability(incomingCompactWrapper, compactLayoutAvailable);
             incomingCompactDetails.hidden = !(compactLayoutAvailable && incomingCompactToggle.checked);
+            if (!linuxCustomAllowed) {
+                linuxCustomContent.forEach(element => setSectionAvailability(element, false));
+            }
+            syncSectionNavigation();
+            updateBuildSummary();
         }
 
         document.querySelectorAll('.platform-icon').forEach(icon => {
@@ -906,6 +1460,7 @@
             updateDesktopBehaviorVisibility();
         });
         versionSelect.addEventListener('change', updateDesktopBehaviorVisibility);
+        exenameInput?.addEventListener('input', updateBuildSummary);
         document.querySelectorAll('input[name="direction"]').forEach(input => {
             input.addEventListener('change', updateDesktopBehaviorVisibility);
         });
@@ -922,6 +1477,7 @@
         });
         syncPlatformIconState();
         updateDesktopBehaviorVisibility();
+        focusFirstFormError();
         document.getElementById("{{ form.iconfile.id_for_label }}").addEventListener('change', function(event) {
             previewImage(event.target, 'icon-preview');
         });
@@ -1027,37 +1583,24 @@
                 var reader = new FileReader();
                 reader.onload = function(e) {
                     var img = document.createElement('img');
-                    img.src = e.target.result;   
-                    img.style.maxWidth = '300px';
-                    img.style.maxHeight = '60px';
+                    img.src = e.target.result;
                     document.getElementById(previewContainerId).innerHTML = '';
                     document.getElementById(previewContainerId).appendChild(img);
                 };
                 reader.readAsDataURL(input.files[0]);
             }
         }
-        const saveLoadTitle = document.getElementById("saveLoadTitle");
-        const saveLoadSection = document.querySelector(".save-load-section");
-
-        saveLoadTitle.addEventListener("click", () => {
-            if (!saveLoadSection.style.display || saveLoadSection.style.display === "none") {
-                saveLoadSection.style.display = "block";
-            } else {
-                saveLoadSection.style.display = "none";
-            }
-
-            const icon = saveLoadTitle.querySelector("i");
-            icon.classList.toggle("fa-chevron-down");
-            icon.classList.toggle("fa-chevron-up");
-        });
-
         async function saveFormData() {
-            const filename = document.getElementById("{{ form.exename.id_for_label }}").value;
+            const filename = exenameInput.value;
             if (!filename) {
                 document.getElementById("filenameError").textContent = "请输入配置名称。";
+                exenameInput.setAttribute('aria-invalid', 'true');
+                exenameInput.scrollIntoView({behavior: 'smooth', block: 'center'});
+                exenameInput.focus({preventScroll: true});
                 return;
             } else {
                 document.getElementById("filenameError").textContent = "";
+                exenameInput.removeAttribute('aria-invalid');
             }
 
             const formData = {};
@@ -1202,18 +1745,15 @@
                                             element.value = formData[key];
                                         }
 
-                                        // Handle image previews (as before)
+                                        // Render imported images without injecting JSON values into HTML.
                                         if (key === 'iconfile' && isPngDataUrl(formData[key])) {
-                                            document.getElementById('id_iconbase64').value = formData[key];
-                                            document.getElementById('icon-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            renderImportedPngPreview(formData[key], 'id_iconbase64', 'icon-preview');
                                         }
                                         if (key === 'logofile' && isPngDataUrl(formData[key])) {
-                                            document.getElementById('id_logobase64').value = formData[key];
-                                            document.getElementById('logo-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            renderImportedPngPreview(formData[key], 'id_logobase64', 'logo-preview');
                                         }
                                         if (key === 'privacyfile' && isPngDataUrl(formData[key])) {
-                                            document.getElementById('id_privacybase64').value = formData[key];
-                                            document.getElementById('privacy-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            renderImportedPngPreview(formData[key], 'id_privacybase64', 'privacy-preview');
                                         }
                                     });
                                 }
@@ -1229,8 +1769,17 @@
             };
         }
 
+        function renderImportedPngPreview(dataUrl, base64InputId, previewContainerId) {
+            const image = document.createElement('img');
+            image.alt = '';
+            image.src = dataUrl;
+            document.getElementById(base64InputId).value = dataUrl;
+            document.getElementById(previewContainerId).replaceChildren(image);
+        }
+
         function isPngDataUrl(value) {
-            return typeof value === 'string' && value.startsWith('data:image/png;base64,');
+            return typeof value === 'string' &&
+                /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
         }
     </script>
 </body>

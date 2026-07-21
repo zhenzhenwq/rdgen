@@ -1,29 +1,46 @@
 {% extends "base_account.html" %}
 
 {% block title %}登录 | RustDesk 生成器{% endblock %}
+{% block body_class %}auth-page{% endblock %}
 {% block header %}{% endblock %}
 
 {% block content %}
-<section class="panel form-panel form-panel--center login-panel">
-    <h1>登录 RustDesk 生成器</h1>
-    <p class="form-panel__subtitle">请输入管理员分配给你的账号。</p>
-    <form method="post" action="{% url 'users:login' %}">
-        {% csrf_token %}
-        {% if form.non_field_errors %}
-            <ul class="errorlist"><li>用户名或密码不正确。</li></ul>
-        {% endif %}
-        <div class="field">
-            {{ form.username.label_tag }}
-            {{ form.username }}
-            {{ form.username.errors }}
+<div class="auth-layout">
+    <section class="auth-showcase" aria-label="RustDesk 生成器介绍">
+        <a class="app-brand" href="/" aria-label="RustDesk 生成器">
+            <span class="brand-mark" aria-hidden="true">RD</span>
+            <span class="brand-copy"><span>RustDesk</span><small>生成器控制台</small></span>
+        </a>
+        <div class="auth-showcase__copy">
+            <span class="eyebrow">BUILD WORKSPACE</span>
+            <h1>把远程支持工具，做成你的产品。</h1>
+            <p>集中管理服务器配置、品牌外观与客户端能力，生成可直接交付的 RustDesk 客户端。</p>
         </div>
-        <div class="field">
-            {{ form.password.label_tag }}
-            {{ form.password }}
-            {{ form.password.errors }}
+        <p class="auth-showcase__footer">Secure workspace · RustDesk client generator</p>
+    </section>
+    <section class="auth-form-side">
+        <div class="panel form-panel form-panel--center login-panel">
+            <h1>欢迎回来</h1>
+            <p class="form-panel__subtitle">登录后继续你的客户端构建工作。</p>
+            <form method="post" action="{% url 'users:login' %}">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <p class="form-error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> 用户名或密码不正确。</p>
+                {% endif %}
+                <div class="field">
+                    {{ form.username.label_tag }}
+                    {{ form.username }}
+                    {{ form.username.errors }}
+                </div>
+                <div class="field">
+                    {{ form.password.label_tag }}
+                    {{ form.password }}
+                    {{ form.password.errors }}
+                </div>
+                <input type="hidden" name="next" value="{{ next }}">
+                <button class="button" type="submit"><i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> 登录控制台</button>
+            </form>
         </div>
-        <input type="hidden" name="next" value="{{ next }}">
-        <button class="button" type="submit">登录</button>
-    </form>
-</section>
+    </section>
+</div>
 {% endblock %}

@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from .models import GithubRun
+
 
 User = get_user_model()
 
@@ -173,6 +175,76 @@ class UserManagementTests(TestCase):
         self.assertRedirects(toggle_response, reverse("users:list"))
         created.refresh_from_db()
         self.assertFalse(created.is_active)
+
+    def test_staff_can_confirm_and_delete_regular_user(self):
+        target = User.objects.create_user("delete-me", password=self.password)
+        run = GithubRun.objects.create(
+            id=701,
+            uuid="delete-user-history",
+            status="finished",
+            owner=target,
+        )
+        self.client.force_login(self.staff)
+
+        confirmation_response = self.client.get(reverse("users:delete", args=[target.pk]))
+
+        self.assertEqual(confirmation_response.status_code, 200)
+        self.assertContains(confirmation_response, "delete-me")
+        self.assertTrue(User.objects.filter(pk=target.pk).exists())
+
+        delete_response = self.client.post(reverse("users:delete", args=[target.pk]))
+
+        self.assertRedirects(delete_response, reverse("users:list"))
+        self.assertFalse(User.objects.filter(pk=target.pk).exists())
+        run.refresh_from_db()
+        self.assertIsNone(run.owner)
+
+    def test_staff_cannot_delete_another_staff_user(self):
+        other_staff = User.objects.create_user(
+            "other-manager-to-delete",
+            password=self.password,
+            is_staff=True,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("users:delete", args=[other_staff.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(User.objects.filter(pk=other_staff.pk).exists())
+
+    def test_account_cannot_delete_itself(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("users:delete", args=[self.staff.pk]))
+
+        self.assertRedirects(response, reverse("users:list"))
+        self.assertTrue(User.objects.filter(pk=self.staff.pk).exists())
+
+        post_response = self.client.post(reverse("users:delete", args=[self.staff.pk]))
+
+        self.assertRedirects(post_response, reverse("users:list"))
+        self.assertTrue(User.objects.filter(pk=self.staff.pk).exists())
+
+    def test_superuser_cannot_delete_last_active_superuser(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(reverse("users:delete", args=[self.superuser.pk]))
+
+        self.assertRedirects(response, reverse("users:list"))
+        self.assertTrue(User.objects.filter(pk=self.superuser.pk).exists())
+
+    def test_superuser_can_delete_another_superuser_when_one_remains(self):
+        another_superuser = User.objects.create_superuser(
+            "another-root",
+            "another-root@example.com",
+            self.password,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(reverse("users:delete", args=[another_superuser.pk]))
+
+        self.assertRedirects(response, reverse("users:list"))
+        self.assertFalse(User.objects.filter(pk=another_superuser.pk).exists())
 
     def test_staff_cannot_manage_another_staff_user(self):
         other_staff = User.objects.create_user(

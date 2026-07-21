@@ -36,6 +36,14 @@ class GeneratorFeaturePayloadTests(TestCase):
             if path.exists():
                 path.unlink()
 
+    def test_generator_import_renders_png_previews_without_inner_html(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "renderImportedPngPreview")
+        self.assertContains(response, "replaceChildren(image)")
+        self.assertNotContains(response, 'innerHTML = `<img src="${formData[key]}">`')
+
     def _feature_payload(self, platform="windows", direction="incoming"):
         data = {
             "platform": platform,
