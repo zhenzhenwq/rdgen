@@ -58,7 +58,9 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Core release commit: `8e33770` (`Adapt generator for RustDesk 1.4.9`).
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
-- Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`). This is the application source currently deployed on the generator server.
+- Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
+- Current application release: `7e3c9fd` (`Refresh generator UI and harden account management`, tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`). This is the application source deployed on the generator server.
+- At deployment time the new local commits had not been pushed; `origin/master` still pointed to `d80c3e5`. Pushing `master` separately starts `docker-build.yml`.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -77,8 +79,9 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
 - Authentication and task security add Django sessions/CSRF, administrator-created accounts, strict per-user task ownership, callback bearer tokens, signed expiring downloads, and POST-only logout. Public registration is intentionally absent.
-- Django `5.2.16`: 67 tests pass. The candidate image passed the same suite, production security check, HTTPS cookie checks, and a migration rehearsal against an online copy of the production database.
-- The live generator was deployed from tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`. Anonymous generator access redirects to `/login/`; authenticated generator and `/users/` access, POST logout, HTTPS cookies, and mobile/desktop layouts were verified without submitting the generator form.
+- Django `5.2.16`: 73 tests pass. The candidate image passed the same suite, production security check, migration-drift check, and a migration rehearsal against an online copy of the production database.
+- Desktop, 768px tablet, and 390px mobile layouts passed Playwright checks across Windows, Windows x86, Android, standard/custom Linux, and macOS visibility states. Imported PNG previews now use strict base64 validation plus DOM node creation; a malicious JSON import was verified not to execute while valid PNG previews still render.
+- The live generator was deployed from tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`. Anonymous generator access redirects to `/login/`; authenticated generator, `/users/`, and delete-confirmation rendering were verified without submitting the generator form or deleting an account.
 
 Important Linux/Flatpak boundaries:
 
@@ -91,14 +94,16 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `13408fbc11eb6561a9128bb1a57dc48c059a5c90`; application tree: `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`.
-- Deployment ID: `20260715-174900-d90b5bd`.
-- Live image: `sha256:16f1ef12baa5b21a5e66fdf5eeff2053a206937ed35d793c2ac3b7ef75a2173e`.
+- Application source commit: `7e3c9fd1caed966b68234112517af295bea13ac0`; application tree: `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`.
+- Deployment ID: `20260721-201116-7e3c9fd1caed`.
+- Source archive SHA-256: `b11dfaf8891d5aadf0025fae14eac2d9b884cb82af985a7cee9fb12ee2319492`.
+- Live image: `sha256:f957ac977fb5a715a5ec7142c4dcc0d3ba27ce1407a372b7656e719f243dd050`.
 - Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
-- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migration `0003` and SQLite `quick_check` passed with all 16 historical task rows retained.
-- Root-only rollback material is under `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and `rdgen-rollback:20260715-174900-d90b5bd`. The prior rollback set remains present too.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; no migration was added, and SQLite `quick_check` passed with 4 users and all 26 task rows retained.
+- Root-only rollback material is under `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and `rdgen-rollback:20260721-201116-7e3c9fd1caed`. Both earlier 2026-07-15 rollback sets remain present.
+- One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`; no active client workflow was running during the switch.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
 
 ## Not Yet Verified

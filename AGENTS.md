@@ -58,19 +58,20 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- Authenticated user management and callback hardening are in application commit `13408fbc11eb6561a9128bb1a57dc48c059a5c90` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`). This application commit is deployed at `https://120.55.0.199/`; no live generator form was submitted and no client workflow was dispatched during deployment.
+- The current deployed application release is `7e3c9fd1caed966b68234112517af295bea13ac0` (`Refresh generator UI and harden account management`, tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`). It adds the console-style responsive UI, safe account deletion, and strict DOM-safe PNG preview import. No live generator form was submitted and no client workflow was dispatched during deployment.
+- The deployment commit and its follow-up handoff commit are local until explicitly pushed; `origin/master` was still `d80c3e5` at deployment time. A push to `master` starts the known Docker image workflow.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260715-174900-d90b5bd`.
-- Verified live image: `sha256:16f1ef12baa5b21a5e66fdf5eeff2053a206937ed35d793c2ac3b7ef75a2173e`.
-- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 67 tests inside the candidate image.
+- Deployment ID: `20260721-201116-7e3c9fd1caed`.
+- Verified live image: `sha256:f957ac977fb5a715a5ec7142c4dcc0d3ba27ce1407a372b7656e719f243dd050`.
+- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 73 tests inside the candidate image.
 - Anonymous generator access redirects to `/login/`. The production `admin` superuser exists; its password is intentionally absent from repository memory.
 - HTTPS uses a trusted Let's Encrypt IPv4 certificate, HTTP redirects to HTTPS, HSTS is initially 300 seconds, invalid hosts return 400, and login rate limiting returns 429 after the configured burst.
-- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. SQLite migration `rdgenerator.0003_githubrun_owner` applied successfully and `quick_check` returned `ok`.
-- Keep `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and image tag `rdgen-rollback:20260715-174900-d90b5bd` for rollback. Retain the older `20260715-020154-23d1cf3941b2` rollback set as an additional fallback for now.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. No migration was added; `migrate --check` and SQLite `quick_check` passed with 4 users and all 26 task rows retained.
+- Keep `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and image tag `rdgen-rollback:20260721-201116-7e3c9fd1caed` for the current rollback. Retain both 2026-07-15 rollback sets as additional fallbacks.
 
 ## Historical Verified Outputs
 

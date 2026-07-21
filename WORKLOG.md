@@ -703,3 +703,24 @@ User constraint recorded:
 - Live verification passed for HTTPS trust, HTTP redirect, HSTS, secure session/CSRF cookies, anonymous redirects, admin login, user management, POST logout, invalid-host rejection, login 429 responses, database integrity, container health, zero restarts, and clean live logs.
 - Production rollback material is `/opt/rdgen-backups/20260715-174900-d90b5bd`, `/opt/rdgen-previous-20260715-174900-d90b5bd`, and image tag `rdgen-rollback:20260715-174900-d90b5bd`.
 - Automatic Docker workflow run `29406597406` still failed at `Login to Docker Hub`; this did not affect the directly built and verified production image.
+
+## 2026-07-21
+
+### Generator Console UI And Account Controls
+
+- Reworked the generator and authenticated account pages into a responsive console layout with a fixed desktop sidebar, compact mobile navigation, section navigation, platform cards, build summaries, and consistent form controls.
+- Corrected mixed field/toggle grids that stretched controls or left accidental gaps. Dynamic desktop options, uploads, and advanced options now redistribute visible items across Windows, Windows x86, Android, Linux, and macOS states.
+- Added safe account deletion with confirmation, protection against self-deletion and deleting the last superuser, staff ownership boundaries, and retained historical build rows through `SET_NULL` ownership.
+- Fixed the password-reset description to reflect Django session invalidation behavior.
+- Replaced imported PNG preview `innerHTML` interpolation with strict base64 validation and DOM node creation. A malicious JSON payload was reproduced against the old path, then verified unable to execute after the fix; valid PNG imports continue to render.
+- Verified desktop, tablet, and mobile layouts with Playwright. Django `5.2.16` passes 73 tests, system checks and migration-drift checks pass, and `git diff --check` reports no whitespace errors.
+
+### Production Deployment
+
+- Committed the application as `7e3c9fd1caed966b68234112517af295bea13ac0` (`Refresh generator UI and harden account management`, tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`). The source archive SHA-256 is `b11dfaf8891d5aadf0025fae14eac2d9b884cb82af985a7cee9fb12ee2319492`.
+- Created an online SQLite backup and rollback image while the old service remained healthy, then built candidate image `sha256:f957ac977fb5a715a5ec7142c4dcc0d3ba27ce1407a372b7656e719f243dd050` directly on the server.
+- The candidate passed all 73 tests, production security checks, migration checks, SQLite integrity checks, authenticated template rendering, and an isolated healthy instance on `127.0.0.1:18000` before production was stopped.
+- Deployed under ID `20260721-201116-7e3c9fd1caed`. The live `rdgen-rdgen-1` container is healthy with zero restarts and clean logs; HTTP redirects to trusted HTTPS, anonymous access redirects to login, the new login markup is public, and port 8000 remains loopback-only.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. The production database retained 4 users and all 26 task rows; no schema migration was added.
+- Rollback material is `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and image tag `rdgen-rollback:20260721-201116-7e3c9fd1caed`. Both 2026-07-15 rollback sets remain intact.
+- No live generator form was submitted, no account was deleted, and no client workflow was dispatched during deployment. One stale database row labeled `in_progress` maps to a GitHub run already completed as cancelled.
