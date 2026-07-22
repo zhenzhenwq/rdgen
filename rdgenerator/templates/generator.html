@@ -558,6 +558,40 @@
         .workspace-page .app-nav a { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; color: #91a0bb; font-size: 13px; font-weight: 700; }
         .workspace-page .app-nav a i { width: 18px; color: #6f83a6; text-align: center; }
         .workspace-page .app-nav a:hover, .workspace-page .app-nav a[aria-current="page"] { border-color: rgba(111,163,255,.16); background: #1d2a44; color: #fff; }
+        .workspace-page .entitlement-panel {
+            margin-top: auto;
+            padding: 14px;
+            border: 1px solid rgba(116,159,229,.22);
+            border-radius: 8px;
+            background: #182641;
+            color: #fff;
+        }
+        .workspace-page .entitlement-panel + .app-account { margin-top: 12px; }
+        .workspace-page .entitlement-panel__header,
+        .workspace-page .entitlement-panel__identity { display: flex; align-items: center; }
+        .workspace-page .entitlement-panel__header { justify-content: space-between; gap: 8px; }
+        .workspace-page .entitlement-panel__identity { min-width: 0; gap: 7px; font-size: 12px; }
+        .workspace-page .entitlement-panel__identity i { color: #7faaff; }
+        .workspace-page .entitlement-status { flex: 0 0 auto; color: #94b8ff; font-size: 10px; font-weight: 800; }
+        .workspace-page .entitlement-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 14px; margin: 13px 0 0; }
+        .workspace-page .entitlement-metrics div { min-width: 0; }
+        .workspace-page .entitlement-metrics dt { margin: 0; color: #8293b0; font-size: 10px; }
+        .workspace-page .entitlement-metrics dd { margin: 2px 0 0; color: #fff; font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 700; }
+        .workspace-page .entitlement-metrics__remaining dd { color: #85b4ff; }
+        .workspace-page .entitlement-validity { display: grid; gap: 4px; margin-top: 12px; }
+        .workspace-page .entitlement-validity strong { color: #fff; font-size: 15px; }
+        .workspace-page .entitlement-validity span { color: #91a0bb; font-size: 10px; line-height: 1.5; }
+        .workspace-page .entitlement-panel--expired,
+        .workspace-page .entitlement-panel--exhausted,
+        .workspace-page .entitlement-panel--unconfigured { border-color: rgba(255,130,143,.35); background: #321e2b; }
+        .workspace-page .entitlement-panel--expired .entitlement-panel__identity i,
+        .workspace-page .entitlement-panel--expired .entitlement-status,
+        .workspace-page .entitlement-panel--exhausted .entitlement-panel__identity i,
+        .workspace-page .entitlement-panel--exhausted .entitlement-status,
+        .workspace-page .entitlement-panel--unconfigured .entitlement-panel__identity i,
+        .workspace-page .entitlement-panel--unconfigured .entitlement-status,
+        .workspace-page .entitlement-panel--exhausted .entitlement-metrics__remaining dd,
+        .workspace-page .entitlement-panel--unconfigured .entitlement-metrics__remaining dd { color: #ff9da9; }
         .workspace-page .app-account { display: grid; grid-template-columns: 36px minmax(0,1fr) 32px 32px; gap: 8px; align-items: center; margin-top: auto; padding: 16px 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
         .workspace-page .account-avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: #273a5c; color: #b9d2ff; font-size: 12px; font-weight: 800; }
         .workspace-page .account-copy { min-width: 0; }
@@ -763,6 +797,8 @@
         .workspace-page .action-bar { position: static; margin: 0; padding: 0; background: #f8faff; }
         .workspace-page .action-bar .section { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 30px; border-top: 0; }
         .workspace-page .action-bar button { min-width: 250px; border-radius: 8px; }
+        .workspace-page .action-bar button:disabled { background: #9aa8bd; color: #fff; cursor: not-allowed; box-shadow: none; opacity: 1; transform: none; }
+        .workspace-page .action-bar button:disabled:hover { background: #9aa8bd; box-shadow: none; transform: none; }
         .workspace-page .build-summary { color: #526079; font-size: 12px; font-weight: 750; }
         .workspace-page .errorlist { display: grid; width: auto; max-width: none; margin: 0 36px 16px; justify-content: stretch; align-items: start; gap: 4px; padding: 13px 15px; border-color: #f2c2c9; border-radius: 8px; background: #ffeaed; color: #c23b4b; }
         .workspace-page .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
@@ -773,6 +809,11 @@
             .workspace-page .app-nav { grid-column: 1 / -1; grid-row: 2; display: flex; overflow-x: auto; gap: 5px; padding-top: 8px; }
             .workspace-page .nav-label { display: none; }
             .workspace-page .app-nav a { min-height: 36px; padding: 0 10px; white-space: nowrap; }
+            .workspace-page .entitlement-panel { grid-column: 1 / -1; grid-row: 3; margin: 10px 0 0; padding: 12px 14px; }
+            .workspace-page .entitlement-panel + .app-account { margin: 0; }
+            .workspace-page .entitlement-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); margin-top: 10px; }
+            .workspace-page .entitlement-validity { grid-template-columns: auto 1fr; align-items: baseline; gap: 12px; margin-top: 8px; }
+            .workspace-page .entitlement-validity span { text-align: right; }
             .workspace-page .app-account { grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; grid-template-columns: 30px auto; }
             .workspace-page .account-copy, .workspace-page .account-action { display: none; }
             .workspace-page .account-avatar { width: 30px; height: 30px; }
@@ -811,6 +852,9 @@
             .workspace-page #id_direction { grid-template-columns: 1fr; }
             .workspace-page .desktop-behavior-field--primary, .workspace-page .desktop-behavior-size { grid-template-columns: 1fr; }
             .workspace-page .action-bar .section { align-items: stretch; flex-direction: column; padding: 16px; }
+            .workspace-page .entitlement-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+            .workspace-page .entitlement-validity { grid-template-columns: 1fr; gap: 3px; }
+            .workspace-page .entitlement-validity span { text-align: left; }
         }
 
         @media (min-width: 561px) {
@@ -1202,7 +1246,7 @@
                 <div class="platform action-bar">
                     <div class="section form-actions">
                         <span id="buildSummary" class="build-summary">Windows 64 位 · 1.4.9 · 登录后下载 · 保存 7 天</span>
-                        <button type="submit"><i class="fas fa-rocket" aria-hidden="true"></i> 生成自定义客户端</button>
+                        <button id="generateSubmit" type="submit"{% if entitlement_summary and not entitlement_summary.can_generate %} disabled aria-disabled="true" title="{% if entitlement_summary.block_reason == 'count_unconfigured' %}管理员尚未配置生成次数{% elif entitlement_summary.block_reason == 'count_exhausted' %}当前套餐的生成次数已用尽{% elif entitlement_summary.block_reason == 'time_expired' %}当前会员有效期已结束{% endif %}"{% endif %}><i class="fas fa-rocket" aria-hidden="true"></i> {% if entitlement_summary %}{{ entitlement_summary.submit_label }}{% else %}生成自定义客户端{% endif %}</button>
                     </div>
                 </div>
             </div>

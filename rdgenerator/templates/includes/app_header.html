@@ -15,6 +15,34 @@
                 </a>
             {% endif %}
         </nav>
+        {% if entitlement_summary %}
+            <section class="entitlement-panel entitlement-panel--{{ entitlement_summary.mode }} entitlement-panel--{{ entitlement_summary.status }}" aria-label="当前生成权益">
+                <div class="entitlement-panel__header">
+                    <span class="entitlement-panel__identity">
+                        <i class="fa-solid {% if entitlement_summary.mode == 'count' %}fa-layer-group{% elif entitlement_summary.status == 'permanent' %}fa-infinity{% else %}fa-calendar-check{% endif %}" aria-hidden="true"></i>
+                        <strong>{{ entitlement_summary.plan_label }}</strong>
+                    </span>
+                    <span class="entitlement-status">{{ entitlement_summary.status_label }}</span>
+                </div>
+                {% if entitlement_summary.mode == 'count' %}
+                    <dl class="entitlement-metrics">
+                        <div><dt>总次数</dt><dd>{% if entitlement_summary.generation_limit_configured %}{{ entitlement_summary.generation_limit }}{% else %}--{% endif %}</dd></div>
+                        <div><dt>已使用</dt><dd>{{ entitlement_summary.generations_used }}</dd></div>
+                        <div><dt>构建中</dt><dd>{{ entitlement_summary.reserved_generations }}</dd></div>
+                        <div class="entitlement-metrics__remaining"><dt>剩余次数</dt><dd>{% if entitlement_summary.generation_limit_configured %}{{ entitlement_summary.remaining_generations }}{% else %}--{% endif %}</dd></div>
+                    </dl>
+                {% else %}
+                    <div class="entitlement-validity">
+                        <strong>{{ entitlement_summary.remaining_label }}</strong>
+                        {% if entitlement_summary.expires_at_display %}
+                            <span>{% if entitlement_summary.status == 'expired' %}原到期时间{% else %}北京时间到期{% endif %} <time datetime="{{ entitlement_summary.expires_at|date:'c' }}">{{ entitlement_summary.expires_at_display }}</time></span>
+                        {% else %}
+                            <span>无需续期</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </section>
+        {% endif %}
         <div class="app-account">
             <span class="account-avatar" aria-hidden="true">{{ request.user.username|first|upper }}</span>
             <span class="account-copy"><span class="app-username">{{ request.user.username }}</span><span class="account-role">{% if request.user.is_superuser %}超级管理员{% elif request.user.is_staff %}管理员{% else %}成员{% endif %}</span></span>

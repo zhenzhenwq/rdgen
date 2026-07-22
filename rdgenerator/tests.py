@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -11,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from .forms import GenerateForm
-from .models import GithubRun
+from .models import GithubRun, UserEntitlement
 
 
 @override_settings(
@@ -104,6 +105,38 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.created_secret_zips.extend(
             Path("temp_zips").glob(f"secrets_{run.uuid}_*.zip")
         )
+
+    def test_exhausted_user_cannot_bypass_disabled_button_with_forged_post(self):
+        UserEntitlement.objects.create(
+            user=self.user,
+            expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+            generation_limit=1,
+            generations_used=1,
+        )
+        existing_archives = set(Path("temp_zips").glob("secrets_*.zip"))
+
+        with (
+            patch("rdgenerator.views.requests.post") as post_mock,
+            patch("rdgenerator.views.save_png", side_effect=ValueError("no image in test")),
+        ):
+            response = self.client.post("/generator", data=self._feature_payload())
+
+        self.created_secret_zips.extend(
+            set(Path("temp_zips").glob("secrets_*.zip")) - existing_archives
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "当前账号的生成额度已用尽或已过期")
+        self.assertContains(response, "生成次数已用尽")
+        self.assertIn(
+            "disabled",
+            re.search(
+                r'<button id="generateSubmit"[^>]*>',
+                response.content.decode(),
+            ).group(0),
+        )
+        self.assertFalse(response.context["entitlement_summary"]["can_generate"])
+        post_mock.assert_not_called()
+        self.assertFalse(GithubRun.objects.exists())
 
     def _feature_payload(self, platform="windows", direction="incoming"):
         data = {

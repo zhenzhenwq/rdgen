@@ -1,7 +1,8 @@
 import hashlib
+import re
 import shutil
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -105,6 +106,189 @@ class UserEntitlementTests(TestCase):
         expires_at = form.cleaned_data["expires_at"]
         self.assertEqual(expires_at.tzinfo, ZoneInfo("Asia/Shanghai"))
         self.assertEqual(expires_at.hour, 12)
+
+
+class GeneratorEntitlementSummaryTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("entitlement-summary-user")
+        self.client.force_login(self.user)
+
+    def _button_tag(self, response):
+        match = re.search(
+            r'<button id="generateSubmit"[^>]*>',
+            response.content.decode(),
+        )
+        self.assertIsNotNone(match)
+        return match.group(0)
+
+    def test_count_plan_shows_complete_available_quota(self):
+        UserEntitlement.objects.create(
+            user=self.user,
+            expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+            generation_limit=10,
+            generations_used=3,
+            reserved_generations=2,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["mode"], UserEntitlement.EXPIRATION_COUNT)
+        self.assertEqual(summary["status"], "active")
+        self.assertTrue(summary["can_generate"])
+        self.assertEqual(summary["generation_limit"], 10)
+        self.assertEqual(summary["generations_used"], 3)
+        self.assertEqual(summary["reserved_generations"], 2)
+        self.assertEqual(summary["remaining_generations"], 5)
+        self.assertContains(response, "次数套餐")
+        self.assertContains(response, "构建中")
+        self.assertContains(response, "剩余次数")
+        self.assertNotIn("disabled", self._button_tag(response))
+
+    def test_exhausted_count_plan_clamps_remaining_and_disables_generation(self):
+        UserEntitlement.objects.create(
+            user=self.user,
+            expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+            generation_limit=5,
+            generations_used=6,
+            reserved_generations=1,
+        )
+
+        response = self.client.get("/")
+
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["status"], "exhausted")
+        self.assertFalse(summary["can_generate"])
+        self.assertEqual(summary["remaining_generations"], 0)
+        self.assertContains(response, "生成次数已用尽")
+        self.assertIn("disabled", self._button_tag(response))
+
+    def test_missing_count_limit_is_distinctly_unconfigured(self):
+        UserEntitlement.objects.create(
+            user=self.user,
+            expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+            generation_limit=None,
+        )
+
+        response = self.client.get("/")
+
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["status"], "unconfigured")
+        self.assertEqual(summary["block_reason"], "count_unconfigured")
+        self.assertFalse(summary["generation_limit_configured"])
+        self.assertIsNone(summary["remaining_generations"])
+        self.assertContains(response, "额度未配置")
+        panel = re.search(
+            r'<section class="entitlement-panel.*?</section>',
+            response.content.decode(),
+            re.DOTALL,
+        ).group(0)
+        self.assertEqual(panel.count("<dd>--</dd>"), 2)
+        self.assertIn("disabled", self._button_tag(response))
+
+    def test_time_plan_rounds_remaining_days_up_and_shows_beijing_expiry(self):
+        now = datetime(2026, 7, 22, 4, 0, tzinfo=datetime_timezone.utc)
+        UserEntitlement.objects.create(
+            user=self.user,
+            expires_at=now + timedelta(hours=49),
+        )
+
+        with (
+            patch("rdgenerator.views.timezone.now", return_value=now),
+            patch("rdgenerator.models.timezone.now", return_value=now),
+        ):
+            response = self.client.get("/")
+
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["status"], "active")
+        self.assertEqual(summary["remaining_days"], 3)
+        self.assertContains(response, "有效期会员")
+        self.assertContains(response, "剩余 3 天")
+        self.assertContains(response, "2026-07-24 13:00")
+        self.assertNotIn("disabled", self._button_tag(response))
+
+    def test_time_plan_under_one_day_uses_precise_short_label(self):
+        now = datetime(2026, 7, 22, 4, 0, tzinfo=datetime_timezone.utc)
+        UserEntitlement.objects.create(
+            user=self.user,
+            expires_at=now + timedelta(hours=23, minutes=59),
+        )
+
+        with (
+            patch("rdgenerator.views.timezone.now", return_value=now),
+            patch("rdgenerator.models.timezone.now", return_value=now),
+        ):
+            response = self.client.get("/")
+
+        self.assertContains(response, "剩余不足 1 天")
+        self.assertNotContains(response, ">剩余 1 天<")
+
+    def test_missing_entitlement_defaults_to_permanent_membership(self):
+        self.assertFalse(UserEntitlement.objects.filter(user=self.user).exists())
+
+        response = self.client.get("/")
+
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["status"], "permanent")
+        self.assertTrue(summary["can_generate"])
+        self.assertContains(response, "永久会员")
+        self.assertContains(response, "长期有效")
+        self.assertTrue(UserEntitlement.objects.filter(user=self.user).exists())
+
+    def test_expired_time_plan_shows_original_expiry_and_disables_generation(self):
+        now = datetime(2026, 7, 22, 4, 0, tzinfo=datetime_timezone.utc)
+        UserEntitlement.objects.create(
+            user=self.user,
+            expires_at=now - timedelta(minutes=1),
+        )
+
+        with (
+            patch("rdgenerator.views.timezone.now", return_value=now),
+            patch("rdgenerator.models.timezone.now", return_value=now),
+        ):
+            response = self.client.get("/")
+
+        summary = response.context["entitlement_summary"]
+        self.assertEqual(summary["status"], "expired")
+        self.assertFalse(summary["can_generate"])
+        self.assertContains(response, "原到期时间")
+        self.assertContains(response, "2026-07-22 11:59")
+        self.assertContains(response, "会员已到期")
+        self.assertIn("disabled", self._button_tag(response))
+
+    def test_administrators_have_no_entitlement_panel_and_remain_unlimited(self):
+        for username, flags in (
+            ("staff-summary-user", {"is_staff": True}),
+            ("super-summary-user", {"is_superuser": True}),
+        ):
+            with self.subTest(username=username):
+                administrator = get_user_model().objects.create_user(username, **flags)
+                self.client.force_login(administrator)
+
+                response = self.client.get("/")
+
+                self.assertIsNone(response.context["entitlement_summary"])
+                self.assertNotContains(response, 'aria-label="当前生成权益"')
+                self.assertNotIn("disabled", self._button_tag(response))
+                self.assertFalse(
+                    UserEntitlement.objects.filter(user=administrator).exists()
+                )
+
+    def test_invalid_form_keeps_entitlement_context(self):
+        UserEntitlement.objects.create(
+            user=self.user,
+            expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+            generation_limit=5,
+            generations_used=1,
+        )
+
+        response = self.client.post("/generator", data={})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertEqual(response.context["entitlement_summary"]["remaining_generations"], 4)
+        self.assertContains(response, 'aria-label="当前生成权益"')
 
 
 class ArtifactQuotaTests(TestCase):

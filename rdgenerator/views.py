@@ -1,6 +1,7 @@
 import io
 import hashlib
 import hmac
+import math
 import mimetypes
 import tempfile
 from datetime import timedelta
@@ -32,6 +33,8 @@ from .models import (
     GeneratedArtifact,
     GenerationQuotaExceeded,
     GithubRun,
+    UserEntitlement,
+    get_user_entitlement,
     mark_artifact_uploaded,
     release_generation_reservation,
 )
@@ -302,6 +305,105 @@ def _delivery_context(run, files):
         "download_access": run.download_access,
         "download_ttl_hours": run.download_ttl_hours,
         "download_expires_at": run.download_expires_at,
+    }
+
+
+def _entitlement_summary(user):
+    """Build the ordinary-user entitlement shown on the generator page."""
+    if not user.is_authenticated or user.is_staff or user.is_superuser:
+        return None
+
+    entitlement = get_user_entitlement(user)
+    if entitlement.expiration_mode == UserEntitlement.EXPIRATION_COUNT:
+        limit = entitlement.generation_limit
+        remaining = entitlement.remaining_generations
+        can_generate = entitlement.can_generate
+        if limit is None:
+            status = "unconfigured"
+            status_label = "额度未配置"
+        elif can_generate:
+            status = "active"
+            status_label = "可生成"
+        else:
+            status = "exhausted"
+            status_label = "已用尽"
+        return {
+            "mode": UserEntitlement.EXPIRATION_COUNT,
+            "plan_label": "次数套餐",
+            "status": status,
+            "status_label": status_label,
+            "can_generate": can_generate,
+            "block_reason": (
+                None
+                if can_generate
+                else "count_unconfigured" if limit is None else "count_exhausted"
+            ),
+            "submit_label": "生成自定义客户端" if can_generate else "生成次数已用尽",
+            "generation_limit": limit,
+            "generation_limit_configured": limit is not None,
+            "generations_used": entitlement.generations_used,
+            "reserved_generations": entitlement.reserved_generations,
+            "remaining_generations": remaining,
+        }
+
+    expires_at = entitlement.expires_at
+    if expires_at is None:
+        return {
+            "mode": UserEntitlement.EXPIRATION_TIME,
+            "plan_label": "永久会员",
+            "status": "permanent",
+            "status_label": "长期有效",
+            "can_generate": True,
+            "block_reason": None,
+            "submit_label": "生成自定义客户端",
+            "expires_at": None,
+            "expires_at_display": None,
+            "remaining_label": "长期有效",
+        }
+
+    now = timezone.now()
+    local_expires_at = timezone.localtime(expires_at)
+    expires_at_display = local_expires_at.strftime("%Y-%m-%d %H:%M")
+    if now >= expires_at:
+        return {
+            "mode": UserEntitlement.EXPIRATION_TIME,
+            "plan_label": "有效期会员",
+            "status": "expired",
+            "status_label": "已到期",
+            "can_generate": False,
+            "block_reason": "time_expired",
+            "submit_label": "会员已到期",
+            "expires_at": local_expires_at,
+            "expires_at_display": expires_at_display,
+            "remaining_label": "已到期",
+        }
+
+    remaining_seconds = (expires_at - now).total_seconds()
+    remaining_days = math.ceil(remaining_seconds / timedelta(days=1).total_seconds())
+    remaining_label = (
+        "剩余不足 1 天"
+        if remaining_seconds < timedelta(days=1).total_seconds()
+        else f"剩余 {remaining_days} 天"
+    )
+    return {
+        "mode": UserEntitlement.EXPIRATION_TIME,
+        "plan_label": "有效期会员",
+        "status": "active",
+        "status_label": "有效",
+        "can_generate": True,
+        "block_reason": None,
+        "submit_label": "生成自定义客户端",
+        "expires_at": local_expires_at,
+        "expires_at_display": expires_at_display,
+        "remaining_days": remaining_days,
+        "remaining_label": remaining_label,
+    }
+
+
+def _generator_context(request, form):
+    return {
+        "form": form,
+        "entitlement_summary": _entitlement_summary(request.user),
     }
 
 @login_required
@@ -751,7 +853,7 @@ def generator_view(request):
                 # may exist; do not dispatch a workflow when the entitlement
                 # is exhausted or expired.
                 form.add_error(None, "当前账号的生成额度已用尽或已过期，无法开始新的生成任务。")
-                return render(request, "generator.html", {"form": form})
+                return render(request, "generator.html", _generator_context(request, form))
 
             # Persist the run before dispatch so any rejected/failed request
             # can release a count reservation atomically.
@@ -801,7 +903,7 @@ def generator_view(request):
     else:
         form = GenerateForm()
     #return render(request, 'maintenance.html')
-    return render(request, 'generator.html', {'form': form})
+    return render(request, 'generator.html', _generator_context(request, form))
 
 
 @login_required
