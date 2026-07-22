@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% include "includes/local_icons.html" %}
     <style>
         :root {
             --page: #f5f9ff;
@@ -567,9 +567,13 @@
         .workspace-page .app-nav { display: grid; gap: 6px; align-items: stretch; }
         .workspace-page .nav-label { margin: 0 10px 8px; color: #8e949f; font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
         .workspace-page .app-nav a { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; color: #9ca2ad; font-size: 13px; font-weight: 600; }
-        .workspace-page .app-nav a i { width: 18px; color: #727985; text-align: center; }
+        .workspace-page .app-nav a i,
+        .workspace-page .app-nav a .rd-generated-icon { width: 18px; height: 18px; color: #727985; text-align: center; }
         .workspace-page .app-nav a:hover, .workspace-page .app-nav a[aria-current="page"] { border-color: #343842; background: #24272e; color: #fff; }
-        .workspace-page .app-nav a:hover i, .workspace-page .app-nav a[aria-current="page"] i { color: #91aff0; }
+        .workspace-page .app-nav a:hover i,
+        .workspace-page .app-nav a:hover .rd-generated-icon,
+        .workspace-page .app-nav a[aria-current="page"] i,
+        .workspace-page .app-nav a[aria-current="page"] .rd-generated-icon { color: #91aff0; }
         .workspace-page .entitlement-panel {
             margin-top: auto;
             padding: 14px;
@@ -1277,7 +1281,7 @@
                 <div class="platform action-bar">
                     <div class="section form-actions">
                         <span id="buildSummary" class="build-summary">Windows 64 位 · 1.4.9 · 登录后下载 · 保存 7 天</span>
-                        <button id="generateSubmit" type="submit"{% if entitlement_summary and not entitlement_summary.can_generate %} disabled aria-disabled="true" title="{% if entitlement_summary.block_reason == 'count_unconfigured' %}管理员尚未配置生成次数{% elif entitlement_summary.block_reason == 'count_exhausted' %}当前套餐的生成次数已用尽{% elif entitlement_summary.block_reason == 'time_expired' %}当前会员有效期已结束{% endif %}"{% endif %}><i class="fas fa-rocket" aria-hidden="true"></i> {% if entitlement_summary %}{{ entitlement_summary.submit_label }}{% else %}生成自定义客户端{% endif %}</button>
+                        <button id="generateSubmit" type="submit"{% if entitlement_summary and not entitlement_summary.can_generate %} disabled aria-disabled="true" title="{% if entitlement_summary.block_reason == 'count_unconfigured' %}管理员尚未配置生成次数{% elif entitlement_summary.block_reason == 'count_exhausted' %}当前套餐的生成次数已用尽{% elif entitlement_summary.block_reason == 'time_expired' %}当前会员有效期已结束{% endif %}"{% endif %}><span class="rd-generated-icon rd-generated-icon--generate" aria-hidden="true"></span> {% if entitlement_summary %}{{ entitlement_summary.submit_label }}{% else %}生成自定义客户端{% endif %}</button>
                     </div>
                 </div>
             </div>

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% include "includes/local_icons.html" %}
     <style>
         :root {
             --ink: #172033;
@@ -121,13 +121,15 @@
             font-size: 13px;
             font-weight: 700;
         }
-        .app-nav a i { width: 18px; color: #6f83a6; text-align: center; }
+        .app-nav a i,
+        .app-nav a .rd-generated-icon { width: 18px; height: 18px; color: #6f83a6; text-align: center; }
         .app-nav a:hover, .app-nav a[aria-current="page"] {
             border-color: rgba(111, 163, 255, .16);
             background: var(--nav-soft);
             color: #fff;
         }
-        .app-nav a[aria-current="page"] i { color: #75a8ff; }
+        .app-nav a[aria-current="page"] i,
+        .app-nav a[aria-current="page"] .rd-generated-icon { color: #75a8ff; }
         .app-account {
             display: grid;
             grid-template-columns: 36px minmax(0,1fr) 32px 32px;
@@ -174,9 +176,9 @@
         }
         .messages { display: grid; gap: 10px; margin: 0 0 22px; padding: 0; list-style: none; }
         .message { display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 6px 16px rgba(25,43,76,.04); font-size: 13px; }
-        .message::before { color: var(--accent); content: '\f05a'; font-family: 'Font Awesome 6 Free'; font-weight: 900; }
+        .message::before { color: var(--accent); content: '\f05a'; font-family: 'RDGen Icons'; font-weight: 900; }
         .message.success { border-color: #bfe8d4; color: var(--success); }
-        .message.success::before { color: var(--success); content: '\f058'; }
+        .message.success::before { color: var(--success); content: '\f00c'; }
         .message.error { border-color: #f2c2c9; color: var(--danger); }
         .message.error::before { color: var(--danger); content: '\f06a'; }
 

@@ -7,11 +7,11 @@
         <nav class="app-nav" aria-label="主导航">
             <span class="nav-label">工作区</span>
             <a href="/"{% if request.path == '/' or request.path == '/generator' %} aria-current="page"{% endif %}>
-                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>客户端生成</span>
+                <span class="rd-generated-icon rd-generated-icon--client" aria-hidden="true"></span><span>客户端生成</span>
             </a>
             {% if request.user.is_staff %}
                 <a href="{% url 'users:list' %}"{% if request.path|slice:':7' == '/users/' %} aria-current="page"{% endif %}>
-                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>用户管理</span>
+                    <span class="rd-generated-icon rd-generated-icon--users" aria-hidden="true"></span><span>用户管理</span>
                 </a>
             {% endif %}
         </nav>
