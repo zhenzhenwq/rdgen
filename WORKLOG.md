@@ -724,3 +724,24 @@ User constraint recorded:
 - `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. The production database retained 4 users and all 26 task rows; no schema migration was added.
 - Rollback material is `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and image tag `rdgen-rollback:20260721-201116-7e3c9fd1caed`. Both 2026-07-15 rollback sets remain intact.
 - No live generator form was submitted, no account was deleted, and no client workflow was dispatched during deployment. One stale database row labeled `in_progress` maps to a GitHub run already completed as cancelled.
+
+## 2026-07-22
+
+### Account Entitlements And Expiring Downloads
+
+- Added permanent/time-based and successful-package-count account policies. Count reservations are created atomically with task rows, released on failure/timeout, and consumed once only after the first valid installer upload; settlement guards administrative mode changes and concurrent cleanup.
+- Added per-build login-required or public-token download delivery with 1-hour, 1-day, 3-day, or 7-day link expiry starting at the first valid installer upload. Physical artifacts are capped at seven days.
+- Added user-management quota controls and status display, Beijing-time expiry input/display, delivery controls and summaries, authenticated/public download enforcement, and retained history/download access after account expiry.
+- Added migrations `0004`-`0006`, the `purge_generated_files` command, and focused entitlement/download/cleanup tests. Alpine now installs `tzdata` for `Asia/Shanghai`.
+- Fixed two release-audit race conditions before deployment: reservation and run creation now commit together, and artifact settlement locks the run while guarding reservation decrements from going negative.
+- Local and candidate-image Django suites both pass 94/94 tests; system, migration-drift, Compose, whitespace, timezone, and archive-content checks passed.
+
+### Production Deployment
+
+- Deployed application commit `80f255ac1bddd5a71401afa4fcd80594297fff0d` (tree `fab056c083c4714dbfc37389e14926c61232e3a4`) from source archive SHA-256 `8f07129d6e1c3cce0300cddffe10bafccddfff7a520d73f95d0d498b2df63c52` under ID `20260722-103341-80f255ac1bdd`.
+- Built image `sha256:523119eb6245e22b365e39a210a5c9632ba887fa9ae6095e5a2040ab60764765` directly on the server. Django `5.2.16` passed all 94 tests, and a copied production database applied migrations `0004`-`0006` and passed authenticated template/health checks on `127.0.0.1:18000` before switching.
+- Live `rdgen-rdgen-1` is `running`, `healthy`, restart count `0`; HTTP redirects to HTTPS, `/` redirects to login, `/login/` and `/healthz` return 200, HSTS remains enabled, and port 8000 is loopback-only.
+- `.env` plus `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. SQLite `quick_check` passed with 2 users, 2 entitlement rows, and all 26 historical task rows retained.
+- Installed `/etc/cron.d/rdgen-cleanup` with hourly `flock` protection. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no generated installer and no quota reservation; a follow-up dry-run reported zero pending removals.
+- Current rollback material is `/opt/rdgen-backups/20260722-103341-80f255ac1bdd`, `/opt/rdgen-previous-20260722-103341-80f255ac1bdd`, and image tag `rdgen-rollback:20260722-103341-80f255ac1bdd`.
+- No live generator form was submitted and no GitHub client workflow was dispatched during deployment. The single legacy `in_progress` database row still maps to a GitHub run already completed as cancelled.

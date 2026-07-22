@@ -58,20 +58,21 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- The current deployed application release is `7e3c9fd1caed966b68234112517af295bea13ac0` (`Refresh generator UI and harden account management`, tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`). It adds the console-style responsive UI, safe account deletion, and strict DOM-safe PNG preview import. No live generator form was submitted and no client workflow was dispatched during deployment.
-- The deployment commit and its follow-up handoff commit are local until explicitly pushed; `origin/master` was still `d80c3e5` at deployment time. A push to `master` starts the known Docker image workflow.
+- The current deployed application release is `80f255ac1bddd5a71401afa4fcd80594297fff0d` (tree `fab056c083c4714dbfc37389e14926c61232e3a4`), comprising `654e51d` (`Add account quotas and expiring downloads`) plus `80f255a` (`Clarify account expiry timezone`). It adds time/count account entitlements, quota reservation/settlement, login/public expiring download links, seven-day artifact retention, and Beijing-time account expiry input. No live generator form was submitted and no client workflow was dispatched during deployment.
+- The deployment commits and follow-up handoff commits are local until explicitly pushed; the local `origin/master` remote-tracking ref was still `d80c3e5` at deployment time. A push to `master` starts the known Docker image workflow.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260721-201116-7e3c9fd1caed`.
-- Verified live image: `sha256:f957ac977fb5a715a5ec7142c4dcc0d3ba27ce1407a372b7656e719f243dd050`.
-- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 73 tests inside the candidate image.
+- Deployment ID: `20260722-103341-80f255ac1bdd`.
+- Verified live image: `sha256:523119eb6245e22b365e39a210a5c9632ba887fa9ae6095e5a2040ab60764765`.
+- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 94 tests inside the candidate image.
 - Anonymous generator access redirects to `/login/`. The production `admin` superuser exists; its password is intentionally absent from repository memory.
 - HTTPS uses a trusted Let's Encrypt IPv4 certificate, HTTP redirects to HTTPS, HSTS is initially 300 seconds, invalid hosts return 400, and login rate limiting returns 429 after the configured burst.
-- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. No migration was added; `migrate --check` and SQLite `quick_check` passed with 4 users and all 26 task rows retained.
-- Keep `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and image tag `rdgen-rollback:20260721-201116-7e3c9fd1caed` for the current rollback. Retain both 2026-07-15 rollback sets as additional fallbacks.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. Migrations `0004` through `0006` are applied; `migrate --check` and SQLite `quick_check` passed with 2 users, 2 entitlement rows, and all 26 task rows retained.
+- `/etc/cron.d/rdgen-cleanup` runs the retention command hourly under `flock`. The first enforced cleanup removed 13 expired secret ZIPs and one empty directory, no generated installer and no quota reservation; the immediate follow-up dry-run was empty.
+- Keep `/opt/rdgen-backups/20260722-103341-80f255ac1bdd`, `/opt/rdgen-previous-20260722-103341-80f255ac1bdd`, and image tag `rdgen-rollback:20260722-103341-80f255ac1bdd` for the current rollback. Retain the 2026-07-21 and both 2026-07-15 rollback sets as additional fallbacks.
 
 ## Historical Verified Outputs
 

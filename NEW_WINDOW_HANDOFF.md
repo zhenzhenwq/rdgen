@@ -94,15 +94,17 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `7e3c9fd1caed966b68234112517af295bea13ac0`; application tree: `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`.
-- Deployment ID: `20260721-201116-7e3c9fd1caed`.
-- Source archive SHA-256: `b11dfaf8891d5aadf0025fae14eac2d9b884cb82af985a7cee9fb12ee2319492`.
-- Live image: `sha256:f957ac977fb5a715a5ec7142c4dcc0d3ba27ce1407a372b7656e719f243dd050`.
+- Application source commit: `80f255ac1bddd5a71401afa4fcd80594297fff0d`; application tree: `fab056c083c4714dbfc37389e14926c61232e3a4`.
+- Deployment ID: `20260722-103341-80f255ac1bdd`.
+- Source archive SHA-256: `8f07129d6e1c3cce0300cddffe10bafccddfff7a520d73f95d0d498b2df63c52`.
+- Live image: `sha256:523119eb6245e22b365e39a210a5c9632ba887fa9ae6095e5a2040ab60764765`.
 - Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
-- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; no migration was added, and SQLite `quick_check` passed with 4 users and all 26 task rows retained.
-- Root-only rollback material is under `/opt/rdgen-backups/20260721-201116-7e3c9fd1caed`, `/opt/rdgen-previous-20260721-201116-7e3c9fd1caed`, and `rdgen-rollback:20260721-201116-7e3c9fd1caed`. Both earlier 2026-07-15 rollback sets remain present.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0004`-`0006` are applied, and SQLite `quick_check` passed with 2 users, 2 entitlement rows, and all 26 task rows retained.
+- Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
+- `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
+- Root-only rollback material is under `/opt/rdgen-backups/20260722-103341-80f255ac1bdd`, `/opt/rdgen-previous-20260722-103341-80f255ac1bdd`, and `rdgen-rollback:20260722-103341-80f255ac1bdd`. The 2026-07-21 and both earlier 2026-07-15 rollback sets remain present.
 - One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`; no active client workflow was running during the switch.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
 
