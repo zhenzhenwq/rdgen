@@ -94,19 +94,19 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `276fb0c016c64336b1b1845ebbb2d1ec9fdf5ce4`; application tree: `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`.
-- Deployment ID: `20260722-110755-276fb0c016c6`.
-- Source archive SHA-256: `c690078b033bb60c4141a32170d4e755d4668186a2e87dbde53bf24fb00c061d`.
-- Live image: `sha256:934bc6a9342d3d93d1b36cdbf2142ad22047de8c84bc26e44b9fc99a4108e66c`.
-- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
+- Application source commit: `f2f8ea0ecc0ccff4178e81e1ca95dbb179005a81`; application tree: `3499379ef567692978e4b55f917e6f9b5dce54b8`.
+- Deployment ID: `20260722-124503-f2f8ea0ecc0c`.
+- Source archive SHA-256: `1d098e67da45d229bf8a401a948954411ea14c799daf9f90f0592fbcbad72af3`.
+- Live image: `sha256:f87baa88f651ccb10b8b8c9312c54a1661d11cacce4541766dd4f16b138921db`.
+- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Windows x64 tasks require a non-empty EXE and MSI before success is visible; status callbacks and GitHub polling cannot bypass or overwrite that finalization. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
 - Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0004`-`0006` are applied, and SQLite `quick_check` passed with 3 users, 3 entitlement rows, and all 27 task rows retained.
 - Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
 - `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
-- Root-only rollback material is under `/opt/rdgen-backups/20260722-110755-276fb0c016c6`, `/opt/rdgen-previous-20260722-110755-276fb0c016c6`, and `rdgen-rollback:20260722-110755-276fb0c016c6`. The preceding `20260722-103341-80f255ac1bdd` set and earlier rollback sets remain present.
+- Root-only rollback material is under `/opt/rdgen-backups/20260722-124503-f2f8ea0ecc0c`, `/opt/rdgen-previous-20260722-124503-f2f8ea0ecc0c`, and `rdgen-rollback:20260722-124503-f2f8ea0ecc0c`. The preceding `20260722-122857-11ce7a56af22`, `20260722-110755-276fb0c016c6`, and earlier rollback sets remain present.
 - One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`. User run `29886880669` completed successfully with two uploaded installers before the switch; no active client workflow remained.
-- No live generator form was submitted and no client workflow was dispatched during deployment.
+- Existing task 27 was verified to render both `21313.exe` and `21313.msi`; SQLite retained 3 users and all 27 tasks. No live generator form was submitted and no client workflow was dispatched during deployment.
 
 ## Not Yet Verified
 

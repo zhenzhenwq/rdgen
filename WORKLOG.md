@@ -756,3 +756,14 @@ User constraint recorded:
 - Deployment waited for user build run `29886880669` to finish. Its two installers (49,280,160 bytes total) uploaded successfully and its quota reservation settled before the container switch.
 - Production verification passed for HTTPS, authenticated password pages, explicit Chinese validation, SQLite integrity, persistent inode preservation, clean logs, container health, and zero restarts. The live database retained 3 users, 3 entitlement rows, and 27 tasks.
 - Current rollback material is `/opt/rdgen-backups/20260722-110755-276fb0c016c6`, `/opt/rdgen-previous-20260722-110755-276fb0c016c6`, and image tag `rdgen-rollback:20260722-110755-276fb0c016c6`.
+
+### Windows EXE And MSI Completion
+
+- Diagnosed task 27: `21313.exe` arrived first and changed the task to success, while `21313.msi` arrived about six seconds later. The generated page enumerates both formats correctly, but the already-rendered result page did not refresh after the second upload.
+- Windows x64 dispatches now start in `artifacts_pending`. Both workflows require MSI build, signing archive extraction, rename, and non-empty EXE/MSI files; each file uploads with deferred completion, followed by a task-authenticated finalization request that validates both expected files before success.
+- GitHub success/progress callbacks cannot bypass deferred completion. Completed GitHub runs without finalization become `artifact_incomplete`; conditional database updates prevent polling, finalization, late callbacks, and failures from overwriting each other with stale state.
+- Local and candidate-image Django suites pass 104/104 tests. Two focused workflow tests pass, all workflow YAML parses, system checks and migration-drift checks pass, and no migration was added.
+- Deployed application commit `f2f8ea0ecc0ccff4178e81e1ca95dbb179005a81` (tree `3499379ef567692978e4b55f917e6f9b5dce54b8`) from archive SHA-256 `1d098e67da45d229bf8a401a948954411ea14c799daf9f90f0592fbcbad72af3` under ID `20260722-124503-f2f8ea0ecc0c`.
+- Live image `sha256:f87baa88f651ccb10b8b8c9312c54a1661d11cacce4541766dd4f16b138921db` is `running`, `healthy`, restart count `0`. SQLite `quick_check`, `migrate --check`, HTTPS health/login redirects, clean logs, and the existing page containing both `21313.exe` and `21313.msi` were verified with 3 users and all 27 tasks retained.
+- Current rollback material is `/opt/rdgen-backups/20260722-124503-f2f8ea0ecc0c`, `/opt/rdgen-previous-20260722-124503-f2f8ea0ecc0c`, and image tag `rdgen-rollback:20260722-124503-f2f8ea0ecc0c`. The immediately preceding `20260722-122857-11ce7a56af22` deployment remains available.
+- No live generator form was submitted and no client workflow was dispatched for this fix.
