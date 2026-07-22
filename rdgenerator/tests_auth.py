@@ -73,6 +73,32 @@ class AuthenticationTests(TestCase):
         self.assertContains(response, "用户名或密码不正确。")
         self.assertNotIn("_auth_user_id", self.client.session)
 
+    def test_user_can_change_password_to_six_digit_numeric_value(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("users:password_change"),
+            {
+                "old_password": self.password,
+                "new_password1": "123456",
+                "new_password2": "123456",
+            },
+        )
+
+        self.assertRedirects(response, reverse("users:password_change_done"))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("123456"))
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.pk)
+
+    def test_password_change_guidance_is_chinese(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("users:password_change"))
+
+        self.assertContains(response, "你的密码必须包含至少 6 个字符。")
+        self.assertNotContains(response, "Your password")
+        self.assertNotContains(response, "Enter the same password")
+
     def test_logout_rejects_get_and_accepts_csrf_protected_post(self):
         client = Client(enforce_csrf_checks=True)
         client.force_login(self.user)
@@ -126,6 +152,77 @@ class UserManagementTests(TestCase):
             f"/login/?next={reverse('users:list')}",
             fetch_redirect_response=False,
         )
+
+    def test_relaxed_password_policy_accepts_previously_rejected_passwords(self):
+        self.client.force_login(self.staff)
+        cases = (
+            ("samepass", "samepass"),
+            ("common-user", "password"),
+            ("numeric-user", "123456"),
+        )
+
+        for username, password in cases:
+            with self.subTest(username=username):
+                response = self.client.post(
+                    reverse("users:create"),
+                    {
+                        "username": username,
+                        "is_active": "on",
+                        "password1": password,
+                        "password2": password,
+                    },
+                )
+
+                self.assertRedirects(response, reverse("users:list"))
+                self.assertTrue(
+                    User.objects.get(username=username).check_password(password)
+                )
+
+    def test_password_policy_rejects_fewer_than_six_characters_in_chinese(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse("users:create"),
+            {
+                "username": "short-password-user",
+                "is_active": "on",
+                "password1": "12345",
+                "password2": "12345",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "此密码太短，至少要包含 6 个字符。")
+        self.assertFalse(User.objects.filter(username="short-password-user").exists())
+
+    def test_password_guidance_is_chinese(self):
+        self.client.force_login(self.staff)
+
+        create_response = self.client.get(reverse("users:create"))
+        reset_response = self.client.get(
+            reverse("users:password", args=[self.member.pk])
+        )
+
+        for response in (create_response, reset_response):
+            with self.subTest(path=response.request["PATH_INFO"]):
+                self.assertContains(
+                    response,
+                    "密码至少 6 位，允许使用字母、数字或符号。",
+                )
+                self.assertContains(response, "请再次输入相同的密码。")
+                self.assertNotContains(response, "Your password")
+                self.assertNotContains(response, "Enter the same password")
+
+        mismatch_response = self.client.post(
+            reverse("users:create"),
+            {
+                "username": "mismatch-user",
+                "is_active": "on",
+                "password1": "abcdef",
+                "password2": "abcdeg",
+            },
+        )
+        self.assertContains(mismatch_response, "两次输入的密码不一致。")
 
     def test_staff_can_create_edit_reset_and_disable_regular_user(self):
         self.client.force_login(self.staff)

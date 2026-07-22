@@ -1,6 +1,7 @@
 import re
 
 from django import forms
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
 from django.utils import timezone
@@ -11,6 +12,11 @@ from .models import UserEntitlement, get_user_entitlement
 
 
 User = get_user_model()
+
+PASSWORD_HELP_TEXT = (
+    f"密码至少 {settings.PASSWORD_MIN_LENGTH} 位，允许使用字母、数字或符号。"
+)
+PASSWORD_CONFIRM_HELP_TEXT = "请再次输入相同的密码。"
 
 
 class UsernameAuthenticationForm(AuthenticationForm):
@@ -33,6 +39,10 @@ class UsernameAuthenticationForm(AuthenticationForm):
 
 
 class ManagedUserCreationForm(UserCreationForm):
+    error_messages = {
+        "password_mismatch": "两次输入的密码不一致。",
+    }
+
     email = forms.EmailField(label="邮箱", required=False)
     first_name = forms.CharField(label="名", max_length=150, required=False)
     last_name = forms.CharField(label="姓", max_length=150, required=False)
@@ -78,7 +88,9 @@ class ManagedUserCreationForm(UserCreationForm):
         self.actor = actor
         self.fields["username"].label = "用户名"
         self.fields["password1"].label = "密码"
+        self.fields["password1"].help_text = PASSWORD_HELP_TEXT
         self.fields["password2"].label = "确认密码"
+        self.fields["password2"].help_text = PASSWORD_CONFIRM_HELP_TEXT
         if not actor or not actor.is_superuser:
             self.fields.pop("is_staff", None)
 
@@ -227,14 +239,20 @@ def _apply_entitlement_fields(entitlement, cleaned):
 
 
 class ManagedSetPasswordForm(SetPasswordForm):
+    error_messages = {
+        "password_mismatch": "两次输入的密码不一致。",
+    }
+
     new_password1 = forms.CharField(
         label="新密码",
         strip=False,
+        help_text=PASSWORD_HELP_TEXT,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     new_password2 = forms.CharField(
         label="确认新密码",
         strip=False,
+        help_text=PASSWORD_CONFIRM_HELP_TEXT,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
 
