@@ -62,7 +62,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
 - Current deployed application release: `fe7ee968c91a0eead6e5d31267e41cc013522eb9` (`Show generation entitlements on workspace`, tree `057845f4718b4987e01eb634cad3a58dbe9127de`). It includes the prior account/download/artifact hardening plus visible ordinary-user entitlement summaries and exhausted/expired generation controls.
-- Application commit `c92c48c` was independently verified after a non-force fast-forward to `origin/master`; later documentation-only commits may follow. Push-triggered Docker run `29907047085` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
+- `origin/master` was independently verified at documentation commit `c620190`, containing deployed application commit `fe7ee96`. Push-triggered Docker run `29911513230` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -116,7 +116,7 @@ Important Linux/Flatpak boundaries:
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
 - No fresh public Windows generation has been intentionally submitted against `fe7ee96`; task 27 verifies legacy EXE/MSI rendering, while artifact and entitlement enforcement are covered by backend/workflow tests. A real generation remains an explicit user-approved follow-up.
 - No real Linux, macOS, or Android client compilation has been verified for this batch.
-- Docker image runs, including `29406597406` and the latest application push run `29907047085`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
+- Docker image runs, including `29406597406`, `29907047085`, and latest push run `29911513230`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 

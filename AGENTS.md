@@ -60,7 +60,7 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
 - The current deployed application release is `fe7ee968c91a0eead6e5d31267e41cc013522eb9` (tree `057845f4718b4987e01eb634cad3a58dbe9127de`). It retains the persisted EXE/MSI artifact contract and adds ordinary-user entitlement summaries plus exhausted/expired submit states on the generator workspace.
-- Application commit `c92c48c` was non-force fast-forwarded to `origin/master` with every blob, tree, and commit SHA verified. Later documentation-only commits may follow. Push-triggered Docker run `29907047085` failed at the repository's existing Docker Hub login step; it did not dispatch a client build and does not affect the directly deployed server image.
+- `origin/master` was non-force fast-forwarded through `fe87793`, `fe7ee96`, and documentation commit `c620190`, with every blob, tree, and commit SHA verified. Push-triggered Docker run `29911513230` failed at the repository's existing Docker Hub login step; it did not dispatch a client build and does not affect the directly deployed server image.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
