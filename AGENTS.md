@@ -14,6 +14,7 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Use `apply_patch` for manual edits.
 - Do not overwrite user changes. Check `git status --short` before edits.
 - Avoid submitting the live generator form unless the user explicitly asks.
+- Full generation depends on public GitHub Actions callbacks and cannot be proven with a local-only Docker stack. Do not treat local Docker parity as a release requirement; local services are useful only for UI/form inspection unless the user explicitly asks for local container work.
 - Browser inspection artifacts should go under `output/playwright/`.
 
 ## Git / Network Notes
@@ -58,21 +59,21 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- The current deployed application release is `f2f8ea0ecc0ccff4178e81e1ca95dbb179005a81` (tree `3499379ef567692978e4b55f917e6f9b5dce54b8`). Windows x64 builds now remain pending until both the EXE and MSI have reached the generator and an authenticated finalization call validates both non-empty files. MSI build/sign/package failures are no longer optional, and callback/poll races cannot bypass or undo finalization.
-- Commits through `11ce7a5` were on `origin/master` before the final deployment record was written; verify the remote tip before future work. A push to `master` starts the known Docker image workflow.
+- The current deployed application release is `c92c48cc71d6123b2f401863c15407bc03c524ed` (tree `6b2d6cf3b6ac092fa80538973a6a96176c701102`). Windows x64 builds use persisted EXE/MSI contracts, immutable size/SHA-256 receipts, staged atomic file replacement, and explicit finalization; callbacks cannot bypass finalization or revive terminal tasks.
+- Application commit `c92c48c` was non-force fast-forwarded to `origin/master` with every blob, tree, and commit SHA verified. Later documentation-only commits may follow. Push-triggered Docker run `29907047085` failed at the repository's existing Docker Hub login step; it did not dispatch a client build and does not affect the directly deployed server image.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260722-124503-f2f8ea0ecc0c`.
-- Verified live image: `sha256:f87baa88f651ccb10b8b8c9312c54a1661d11cacce4541766dd4f16b138921db`.
-- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 104 tests inside the candidate image; both Windows workflow command tests also passed.
+- Deployment ID: `20260722-163349-c92c48cc71d6`.
+- Source archive SHA-256: `258f97022b1774993b13e1630a687c411d3f7778c258b7235fcd14d4a1caeab3`. Verified live image: `sha256:274761ab3fdec4dbbaaaf12f399cce99f846cc6e3263362b1caded9a089ec815`.
+- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 124 tests; three Windows workflow command tests, both workflow YAML files, `actionlint`, system checks, migration drift checks, and whitespace checks passed.
 - Anonymous generator access redirects to `/login/`. The production `admin` superuser exists; its password is intentionally absent from repository memory.
 - HTTPS uses a trusted Let's Encrypt IPv4 certificate, HTTP redirects to HTTPS, HSTS is initially 300 seconds, invalid hosts return 400, and login rate limiting returns 429 after the configured burst.
-- `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. Migrations `0004` through `0006` are applied; `migrate --check` and SQLite `quick_check` passed with 3 users, 3 entitlement rows, and all 27 task rows retained.
-- `/etc/cron.d/rdgen-cleanup` runs the retention command hourly under `flock`. The first enforced cleanup removed 13 expired secret ZIPs and one empty directory, no generated installer and no quota reservation; the immediate follow-up dry-run was empty.
-- Keep `/opt/rdgen-backups/20260722-124503-f2f8ea0ecc0c`, `/opt/rdgen-previous-20260722-124503-f2f8ea0ecc0c`, and image tag `rdgen-rollback:20260722-124503-f2f8ea0ecc0c` for the current rollback. Retain the preceding `20260722-122857-11ce7a56af22`, `20260722-110755-276fb0c016c6`, and earlier rollback sets as fallbacks.
+- `.env`, `data`, `exe`, `png`, `temp_zips`, and the production SQLite database were preserved. Migration `0007_githubrun_artifact_contract_generatedartifact` is applied; `migrate --check` and SQLite `quick_check` passed with 3 users and all 27 task rows retained. The new receipt table initially contains zero rows, preserving legacy task fallback behavior.
+- `/etc/cron.d/rdgen-cleanup` runs the retention command hourly under `flock`. It now marks nonterminal runs older than the 24-hour callback lifetime as `timed_out`; the former cancelled legacy row is no longer active, and both the database and GitHub activity gates report zero active client builds.
+- Keep `/opt/rdgen-backups/20260722-163349-c92c48cc71d6`, `/opt/rdgen-previous-20260722-163349-c92c48cc71d6`, and image tag `rdgen-rollback:20260722-163349-c92c48cc71d6` for the current rollback. Retain the preceding `20260722-124503-f2f8ea0ecc0c` and earlier rollback sets as fallbacks.
 
 ## Historical Verified Outputs
 

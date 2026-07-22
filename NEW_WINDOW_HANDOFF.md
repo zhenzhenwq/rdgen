@@ -17,6 +17,8 @@ Do not write server passwords, GitHub tokens, signing passwords, private certifi
 
 Do not submit the live generator form unless the user explicitly asks. A push to `master` automatically starts the repository's Docker image workflow, but it does not dispatch a RustDesk client generation workflow.
 
+The full generator path requires public GitHub Actions callbacks. Local Docker cannot provide meaningful end-to-end generation coverage and is not a release prerequisite; use local services only for UI/form inspection unless the user explicitly requests local container work.
+
 ## Current Release Batch
 
 The active batch adapts the generator to RustDesk `1.4.9` while retaining `1.4.7` and `1.4.8` compatibility for strict optional patches.
@@ -59,8 +61,8 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
-- Current deployed application release: `276fb0c016c64336b1b1845ebbb2d1ec9fdf5ce4` (`Keep password validation messages in Chinese`, tree `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`). It includes the account-entitlement release plus the relaxed minimum-six-character password policy and version-independent Chinese validation messages.
-- At deployment time the new local commits had not been pushed; `origin/master` still pointed to `d80c3e5`. Pushing `master` separately starts `docker-build.yml`.
+- Current deployed application release: `c92c48cc71d6123b2f401863c15407bc03c524ed` (`Make Windows artifact delivery atomic`, tree `6b2d6cf3b6ac092fa80538973a6a96176c701102`). It includes account entitlements, relaxed Chinese password validation, EXE/MSI completion, immutable artifact receipts, and race-safe workflow callbacks.
+- Application commit `c92c48c` was independently verified after a non-force fast-forward to `origin/master`; later documentation-only commits may follow. Push-triggered Docker run `29907047085` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -79,9 +81,9 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
 - Authentication and task security add Django sessions/CSRF, administrator-created accounts, strict per-user task ownership, callback bearer tokens, signed expiring downloads, and POST-only logout. Public registration is intentionally absent.
-- Django `5.2.16`: 99 tests pass. The candidate image passed the same suite, password-policy runtime assertions, production security check, migration-drift check, and a rehearsal against an online copy of the production database.
+- Django `5.2.16`: 124 tests pass locally and in the candidate release path. Three Windows workflow command tests, both workflow YAML files, `actionlint`, system checks, migration-drift checks, and `git diff --check` pass.
 - Desktop, 768px tablet, and 390px mobile layouts passed Playwright checks across Windows, Windows x86, Android, standard/custom Linux, and macOS visibility states. Imported PNG previews now use strict base64 validation plus DOM node creation; a malicious JSON import was verified not to execute while valid PNG previews still render.
-- The live generator was deployed from tree `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`. Anonymous generator access redirects to `/login/`; authenticated generator, `/users/`, creation, reset, personal password-change, and delete-confirmation rendering were verified without submitting the generator form or deleting an account.
+- The live generator was deployed from tree `6b2d6cf3b6ac092fa80538973a6a96176c701102`. Windows x64 task success requires exact persisted `.exe` and `.msi` receipts whose size and SHA-256 match the final files; uploads are staged and atomically committed, retries cannot replace immutable content, and terminal status callbacks cannot revive or bypass finalization.
 
 Important Linux/Flatpak boundaries:
 
@@ -94,25 +96,26 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `f2f8ea0ecc0ccff4178e81e1ca95dbb179005a81`; application tree: `3499379ef567692978e4b55f917e6f9b5dce54b8`.
-- Deployment ID: `20260722-124503-f2f8ea0ecc0c`.
-- Source archive SHA-256: `1d098e67da45d229bf8a401a948954411ea14c799daf9f90f0592fbcbad72af3`.
-- Live image: `sha256:f87baa88f651ccb10b8b8c9312c54a1661d11cacce4541766dd4f16b138921db`.
-- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Windows x64 tasks require a non-empty EXE and MSI before success is visible; status callbacks and GitHub polling cannot bypass or overwrite that finalization. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
+- Application source commit: `c92c48cc71d6123b2f401863c15407bc03c524ed`; application tree: `6b2d6cf3b6ac092fa80538973a6a96176c701102`.
+- Deployment ID: `20260722-163349-c92c48cc71d6`.
+- Source archive SHA-256: `258f97022b1774993b13e1630a687c411d3f7778c258b7235fcd14d4a1caeab3`.
+- Live image: `sha256:274761ab3fdec4dbbaaaf12f399cce99f846cc6e3263362b1caded9a089ec815`.
+- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Windows x64 tasks stay pending until exact EXE/MSI receipts and final disk hashes pass explicit finalization. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
-- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0004`-`0006` are applied, and SQLite `quick_check` passed with 3 users, 3 entitlement rows, and all 27 task rows retained.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite data were preserved. `.env` remains mode `600`; migration `0007_githubrun_artifact_contract_generatedartifact` is applied, and SQLite `quick_check` passed with 3 users and all 27 task rows retained. The receipt table began empty so historical tasks continue through the legacy file fallback.
 - Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
 - `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
-- Root-only rollback material is under `/opt/rdgen-backups/20260722-124503-f2f8ea0ecc0c`, `/opt/rdgen-previous-20260722-124503-f2f8ea0ecc0c`, and `rdgen-rollback:20260722-124503-f2f8ea0ecc0c`. The preceding `20260722-122857-11ce7a56af22`, `20260722-110755-276fb0c016c6`, and earlier rollback sets remain present.
-- One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`. User run `29886880669` completed successfully with two uploaded installers before the switch; no active client workflow remained.
+- Root-only rollback material is under `/opt/rdgen-backups/20260722-163349-c92c48cc71d6`, `/opt/rdgen-previous-20260722-163349-c92c48cc71d6`, and `rdgen-rollback:20260722-163349-c92c48cc71d6`. The preceding `20260722-124503-f2f8ea0ecc0c` and earlier rollback sets remain present.
+- The hourly cleanup converted the former cancelled legacy `in_progress` row to `timed_out`. Current database and GitHub gates report zero active client workflows.
 - Existing task 27 was verified to render both `21313.exe` and `21313.msi`; SQLite retained 3 users and all 27 tasks. No live generator form was submitted and no client workflow was dispatched during deployment.
 
 ## Not Yet Verified
 
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
+- No fresh public Windows generation has been intentionally submitted against `c92c48c`; task 27 verifies legacy EXE/MSI rendering, while the new protocol is covered by backend/workflow tests. A real generation remains an explicit user-approved follow-up.
 - No real Linux, macOS, or Android client compilation has been verified for this batch.
-- Docker image runs, including auth push run `29406597406`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
+- Docker image runs, including `29406597406` and the latest application push run `29907047085`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
@@ -122,12 +125,12 @@ Important Linux/Flatpak boundaries:
 2. Confirm the eleven new patch and test files are tracked in the release commit.
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
-5. Treat additional client builds and Docker credential repair as separate, explicit follow-up work. The live generator deployment is complete.
+5. Treat additional client builds, local Docker setup, and Docker credential repair as separate, explicit follow-up work. The live generator deployment is complete.
 
 ## Deployment Notes
 
 The deployed host directory is `/opt/rdgen`; the Docker service is `rdgen-rdgen-1` on loopback port `8000`, behind Nginx on public ports 80/443. The host is CentOS 9 with Docker `29.6.1` and Compose `v5.2.0`; `/opt/rdgen` is a controlled source snapshot rather than a Git checkout.
 
-For a future deployment, preserve `.env`, `exe`, `png`, `temp_zips`, and `data`. Inspect the server first, upload a fixed-commit source archive, build and preflight a candidate while the old container remains live, then rebuild/recreate the Docker service and verify the live URL. Do not perform a blind destructive sync or remove the current rollback material before the next deployment is verified.
+For a future deployment, preserve `.env`, `exe`, `png`, `temp_zips`, and `data`. On Windows, use `git -c core.autocrlf=false archive` when byte-for-byte Git blob fidelity matters. Build and test the candidate while the old container remains live; before a schema-changing cutover, stop or block public writes, take and verify a final SQLite snapshot, recheck GitHub activity from the isolated snapshot, then switch and keep signal-aware rollback responsibility until health checks pass. Do not perform a blind destructive sync or remove current rollback material before the next deployment is verified.
 
 Historical work, previous real Windows signing and Android universal APK verification, and RustDesk server network investigation remain documented in `WORKLOG.md`.
