@@ -780,3 +780,15 @@ User constraint recorded:
 - GitHub `master` was non-force fast-forwarded to `c92c48c` after verifying all 11 blobs, the tree, and commit SHA. Push-triggered Docker run `29907047085` failed at the existing Docker Hub login step; it did not trigger a client generation and does not affect the directly deployed production image.
 - No live generator form was submitted and no fresh public client build was dispatched. Full generation depends on the public GitHub callback path; local Docker is not a meaningful end-to-end test environment and is only useful for optional UI/form inspection.
 - Current rollback material is `/opt/rdgen-backups/20260722-163349-c92c48cc71d6`, `/opt/rdgen-previous-20260722-163349-c92c48cc71d6`, and image tag `rdgen-rollback:20260722-163349-c92c48cc71d6`.
+
+### Generator Workspace Entitlement Summary
+
+- Added a single `entitlement_summary` context for every generator-page render branch. Ordinary count-plan users see total, used, in-progress reservations, and remaining generations; time-plan users see permanent, remaining-day, Beijing expiry, or expired status. Staff and superusers remain unlimited and do not receive the panel.
+- Exhausted counts, missing count limits, and expired memberships render explicit unavailable states and disable the submit button with matching Chinese text. The existing atomic backend reservation check remains authoritative and a forged valid POST was verified unable to create a task or call GitHub.
+- Added 10 focused page/security tests; the complete Django `5.2.16` suite now passes 134/134 locally and in the production candidate image. No database field or migration was added.
+- Playwright screenshots at 1440x1000, 900x900, and 390x844 verified the desktop sidebar placement and responsive navigation-under status strip without account/nav overlap or page-level horizontal scrolling.
+- Deployed commit `fe7ee968c91a0eead6e5d31267e41cc013522eb9` (tree `057845f4718b4987e01eb634cad3a58dbe9127de`) from archive SHA-256 `cb7133b2f8c48fb1f3566317a7987dbefec2ee11dae5cd5c7cc4ae627abd9b5e` under ID `20260722-180717-fe7ee968c91a`.
+- Live image `sha256:2d89717ea403ccc92c639254b28695c489ebf5bc72586844269130395bb64c50` is `running`, `healthy`, restart count `0`. The final stop-time SQLite snapshot passed `quick_check`, retained 3 users and all 27 tasks, and both pre/post gates reported zero active GitHub client workflows.
+- Production-only rendering verified both ordinary accounts against their actual entitlement rows and verified the administrator has no entitlement panel or disabled submit button. Public `/healthz` and `/login/` returned 200, Nginx validation passed, and live logs had no error fingerprints.
+- Current rollback material is `/opt/rdgen-backups/20260722-180717-fe7ee968c91a`, `/opt/rdgen-previous-20260722-180717-fe7ee968c91a`, and image tag `rdgen-rollback:20260722-180717-fe7ee968c91a`. The previous atomic-artifact deployment remains available.
+- No live generator form was submitted and no client workflow was dispatched during deployment or verification.

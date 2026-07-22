@@ -59,21 +59,21 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- The current deployed application release is `c92c48cc71d6123b2f401863c15407bc03c524ed` (tree `6b2d6cf3b6ac092fa80538973a6a96176c701102`). Windows x64 builds use persisted EXE/MSI contracts, immutable size/SHA-256 receipts, staged atomic file replacement, and explicit finalization; callbacks cannot bypass finalization or revive terminal tasks.
+- The current deployed application release is `fe7ee968c91a0eead6e5d31267e41cc013522eb9` (tree `057845f4718b4987e01eb634cad3a58dbe9127de`). It retains the persisted EXE/MSI artifact contract and adds ordinary-user entitlement summaries plus exhausted/expired submit states on the generator workspace.
 - Application commit `c92c48c` was non-force fast-forwarded to `origin/master` with every blob, tree, and commit SHA verified. Later documentation-only commits may follow. Push-triggered Docker run `29907047085` failed at the repository's existing Docker Hub login step; it did not dispatch a client build and does not affect the directly deployed server image.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260722-163349-c92c48cc71d6`.
-- Source archive SHA-256: `258f97022b1774993b13e1630a687c411d3f7778c258b7235fcd14d4a1caeab3`. Verified live image: `sha256:274761ab3fdec4dbbaaaf12f399cce99f846cc6e3263362b1caded9a089ec815`.
-- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 124 tests; three Windows workflow command tests, both workflow YAML files, `actionlint`, system checks, migration drift checks, and whitespace checks passed.
+- Deployment ID: `20260722-180717-fe7ee968c91a`.
+- Source archive SHA-256: `cb7133b2f8c48fb1f3566317a7987dbefec2ee11dae5cd5c7cc4ae627abd9b5e`. Verified live image: `sha256:2d89717ea403ccc92c639254b28695c489ebf5bc72586844269130395bb64c50`.
+- The service was verified `running`, `healthy`, restart count `0`, and with no error fingerprints in live logs. Django `5.2.16` passed all 134 tests locally and in the candidate image; system, migration-drift, responsive Playwright, production template-render, and whitespace checks passed.
 - Anonymous generator access redirects to `/login/`. The production `admin` superuser exists; its password is intentionally absent from repository memory.
 - HTTPS uses a trusted Let's Encrypt IPv4 certificate, HTTP redirects to HTTPS, HSTS is initially 300 seconds, invalid hosts return 400, and login rate limiting returns 429 after the configured burst.
 - `.env`, `data`, `exe`, `png`, `temp_zips`, and the production SQLite database were preserved. Migration `0007_githubrun_artifact_contract_generatedartifact` is applied; `migrate --check` and SQLite `quick_check` passed with 3 users and all 27 task rows retained. The new receipt table initially contains zero rows, preserving legacy task fallback behavior.
 - `/etc/cron.d/rdgen-cleanup` runs the retention command hourly under `flock`. It now marks nonterminal runs older than the 24-hour callback lifetime as `timed_out`; the former cancelled legacy row is no longer active, and both the database and GitHub activity gates report zero active client builds.
-- Keep `/opt/rdgen-backups/20260722-163349-c92c48cc71d6`, `/opt/rdgen-previous-20260722-163349-c92c48cc71d6`, and image tag `rdgen-rollback:20260722-163349-c92c48cc71d6` for the current rollback. Retain the preceding `20260722-124503-f2f8ea0ecc0c` and earlier rollback sets as fallbacks.
+- Keep `/opt/rdgen-backups/20260722-180717-fe7ee968c91a`, `/opt/rdgen-previous-20260722-180717-fe7ee968c91a`, and image tag `rdgen-rollback:20260722-180717-fe7ee968c91a` for the current rollback. Retain the preceding `20260722-163349-c92c48cc71d6` and earlier rollback sets as fallbacks.
 
 ## Historical Verified Outputs
 
