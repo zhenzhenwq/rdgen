@@ -754,10 +754,19 @@ def check_for_file(request):
                     conclusion = gh_data['conclusion']
                     if conclusion == "success" and current_status == ARTIFACT_PENDING_STATUS:
                         # A deferred workflow must explicitly confirm that every
-                        # required installer reached this server.
-                        conclusion = ARTIFACT_INCOMPLETE_STATUS
-                    gh_run.status = conclusion
-                    gh_run.save(update_fields=["status"])
+                        # required installer reached this server. The conditional
+                        # write avoids racing a successful finalization request.
+                        GithubRun.objects.filter(
+                            pk=gh_run.pk,
+                            status=ARTIFACT_PENDING_STATUS,
+                        ).update(status=ARTIFACT_INCOMPLETE_STATUS)
+                        gh_run.refresh_from_db(fields=["status"])
+                    else:
+                        GithubRun.objects.filter(
+                            pk=gh_run.pk,
+                            status=current_status,
+                        ).update(status=conclusion)
+                        gh_run.refresh_from_db(fields=["status"])
                     current_status = (gh_run.status or '').lower()
         except Exception as e:
             print(f"Error checking GitHub: {e}")
@@ -887,8 +896,11 @@ def update_github_run(request):
     run, error = _status_run(request, myuuid)
     if error:
         return error
-    if mystatus == "success" and run.status == ARTIFACT_PENDING_STATUS:
-        # The build can report its own success before the upload step has
+    if (
+        run.status == ARTIFACT_PENDING_STATUS
+        and mystatus not in FAILED_TERMINAL_RUN_STATUSES
+    ):
+        # Progress and success callbacks can arrive before the upload step has
         # confirmed both Windows installers. Keep the callback successful so
         # it cannot break the workflow, but leave finalization authoritative.
         return HttpResponse("")
@@ -1084,8 +1096,15 @@ def finalize_custom_client(request):
     if run.artifact_uploaded_at is None:
         return HttpResponse("No valid artifact upload recorded", status=409)
 
-    run.status = "success"
-    run.save(update_fields=["status"])
+    if run.status == ARTIFACT_PENDING_STATUS:
+        updated = GithubRun.objects.filter(
+            pk=run.pk,
+            status=ARTIFACT_PENDING_STATUS,
+        ).update(status="success")
+        if not updated:
+            run.refresh_from_db(fields=["status"])
+            if run.status != "success":
+                return HttpResponse("Run is no longer awaiting artifacts", status=409)
     return JsonResponse({"status": "success", "files": expected_files})
 
 @csrf_exempt

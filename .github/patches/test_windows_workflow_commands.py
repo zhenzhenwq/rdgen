@@ -34,12 +34,18 @@ class WindowsWorkflowCommandTests(unittest.TestCase):
         for workflow_name in WINDOWS_WORKFLOWS:
             with self.subTest(workflow=workflow_name):
                 workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
-                msi_step = named_step(workflow, "Build msi")
-                rename_step = named_step(workflow, "rename rustdesk.msi to filename.msi")
                 upload_step = named_step(workflow, "send file to rdgen server")
 
-                self.assertNotIn("continue-on-error: true", msi_step)
-                self.assertNotIn("continue-on-error: true", rename_step)
+                for step_name in (
+                    "Build msi",
+                    "zip exe and msi",
+                    "unzip exe and msi",
+                    "rename rustdesk.msi to filename.msi",
+                ):
+                    self.assertNotIn(
+                        "continue-on-error: true",
+                        named_step(workflow, step_name),
+                    )
                 self.assertIn('test -s "./SignOutput/${{ env.filename }}.exe"', upload_step)
                 self.assertIn('test -s "./SignOutput/${{ env.filename }}.msi"', upload_step)
                 self.assertEqual(upload_step.count('-F "defer_completion=true"'), 2)

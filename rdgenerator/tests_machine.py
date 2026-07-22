@@ -112,20 +112,22 @@ class MachineEndpointTests(TestCase):
             "failure",
         )
 
-    def test_success_status_cannot_bypass_deferred_artifact_finalize(self):
+    def test_status_callbacks_cannot_bypass_deferred_artifact_finalize(self):
         self.run.status = ARTIFACT_PENDING_STATUS
         self.run.save(update_fields=["status"])
 
-        response = self.client.post(
-            "/updategh",
-            json.dumps({"uuid": self.run_uuid, "status": "success"}),
-            content_type="application/json",
-            **self._bearer(),
-        )
+        for status in ("queued", "in_progress", "success"):
+            with self.subTest(status=status):
+                response = self.client.post(
+                    "/updategh",
+                    json.dumps({"uuid": self.run_uuid, "status": status}),
+                    content_type="application/json",
+                    **self._bearer(),
+                )
 
-        self.assertEqual(response.status_code, 200)
-        self.run.refresh_from_db()
-        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+                self.assertEqual(response.status_code, 200)
+                self.run.refresh_from_db()
+                self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
 
     def test_finalize_cannot_resurrect_a_failed_run(self):
         self.run.status = "failure"
@@ -300,6 +302,33 @@ class MachineEndpointTests(TestCase):
         self.run.refresh_from_db()
         self.assertEqual(self.run.status, ARTIFACT_INCOMPLETE_STATUS)
         self.assertTemplateUsed(second_response, "failure.html")
+
+    def test_github_poll_does_not_overwrite_concurrent_finalize(self):
+        self.run.status = ARTIFACT_PENDING_STATUS
+        self.run.github_run_id = 123456
+        self.run.save(update_fields=["status", "github_run_id"])
+        self.client.force_login(self.run.owner)
+
+        class GithubResponse:
+            status_code = 200
+
+            def json(inner_self):
+                GithubRun.objects.filter(pk=self.run.pk).update(status="success")
+                return {"status": "completed", "conclusion": "success"}
+
+        with patch("rdgenerator.views.requests.get", return_value=GithubResponse()):
+            response = self.client.get(
+                "/check_for_file",
+                {
+                    "filename": "client",
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                },
+            )
+
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "success")
+        self.assertTemplateUsed(response, "generated.html")
 
     def test_cleanup_requires_token_and_deletes_only_matching_archive(self):
         matching = self.temp_dir / f"secrets_{self.run_uuid}_build.zip"
