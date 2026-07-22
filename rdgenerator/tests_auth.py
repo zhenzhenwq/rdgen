@@ -95,7 +95,7 @@ class AuthenticationTests(TestCase):
 
         response = self.client.get(reverse("users:password_change"))
 
-        self.assertContains(response, "你的密码必须包含至少 6 个字符。")
+        self.assertContains(response, "密码至少 6 位，允许使用字母、数字或符号。")
         self.assertNotContains(response, "Your password")
         self.assertNotContains(response, "Enter the same password")
 
@@ -192,7 +192,7 @@ class UserManagementTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "此密码太短，至少要包含 6 个字符。")
+        self.assertContains(response, "密码至少需要 6 个字符。")
         self.assertFalse(User.objects.filter(username="short-password-user").exists())
 
     def test_password_guidance_is_chinese(self):

@@ -9,13 +9,12 @@ from django.core.validators import RegexValidator, URLValidator
 from PIL import Image
 
 from .models import UserEntitlement, get_user_entitlement
+from .validators import minimum_password_help_text
 
 
 User = get_user_model()
 
-PASSWORD_HELP_TEXT = (
-    f"密码至少 {settings.PASSWORD_MIN_LENGTH} 位，允许使用字母、数字或符号。"
-)
+PASSWORD_HELP_TEXT = minimum_password_help_text(settings.PASSWORD_MIN_LENGTH)
 PASSWORD_CONFIRM_HELP_TEXT = "请再次输入相同的密码。"
 
 
