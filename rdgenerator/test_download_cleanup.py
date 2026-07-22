@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from .models import GithubRun, UserEntitlement
+from .models import GeneratedArtifact, GithubRun, UserEntitlement
 
 
 class GeneratedDownloadAccessTests(TestCase):
@@ -60,6 +60,22 @@ class GeneratedDownloadAccessTests(TestCase):
         response = self.client.get(self._url())
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith("/login/"))
+
+    def test_new_runs_only_download_files_with_committed_receipts(self):
+        GeneratedArtifact.objects.create(
+            run=self.run,
+            filename="client.exe",
+            size=len(b"generated-client"),
+            sha256=hashlib.sha256(b"generated-client").hexdigest(),
+        )
+        (self.output_dir / "uncommitted.exe").write_bytes(b"partial")
+        self.client.force_login(self.owner)
+
+        self.assertEqual(self.client.get(self._url()).status_code, 200)
+        self.assertEqual(
+            self.client.get(self._url(filename="uncommitted.exe")).status_code,
+            404,
+        )
 
     def test_public_download_requires_token_and_allows_anonymous(self):
         self.run.download_access = "public"
@@ -224,4 +240,21 @@ class GeneratedCleanupCommandTests(TestCase):
         run.refresh_from_db()
         entitlement.refresh_from_db()
         self.assertFalse(run.quota_reserved)
+        self.assertEqual(run.status, "timed_out")
         self.assertEqual(entitlement.reserved_generations, 0)
+
+    def test_purge_times_out_stale_run_without_count_reservation(self):
+        run = GithubRun.objects.create(
+            uuid=str(uuid.uuid4()),
+            status="artifacts_pending",
+            owner=self.owner,
+        )
+        GithubRun.objects.filter(pk=run.pk).update(
+            created_at=timezone.now() - timedelta(hours=25)
+        )
+
+        with self.settings(BASE_DIR=self.temp_root):
+            call_command("purge_generated_files")
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, "timed_out")

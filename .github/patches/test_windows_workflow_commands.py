@@ -17,6 +17,19 @@ def named_step(workflow: str, name: str) -> str:
     return step.split("      - name:", 1)[0]
 
 
+def named_job(workflow: str, name: str) -> str:
+    marker = f"  {name}:\n"
+    if marker not in workflow:
+        raise AssertionError(f"Missing workflow job: {name}")
+    job = workflow.split(marker, 1)[1]
+    lines = []
+    for line in job.splitlines():
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 class WindowsWorkflowCommandTests(unittest.TestCase):
     def test_update_notification_patch_uses_windows_available_downloader(self):
         for workflow_name in WINDOWS_WORKFLOWS:
@@ -34,7 +47,9 @@ class WindowsWorkflowCommandTests(unittest.TestCase):
         for workflow_name in WINDOWS_WORKFLOWS:
             with self.subTest(workflow=workflow_name):
                 workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
-                upload_step = named_step(workflow, "send file to rdgen server")
+                exe_upload_step = named_step(workflow, "send exe to rdgen server")
+                msi_upload_step = named_step(workflow, "send msi to rdgen server")
+                finalize_step = named_step(workflow, "finalize files on rdgen server")
 
                 for step_name in (
                     "Build msi",
@@ -46,11 +61,43 @@ class WindowsWorkflowCommandTests(unittest.TestCase):
                         "continue-on-error: true",
                         named_step(workflow, step_name),
                     )
-                self.assertIn('test -s "./SignOutput/${{ env.filename }}.exe"', upload_step)
-                self.assertIn('test -s "./SignOutput/${{ env.filename }}.msi"', upload_step)
-                self.assertEqual(upload_step.count('-F "defer_completion=true"'), 2)
-                self.assertIn("/finalize_custom_client", upload_step)
-                self.assertNotIn('if [[ -f "./SignOutput/${{ env.filename }}.msi" ]]', upload_step)
+                self.assertIn('test -s "./SignOutput/${{ env.filename }}.exe"', exe_upload_step)
+                self.assertIn('test -s "./SignOutput/${{ env.filename }}.msi"', exe_upload_step)
+                self.assertIn('test -s "./SignOutput/${{ env.filename }}.msi"', msi_upload_step)
+                self.assertEqual(exe_upload_step.count('-F "defer_completion=true"'), 1)
+                self.assertEqual(msi_upload_step.count('-F "defer_completion=true"'), 1)
+                self.assertNotIn(".msi", exe_upload_step.split("curl", 1)[1])
+                self.assertNotIn(".exe", msi_upload_step.split("curl", 1)[1])
+                self.assertIn("/finalize_custom_client", finalize_step)
+                self.assertNotIn("/save_custom_client", finalize_step)
+
+    def test_rdgen_failures_are_reported_without_masking_build_failure(self):
+        for workflow_name in WINDOWS_WORKFLOWS:
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                step = named_step(workflow, "report generation failure to rdgen server")
+
+                self.assertIn("always()", step)
+                self.assertIn("!success()", step)
+                self.assertIn("env.rdgen == 'true'", step)
+                self.assertIn("continue-on-error: true", step)
+                self.assertIn('Authorization: Bearer ${{ env.token }}', step)
+                self.assertIn('"status":"failure"', step)
+                self.assertIn("${{ secrets.GENURL }}/updategh", step)
+
+                job = named_job(workflow, "report-build-failure")
+                self.assertIn("always()", job)
+                self.assertIn(
+                    "needs.build-for-windows-flutter.result != 'success'",
+                    job,
+                )
+                self.assertIn("setup", job)
+                self.assertIn("generate-bridge", job)
+                self.assertIn("build-RustDeskTempTopMostWindow", job)
+                self.assertIn("build-for-windows-flutter", job)
+                self.assertIn("metadata['status_signature']", job)
+                self.assertIn("/updategh?signature=", job)
+                self.assertIn("for attempt in range(3)", job)
 
 
 if __name__ == "__main__":

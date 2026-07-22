@@ -17,6 +17,12 @@ from ...models import GithubRun, release_generation_reservation
 
 
 RETENTION_DAYS = 7
+STALE_RUN_STATUSES = (
+    "Starting generator...please wait",
+    "in_progress",
+    "queued",
+    "artifacts_pending",
+)
 
 
 class Command(BaseCommand):
@@ -46,22 +52,29 @@ class Command(BaseCommand):
         removed_files = 0
         removed_dirs = 0
         released_reservations = 0
+        timed_out_runs = 0
 
-        # Callback bearer tokens expire after 24 hours. Any still-reserved run
-        # older than that can no longer produce a valid artifact, so release
-        # its count reservation even if the workflow never reported a terminal
-        # state.
+        # Callback credentials expire after 24 hours. Runs still awaiting a
+        # callback after that point can no longer deliver an artifact.
         stale_cutoff = now - timedelta(hours=24)
         stale_runs = GithubRun.objects.filter(
-            quota_reserved=True,
-            quota_counted=False,
+            status__in=STALE_RUN_STATUSES,
             created_at__lte=stale_cutoff,
-        ).only("pk", "quota_reserved", "quota_counted", "owner_id")
+        ).only("pk", "status", "quota_reserved", "quota_counted", "owner_id")
         for run in stale_runs:
             if dry_run:
-                released_reservations += 1
-            elif release_generation_reservation(run):
-                released_reservations += 1
+                timed_out_runs += 1
+                if run.quota_reserved and not run.quota_counted:
+                    released_reservations += 1
+                continue
+            transitioned = GithubRun.objects.filter(
+                pk=run.pk,
+                status__in=STALE_RUN_STATUSES,
+            ).update(status="timed_out")
+            if transitioned:
+                timed_out_runs += 1
+                if release_generation_reservation(run):
+                    released_reservations += 1
 
         run_by_uuid = {
             run.uuid: run
@@ -95,7 +108,8 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"{action} {removed_files} file(s), {removed_dirs} director(ies), "
-                f"and {released_reservations} quota reservation(s)."
+                f"{released_reservations} quota reservation(s), and "
+                f"timed out {timed_out_runs} stale run(s)."
             )
         )
 

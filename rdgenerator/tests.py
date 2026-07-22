@@ -44,6 +44,67 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertContains(response, "replaceChildren(image)")
         self.assertNotContains(response, 'innerHTML = `<img src="${formData[key]}">`')
 
+    def test_ambiguous_dispatch_error_keeps_windows_run_receivable(self):
+        with (
+            patch("rdgenerator.views.requests.post", side_effect=TimeoutError("lost response")),
+            patch("rdgenerator.views.save_png", side_effect=ValueError("no image in test")),
+        ):
+            response = self.client.post(
+                "/generator",
+                data=self._feature_payload(platform="windows"),
+            )
+
+        self.assertEqual(response.status_code, 500)
+        run = GithubRun.objects.get()
+        self.assertEqual(run.status, "artifacts_pending")
+        self.assertTrue(run.callback_token_hash)
+        self.created_secret_zips.extend(
+            Path("temp_zips").glob(f"secrets_{run.uuid}_*.zip")
+        )
+
+    def test_dispatch_response_cannot_overwrite_early_terminal_callback(self):
+        def dispatch_after_failure(*_args, **_kwargs):
+            GithubRun.objects.update(status="failure")
+            return SimpleNamespace(status_code=204, content=b"", text="")
+
+        with (
+            patch("rdgenerator.views.requests.post", side_effect=dispatch_after_failure),
+            patch("rdgenerator.views.save_png", side_effect=ValueError("no image in test")),
+        ):
+            response = self.client.post(
+                "/generator",
+                data=self._feature_payload(platform="windows"),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        run = GithubRun.objects.get()
+        self.assertEqual(run.status, "failure")
+        self.created_secret_zips.extend(
+            Path("temp_zips").glob(f"secrets_{run.uuid}_*.zip")
+        )
+
+    def test_rejected_dispatch_marks_run_failed_without_reviving_callback(self):
+        github_response = SimpleNamespace(
+            status_code=422,
+            content=b'{"message":"invalid"}',
+            text="invalid",
+        )
+        with (
+            patch("rdgenerator.views.requests.post", return_value=github_response),
+            patch("rdgenerator.views.save_png", side_effect=ValueError("no image in test")),
+        ):
+            response = self.client.post(
+                "/generator",
+                data=self._feature_payload(platform="windows"),
+            )
+
+        self.assertEqual(response.status_code, 500)
+        run = GithubRun.objects.get()
+        self.assertEqual(run.status, "dispatch_failed")
+        self.created_secret_zips.extend(
+            Path("temp_zips").glob(f"secrets_{run.uuid}_*.zip")
+        )
+
     def _feature_payload(self, platform="windows", direction="incoming"):
         data = {
             "platform": platform,
@@ -127,6 +188,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(GithubRun.objects.get().owner, self.user)
         post_payload = post_mock.call_args.kwargs["json"]
         zip_url = json.loads(post_payload["inputs"]["zip_url"])
+        self.last_dispatch_metadata = zip_url
         zip_path = Path("temp_zips") / zip_url["file"]
         self.created_secret_zips.append(zip_path)
         with pyzipper.AESZipFile(zip_path) as zf:
@@ -141,7 +203,16 @@ class GeneratorFeaturePayloadTests(TestCase):
         )
 
         self.assertTrue(dispatch_url.endswith("/actions/workflows/generator-windows.yml/dispatches"))
-        self.assertEqual(GithubRun.objects.get().status, "artifacts_pending")
+        run = GithubRun.objects.get()
+        self.assertEqual(run.status, "artifacts_pending")
+        self.assertEqual(run.platform, "windows")
+        self.assertEqual(run.artifact_stem, "AllFeatures")
+        matching_archives = list(
+            Path("temp_zips").glob(f"secrets_{run.uuid}_*.zip")
+        )
+        self.assertEqual(len(matching_archives), 1)
+        self.assertEqual(self.last_dispatch_metadata["uuid"], run.uuid)
+        self.assertTrue(self.last_dispatch_metadata["status_signature"])
         expected_true_flags = [
             "delayFix",
             "hideNetworkSetting",

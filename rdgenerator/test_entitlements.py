@@ -164,6 +164,16 @@ class ArtifactQuotaTests(TestCase):
             first_upload + timedelta(days=7),
         )
 
+    def test_retrying_same_filename_does_not_inflate_file_count(self):
+        self.assertEqual(self._upload("client.exe", b"first-attempt").status_code, 200)
+        self.assertEqual(self._upload("client.exe", b"first-attempt").status_code, 200)
+
+        self.run.refresh_from_db()
+        self.entitlement.refresh_from_db()
+        self.assertEqual(self.run.artifact_file_count, 1)
+        self.assertEqual(self.entitlement.generations_used, 1)
+        self.assertEqual(self.entitlement.reserved_generations, 0)
+
     def test_zero_byte_or_unknown_file_does_not_consume_quota(self):
         self.assertEqual(self._upload("empty.exe", b"").status_code, 200)
         self.assertEqual(self._upload("notes.txt", b"not-a-package").status_code, 200)

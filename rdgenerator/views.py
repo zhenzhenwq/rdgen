@@ -2,6 +2,7 @@ import io
 import hashlib
 import hmac
 import mimetypes
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,7 @@ from django.core.signing import BadSignature, SignatureExpired
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.core.files.base import ContentFile
+from django.db import models, transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
@@ -27,6 +29,7 @@ from django.conf import settings as _settings
 from .forms import GenerateForm
 from .models import (
     create_github_run_with_reservation,
+    GeneratedArtifact,
     GenerationQuotaExceeded,
     GithubRun,
     mark_artifact_uploaded,
@@ -39,6 +42,7 @@ ZIP_DOWNLOAD_MAX_AGE = 6 * 60 * 60
 ZIP_DOWNLOAD_SALT = "rdgenerator.get_zip"
 STATUS_UPDATE_MAX_AGE = 24 * 60 * 60
 STATUS_UPDATE_SALT = "rdgenerator.update_status"
+DISPATCH_FAILURE_SALT = "rdgenerator.dispatch_failure"
 CALLBACK_TOKEN_MAX_AGE = timedelta(hours=24)
 TERMINAL_RUN_STATUSES = {
     "success",
@@ -48,6 +52,7 @@ TERMINAL_RUN_STATUSES = {
     "skipped",
     "action_required",
     "artifact_incomplete",
+    "dispatch_failed",
 }
 FAILED_TERMINAL_RUN_STATUSES = TERMINAL_RUN_STATUSES - {"success"}
 ARTIFACT_PENDING_STATUS = "artifacts_pending"
@@ -117,8 +122,26 @@ def _valid_artifact_filename(filename, platform=None):
     allowed_suffixes = platform_suffixes.get(platform, VALID_ARTIFACT_SUFFIXES)
     return bool(
         filename
+        and not filename.startswith(".upload-")
         and filename.lower().endswith(allowed_suffixes)
     )
+
+
+def _windows_artifact_names(run):
+    if run.platform != "windows" or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_-]*",
+        run.artifact_stem or "",
+    ):
+        return ()
+    return (f"{run.artifact_stem}.exe", f"{run.artifact_stem}.msi")
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as artifact_file:
+        for chunk in iter(lambda: artifact_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _request_token(request):
@@ -155,21 +178,31 @@ def _machine_run(request, raw_uuid):
     return run, None
 
 
-def _status_run(request, raw_uuid):
+def _status_run(request, raw_uuid, requested_status):
     if _request_token(request):
         return _machine_run(request, raw_uuid)
     try:
         run_uuid = _canonical_run_uuid(raw_uuid)
     except Http404:
         return None, HttpResponse("Build not found", status=404)
+    signature = request.GET.get("signature", "")
     try:
         signed = signing.loads(
-            request.GET.get("signature", ""),
+            signature,
             salt=STATUS_UPDATE_SALT,
             max_age=STATUS_UPDATE_MAX_AGE,
         )
     except (BadSignature, SignatureExpired):
-        return None, HttpResponse("Unauthorized", status=401)
+        if requested_status not in FAILED_TERMINAL_RUN_STATUSES:
+            return None, HttpResponse("Unauthorized", status=401)
+        try:
+            signed = signing.loads(
+                signature,
+                salt=DISPATCH_FAILURE_SALT,
+                max_age=STATUS_UPDATE_MAX_AGE,
+            )
+        except (BadSignature, SignatureExpired):
+            return None, HttpResponse("Unauthorized", status=401)
     if not isinstance(signed, dict) or signed.get("uuid") != run_uuid:
         return None, HttpResponse("Unauthorized", status=401)
     try:
@@ -185,6 +218,8 @@ def _shared_api_authorized(request):
 
 
 def _generated_file_or_404(run_uuid, filename):
+    if filename.startswith(".upload-"):
+        raise Http404("Generated file not found")
     output_dir = (Path("exe") / run_uuid).resolve()
     file_path = (output_dir / filename).resolve()
     try:
@@ -195,15 +230,44 @@ def _generated_file_or_404(run_uuid, filename):
         raise Http404("Generated file not found")
     return file_path
 
+
+def _committed_artifact_file_or_404(run, filename):
+    artifact = GeneratedArtifact.objects.filter(
+        run=run,
+        filename=filename,
+    ).first()
+    if artifact is None:
+        raise Http404("Generated file not found")
+    file_path = _generated_file_or_404(run.uuid, filename)
+    if file_path.stat().st_size != artifact.size:
+        raise Http404("Generated file not found")
+    return file_path, artifact
+
 def list_generated_files(run_uuid):
-    output_dir = os.path.join('exe', run_uuid)
-    if not os.path.isdir(output_dir):
+    output_dir = Path("exe") / run_uuid
+    if not output_dir.is_dir():
         return []
-    files = [
-        name
-        for name in os.listdir(output_dir)
-        if os.path.isfile(os.path.join(output_dir, name))
-    ]
+    run = GithubRun.objects.filter(uuid=run_uuid).only("pk", "platform").first()
+    has_receipt_contract = bool(
+        run
+        and (
+            run.platform
+            or GeneratedArtifact.objects.filter(run=run).exists()
+        )
+    )
+    if has_receipt_contract:
+        files = [
+            artifact.filename
+            for artifact in GeneratedArtifact.objects.filter(run=run)
+            if (output_dir / artifact.filename).is_file()
+            and (output_dir / artifact.filename).stat().st_size == artifact.size
+        ]
+    else:
+        files = [
+            path.name
+            for path in output_dir.iterdir()
+            if path.is_file() and not path.name.startswith(".upload-")
+        ]
     android_order = ['-universal.apk', '-aarch64.apk', '-armv7.apk', '-x86_64.apk']
     return sorted(files, key=lambda name: (
         next((idx for idx, suffix in enumerate(android_order) if name.endswith(suffix)), len(android_order)),
@@ -636,6 +700,11 @@ def generator_view(request):
                 {'filename': zip_filename},
                 salt=ZIP_DOWNLOAD_SALT,
             )
+            zipJson['uuid'] = myuuid
+            zipJson['status_signature'] = signing.dumps(
+                {"uuid": myuuid},
+                salt=DISPATCH_FAILURE_SALT,
+            )
 
             zip_url = json.dumps(zipJson)
 
@@ -660,11 +729,18 @@ def generator_view(request):
                 168,
             )
             download_token = download_token_for_run(myuuid)
+            initial_status = (
+                ARTIFACT_PENDING_STATUS
+                if platform == "windows"
+                else "in_progress"
+            )
             try:
                 new_github_run = create_github_run_with_reservation(
                     request.user,
                     uuid=myuuid,
-                    status="Starting generator...please wait",
+                    status=initial_status,
+                    platform=platform,
+                    artifact_stem=filename,
                     callback_token_hash=_callback_token_hash(callback_token),
                     download_access=download_access,
                     download_ttl_hours=download_ttl_hours,
@@ -690,13 +766,12 @@ def generator_view(request):
                             print(github_data)
                         except ValueError as e:
                             print(f"GitHub dispatch returned non-JSON success body: {e}")
-                    new_github_run.github_run_id = github_data.get('workflow_run_id')
-                    new_github_run.status = (
-                        ARTIFACT_PENDING_STATUS
-                        if platform == "windows"
-                        else "in_progress"
-                    )
-                    new_github_run.save(update_fields=["github_run_id", "status"])
+                    workflow_run_id = github_data.get('workflow_run_id')
+                    if workflow_run_id:
+                        GithubRun.objects.filter(
+                            pk=new_github_run.pk,
+                            status=initial_status,
+                        ).update(github_run_id=workflow_run_id)
 
                     log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
                     return render(request, 'waiting.html', {
@@ -710,14 +785,18 @@ def generator_view(request):
                         'download_token': download_token,
                     })
                 else:
-                    release_generation_reservation(new_github_run)
-                    new_github_run.status = "dispatch_failed"
-                    new_github_run.save(update_fields=["status"])
+                    transitioned = GithubRun.objects.filter(
+                        pk=new_github_run.pk,
+                        status=initial_status,
+                    ).update(status="dispatch_failed")
+                    if transitioned:
+                        new_github_run.refresh_from_db()
+                        release_generation_reservation(new_github_run)
                     return JsonResponse({"error": "GitHub rejected the start request", "details": response.text}, status=500)
             except Exception as e:
-                release_generation_reservation(new_github_run)
-                new_github_run.status = "dispatch_failed"
-                new_github_run.save(update_fields=["status"])
+                # A connection error is ambiguous: GitHub may have accepted the
+                # dispatch before the response was lost. Keep the run able to
+                # receive its authenticated callbacks and artifacts.
                 return JsonResponse({"error": f"Connection error: {str(e)}"}, status=500)
     else:
         form = GenerateForm()
@@ -846,9 +925,17 @@ def download(request):
     if now >= artifact_expires_at:
         return HttpResponse("Generated file expired", status=410)
 
-    file_path = _generated_file_or_404(run_uuid, filename)
+    if run.platform or GeneratedArtifact.objects.filter(run=run).exists():
+        file_path, artifact = _committed_artifact_file_or_404(run, filename)
+    else:
+        # Rows created before artifact receipts were introduced remain
+        # downloadable until their existing retention window expires.
+        file_path = _generated_file_or_404(run_uuid, filename)
+        artifact = None
     with open(file_path, 'rb') as file:
         content = file.read()
+    if artifact and hashlib.sha256(content).hexdigest() != artifact.sha256:
+        raise Http404("Generated file not found")
     content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
     response = HttpResponse(content, headers={
         'Content-Type': content_type,
@@ -893,20 +980,21 @@ def update_github_run(request):
     }
     if mystatus not in allowed_statuses:
         return HttpResponse("Invalid status", status=400)
-    run, error = _status_run(request, myuuid)
+    run, error = _status_run(request, myuuid, mystatus)
     if error:
         return error
-    if (
-        run.status == ARTIFACT_PENDING_STATUS
-        and mystatus not in FAILED_TERMINAL_RUN_STATUSES
-    ):
-        # Progress and success callbacks can arrive before the upload step has
-        # confirmed both Windows installers. Keep the callback successful so
-        # it cannot break the workflow, but leave finalization authoritative.
-        return HttpResponse("")
-    run.status = mystatus
-    run.save(update_fields=["status"])
-    if mystatus in FAILED_TERMINAL_RUN_STATUSES and not run.artifact_uploaded_at:
+    blocked_sources = set(TERMINAL_RUN_STATUSES)
+    if mystatus not in FAILED_TERMINAL_RUN_STATUSES:
+        blocked_sources.add(ARTIFACT_PENDING_STATUS)
+    status_filter = GithubRun.objects.filter(pk=run.pk).exclude(
+        status__in=blocked_sources,
+    )
+    if mystatus == "success" and run.platform == "windows":
+        status_filter = status_filter.exclude(platform="windows")
+    status_filter.update(status=mystatus)
+
+    run.refresh_from_db(fields=["status", "artifact_uploaded_at", "quota_reserved", "quota_counted"])
+    if run.status in FAILED_TERMINAL_RUN_STATUSES and not run.artifact_uploaded_at:
         release_generation_reservation(run)
     return HttpResponse("")
 
@@ -1022,6 +1110,8 @@ def save_custom_client(request):
     run, error = _machine_run(request, myuuid)
     if error:
         return error
+    if run.status in FAILED_TERMINAL_RUN_STATUSES:
+        return HttpResponse("Run no longer accepts artifacts", status=409)
     defer_completion = str(
         request.POST.get("defer_completion", "false")
     ).strip().lower()
@@ -1036,21 +1126,87 @@ def save_custom_client(request):
         file_save_path.relative_to(output_root)
     except ValueError:
         raise Http404("Generated file not found")
-    with open(file_save_path, "wb+") as f:
-        for chunk in file.chunks():
-            f.write(chunk)
+    temp_path = None
+    digest = hashlib.sha256()
+    size = 0
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=output_root,
+            prefix=".upload-",
+            suffix=".part",
+            delete=False,
+        ) as output_file:
+            temp_path = Path(output_file.name)
+            for chunk in file.chunks():
+                output_file.write(chunk)
+                digest.update(chunk)
+                size += len(chunk)
 
-    is_valid_artifact = bool(
-        file_save_path.stat().st_size and _valid_artifact_filename(filename)
-    )
-    if is_valid_artifact:
-        mark_artifact_uploaded(run)
-        if not defer_completion:
-            run.status = "success"
-        elif run.status not in TERMINAL_RUN_STATUSES:
-            run.status = ARTIFACT_PENDING_STATUS
-    run.save(update_fields=["status"])
-    return HttpResponse("File saved successfully!")
+        if not size or not _valid_artifact_filename(filename, run.platform or None):
+            return HttpResponse("File saved successfully!")
+
+        with transaction.atomic():
+            # Make the first statement a write so SQLite serializes only this
+            # short commit section, never the multipart upload itself.
+            claimed = GithubRun.objects.filter(pk=run.pk).exclude(
+                status__in=FAILED_TERMINAL_RUN_STATUSES,
+            ).update(status=models.F("status"))
+            if not claimed:
+                return HttpResponse("Run no longer accepts artifacts", status=409)
+
+            run = GithubRun.objects.get(pk=run.pk)
+            expected_windows_files = _windows_artifact_names(run)
+            if run.platform == "windows" and not expected_windows_files:
+                return HttpResponse("Artifact contract is invalid", status=409)
+            if expected_windows_files and filename not in expected_windows_files:
+                return HttpResponse("Artifact does not match this run", status=409)
+
+            content_hash = digest.hexdigest()
+            existing = GeneratedArtifact.objects.filter(
+                run=run,
+                filename=filename,
+            ).first()
+            if existing:
+                if existing.size != size or existing.sha256 != content_hash:
+                    return HttpResponse("Artifact content does not match", status=409)
+                # The staged upload matches the immutable receipt, so it can
+                # also repair a missing or externally corrupted disk copy.
+                os.replace(temp_path, file_save_path)
+                temp_path = None
+                return HttpResponse("File saved successfully!")
+
+            if expected_windows_files and run.status == "success":
+                return HttpResponse("Finalized artifacts are immutable", status=409)
+
+            os.replace(temp_path, file_save_path)
+            temp_path = None
+            GeneratedArtifact.objects.create(
+                run=run,
+                filename=filename,
+                size=size,
+                sha256=content_hash,
+            )
+            artifact_file_count = GeneratedArtifact.objects.filter(run=run).count()
+            mark_artifact_uploaded(
+                run,
+                artifact_file_count=artifact_file_count,
+            )
+            if run.platform == "windows":
+                GithubRun.objects.filter(pk=run.pk).exclude(
+                    status__in=TERMINAL_RUN_STATUSES,
+                ).update(status=ARTIFACT_PENDING_STATUS)
+            elif (
+                run.status not in TERMINAL_RUN_STATUSES
+                and run.status != ARTIFACT_PENDING_STATUS
+            ):
+                GithubRun.objects.filter(pk=run.pk, status=run.status).update(
+                    status=ARTIFACT_PENDING_STATUS if defer_completion else "success"
+                )
+        return HttpResponse("File saved successfully!")
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 @csrf_exempt
@@ -1066,35 +1222,46 @@ def finalize_custom_client(request):
         return error
     if run.status not in {ARTIFACT_PENDING_STATUS, "success"}:
         return HttpResponse("Run is not awaiting artifacts", status=409)
-    if data.get("platform") != "windows":
-        return HttpResponse("Unsupported platform", status=400)
 
-    artifact_stem = str(data.get("filename") or "")
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", artifact_stem):
-        return HttpResponse("Invalid artifact name", status=400)
-
-    expected_files = [f"{artifact_stem}.exe", f"{artifact_stem}.msi"]
+    expected_files = list(_windows_artifact_names(run))
+    if not expected_files:
+        return HttpResponse("Artifact contract is invalid", status=409)
     output_root = (Path("exe") / run.uuid).resolve()
+    receipts = {
+        artifact.filename: artifact
+        for artifact in GeneratedArtifact.objects.filter(
+            run=run,
+            filename__in=expected_files,
+        )
+    }
     missing_files = []
+    invalid_files = []
     for filename in expected_files:
+        receipt = receipts.get(filename)
         file_path = (output_root / filename).resolve()
         try:
             file_path.relative_to(output_root)
         except ValueError:
             return HttpResponse("Invalid artifact path", status=400)
-        if not file_path.is_file() or not file_path.stat().st_size:
+        if receipt is None or not file_path.is_file():
             missing_files.append(filename)
+        elif (
+            file_path.stat().st_size != receipt.size
+            or _sha256_file(file_path) != receipt.sha256
+        ):
+            invalid_files.append(filename)
 
-    if missing_files:
+    if missing_files or invalid_files:
         return JsonResponse(
             {
-                "error": "Required artifacts are missing",
+                "error": "Required artifacts are missing or invalid",
                 "missing": missing_files,
+                "invalid": invalid_files,
             },
             status=409,
         )
-    if run.artifact_uploaded_at is None:
-        return HttpResponse("No valid artifact upload recorded", status=409)
+
+    artifact_file_count = GeneratedArtifact.objects.filter(run=run).count()
 
     if run.status == ARTIFACT_PENDING_STATUS:
         updated = GithubRun.objects.filter(
@@ -1105,6 +1272,14 @@ def finalize_custom_client(request):
             run.refresh_from_db(fields=["status"])
             if run.status != "success":
                 return HttpResponse("Run is no longer awaiting artifacts", status=409)
+    elif not GithubRun.objects.filter(pk=run.pk, status="success").exists():
+        return HttpResponse("Run is no longer successful", status=409)
+
+    GithubRun.objects.filter(
+        pk=run.pk,
+        status="success",
+        artifact_file_count__lt=artifact_file_count,
+    ).update(artifact_file_count=artifact_file_count)
     return JsonResponse({"status": "success", "files": expected_files})
 
 @csrf_exempt

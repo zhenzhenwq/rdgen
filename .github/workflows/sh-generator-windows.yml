@@ -1,5 +1,5 @@
 name: Custom Windows Client Generator
-run-name: Custom Windows Client Generator
+run-name: Custom Windows Client Generator ${{ fromJSON(inputs.zip_url).uuid }}
 on: 
   workflow_dispatch:
     inputs:
@@ -671,7 +671,7 @@ jobs:
         run: |
           mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi"
 
-      - name: send file to rdgen server
+      - name: send exe to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
         with:
@@ -683,7 +683,28 @@ jobs:
             test -s "./SignOutput/${{ env.filename }}.exe"
             test -s "./SignOutput/${{ env.filename }}.msi"
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" -F "defer_completion=true" ${{ secrets.GENURL }}/save_custom_client
+
+      - name: send msi to rdgen server
+        if: ${{ env.rdgen == 'true' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          shell: bash
+          command: |
+            set -euo pipefail
+            test -s "./SignOutput/${{ env.filename }}.msi"
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" -F "defer_completion=true" ${{ secrets.GENURL }}/save_custom_client
+
+      - name: finalize files on rdgen server
+        if: ${{ env.rdgen == 'true' }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          shell: bash
+          command: |
+            set -euo pipefail
             curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${{ env.token }}" --data '{"uuid":"${{ env.uuid }}","platform":"windows","filename":"${{ env.filename }}"}' ${{ secrets.GENURL }}/finalize_custom_client
 
       - name: send file to api server
@@ -700,6 +721,17 @@ jobs:
               curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client
             fi
 
+      - name: report generation failure to rdgen server
+        if: ${{ always() && env.rdgen == 'true' && !success() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          curl --fail --connect-timeout 30 --max-time 60 --retry 2 --retry-delay 5 -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ env.token }}" \
+            --data '{"uuid":"${{ env.uuid }}","status":"failure"}' \
+            "${{ secrets.GENURL }}/updategh"
+
   cleanup:
     needs: [build-for-windows-flutter]
     runs-on: ubuntu-latest
@@ -710,3 +742,40 @@ jobs:
         uses: geekyeggo/delete-artifact@v5
         with:
           name: encrypted-secrets-zip
+
+  report-build-failure:
+    if: ${{ always() && needs.build-for-windows-flutter.result != 'success' }}
+    needs: [setup, generate-bridge, build-RustDeskTempTopMostWindow, build-for-windows-flutter]
+    runs-on: ubuntu-latest
+    steps:
+      - name: report upstream failure to rdgen server
+        continue-on-error: true
+        shell: python
+        env:
+          ZIP_URL_JSON: ${{ inputs.zip_url }}
+        run: |
+          import json
+          import os
+          import time
+          import urllib.request
+
+          metadata = json.loads(os.environ['ZIP_URL_JSON'])
+          payload = json.dumps({
+              'uuid': metadata['uuid'],
+              'status': 'failure',
+          }).encode()
+          request = urllib.request.Request(
+              f"{metadata['url']}/updategh?signature={metadata['status_signature']}",
+              data=payload,
+              headers={'Content-Type': 'application/json'},
+              method='POST',
+          )
+          for attempt in range(3):
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      assert response.status == 200
+                  break
+              except Exception:
+                  if attempt == 2:
+                      raise
+                  time.sleep(5 * (attempt + 1))

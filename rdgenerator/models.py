@@ -133,8 +133,8 @@ def release_generation_reservation(run):
         return True
 
 
-def mark_artifact_uploaded(run, uploaded_at=None):
-    """Record a valid package and consume a count reservation exactly once."""
+def mark_artifact_uploaded(run, uploaded_at=None, artifact_file_count=None):
+    """Record valid package delivery and settle a reservation exactly once."""
     uploaded_at = uploaded_at or timezone.now()
     with transaction.atomic():
         snapshot = GithubRun.objects.select_for_update().only(
@@ -143,11 +143,17 @@ def mark_artifact_uploaded(run, uploaded_at=None):
             "quota_reserved",
             "quota_counted",
             "download_ttl_hours",
+            "artifact_file_count",
         ).get(pk=run.pk)
         ttl_hours = min(max(int(snapshot.download_ttl_hours or 168), 1), 168)
-        GithubRun.objects.filter(pk=run.pk).update(
-            artifact_file_count=F("artifact_file_count") + 1,
-        )
+        if artifact_file_count is None:
+            file_count = F("artifact_file_count") + 1
+        else:
+            file_count = max(
+                snapshot.artifact_file_count,
+                max(int(artifact_file_count), 1),
+            )
+        GithubRun.objects.filter(pk=run.pk).update(artifact_file_count=file_count)
         GithubRun.objects.filter(
             pk=run.pk,
             artifact_uploaded_at__isnull=True,
@@ -204,9 +210,32 @@ class GithubRun(models.Model):
     artifact_uploaded_at = models.DateTimeField(null=True, blank=True)
     artifact_expires_at = models.DateTimeField(null=True, blank=True)
     artifact_file_count = models.PositiveIntegerField(default=0)
+    platform = models.CharField(max_length=20, blank=True, default="")
+    artifact_stem = models.CharField(max_length=255, blank=True, default="")
     quota_chargeable = models.BooleanField(default=False)
     quota_reserved = models.BooleanField(default=False)
     quota_counted = models.BooleanField(default=False)
+
+
+class GeneratedArtifact(models.Model):
+    run = models.ForeignKey(
+        GithubRun,
+        on_delete=models.CASCADE,
+        related_name="artifacts",
+    )
+    filename = models.CharField(max_length=255)
+    size = models.PositiveBigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("run", "filename"),
+                name="unique_generated_artifact_per_run",
+            ),
+        ]
 
 
 def create_github_run_with_reservation(user, **run_fields):

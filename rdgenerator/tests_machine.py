@@ -12,10 +12,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import GithubRun
+from .models import GeneratedArtifact, GithubRun
 from .views import (
     ARTIFACT_INCOMPLETE_STATUS,
     ARTIFACT_PENDING_STATUS,
+    DISPATCH_FAILURE_SALT,
     STATUS_UPDATE_SALT,
     ZIP_DOWNLOAD_SALT,
 )
@@ -30,6 +31,8 @@ class MachineEndpointTests(TestCase):
             uuid=self.run_uuid,
             status="in_progress",
             owner=owner,
+            platform="windows",
+            artifact_stem="client",
             callback_token_hash=hashlib.sha256(self.token.encode()).hexdigest(),
         )
         self.png_dir = Path("png") / self.run_uuid
@@ -75,6 +78,9 @@ class MachineEndpointTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_status_update_requires_matching_callback_token(self):
+        self.run.platform = ""
+        self.run.artifact_stem = ""
+        self.run.save(update_fields=["platform", "artifact_stem"])
         payload = json.dumps({"uuid": self.run_uuid, "status": "success"})
 
         self.assertEqual(
@@ -112,6 +118,28 @@ class MachineEndpointTests(TestCase):
             "failure",
         )
 
+    def test_dispatch_failure_signature_only_authorizes_failure_status(self):
+        signature = signing.dumps(
+            {"uuid": self.run_uuid},
+            salt=DISPATCH_FAILURE_SALT,
+        )
+
+        rejected = self.client.post(
+            f"/updategh?signature={signature}",
+            json.dumps({"uuid": self.run_uuid, "status": "success"}),
+            content_type="application/json",
+        )
+        accepted = self.client.post(
+            f"/updategh?signature={signature}",
+            json.dumps({"uuid": self.run_uuid, "status": "failure"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(rejected.status_code, 401)
+        self.assertEqual(accepted.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "failure")
+
     def test_status_callbacks_cannot_bypass_deferred_artifact_finalize(self):
         self.run.status = ARTIFACT_PENDING_STATUS
         self.run.save(update_fields=["status"])
@@ -128,6 +156,53 @@ class MachineEndpointTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.run.refresh_from_db()
                 self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
+    def test_terminal_statuses_absorb_late_callbacks(self):
+        for terminal_status in ("success", "failure", "dispatch_failed"):
+            for late_status in ("queued", "in_progress", "success", "failure"):
+                with self.subTest(terminal=terminal_status, late=late_status):
+                    GithubRun.objects.filter(pk=self.run.pk).update(status=terminal_status)
+                    response = self.client.post(
+                        "/updategh",
+                        json.dumps({"uuid": self.run_uuid, "status": late_status}),
+                        content_type="application/json",
+                        **self._bearer(),
+                    )
+
+                    self.assertEqual(response.status_code, 200)
+                    self.run.refresh_from_db()
+                    self.assertEqual(self.run.status, terminal_status)
+
+    def test_stale_success_callback_cannot_overwrite_pending_state(self):
+        stale_run = GithubRun.objects.get(pk=self.run.pk)
+        GithubRun.objects.filter(pk=self.run.pk).update(status=ARTIFACT_PENDING_STATUS)
+
+        with patch("rdgenerator.views._status_run", return_value=(stale_run, None)):
+            response = self.client.post(
+                "/updategh",
+                json.dumps({"uuid": self.run_uuid, "status": "success"}),
+                content_type="application/json",
+                **self._bearer(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
+    def test_windows_success_callback_cannot_bypass_finalize_before_pending(self):
+        self.run.status = "in_progress"
+        self.run.save(update_fields=["status"])
+
+        response = self.client.post(
+            "/updategh",
+            json.dumps({"uuid": self.run_uuid, "status": "success"}),
+            content_type="application/json",
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "in_progress")
 
     def test_finalize_cannot_resurrect_a_failed_run(self):
         self.run.status = "failure"
@@ -150,7 +225,53 @@ class MachineEndpointTests(TestCase):
         self.run.refresh_from_db()
         self.assertEqual(self.run.status, "failure")
 
+    def test_repeated_finalize_observes_a_concurrent_failure(self):
+        self.run.status = "success"
+        self.run.artifact_uploaded_at = timezone.now()
+        self.run.save(update_fields=["status", "artifact_uploaded_at"])
+        self.exe_dir.mkdir(parents=True, exist_ok=True)
+        (self.exe_dir / "client.exe").write_bytes(b"exe-data")
+        (self.exe_dir / "client.msi").write_bytes(b"msi-data")
+        GeneratedArtifact.objects.create(
+            run=self.run,
+            filename="client.exe",
+            size=len(b"exe-data"),
+            sha256=hashlib.sha256(b"exe-data").hexdigest(),
+        )
+        GeneratedArtifact.objects.create(
+            run=self.run,
+            filename="client.msi",
+            size=len(b"msi-data"),
+            sha256=hashlib.sha256(b"msi-data").hexdigest(),
+        )
+
+        original_filter = GithubRun.objects.filter
+
+        def filter_then_fail(*args, **kwargs):
+            if kwargs.get("pk") == self.run.pk and kwargs.get("status") == "success":
+                original_filter(pk=self.run.pk).update(status="failure")
+            return original_filter(*args, **kwargs)
+
+        with patch.object(GithubRun.objects, "filter", side_effect=filter_then_fail):
+            response = self.client.post(
+                "/finalize_custom_client",
+                json.dumps(
+                    {
+                        "uuid": self.run_uuid,
+                        "platform": "windows",
+                        "filename": "client",
+                    }
+                ),
+                content_type="application/json",
+                **self._bearer(),
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "failure")
+
     def test_upload_requires_token_and_saves_only_under_run_directory(self):
+        GithubRun.objects.filter(pk=self.run.pk).update(platform="", artifact_stem="")
         upload = SimpleUploadedFile("client.exe", b"client-data")
 
         self.assertEqual(
@@ -169,6 +290,249 @@ class MachineEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual((self.exe_dir / "client.exe").read_bytes(), b"client-data")
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "success")
+
+    def test_pending_windows_upload_cannot_skip_finalize(self):
+        self.run.status = ARTIFACT_PENDING_STATUS
+        self.run.save(update_fields=["status"])
+
+        for filename in ("client.exe", "client.msi"):
+            with self.subTest(filename=filename):
+                response = self.client.post(
+                    "/save_custom_client",
+                    {
+                        "uuid": self.run_uuid,
+                        "file": SimpleUploadedFile(filename, b"package-data"),
+                    },
+                    **self._bearer(),
+                )
+                self.assertEqual(response.status_code, 200)
+                self.run.refresh_from_db()
+                self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
+        retry_response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b"package-data"),
+            },
+            **self._bearer(),
+        )
+        self.assertEqual(retry_response.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+        self.assertEqual(self.run.artifact_file_count, 2)
+
+        finalize_response = self.client.post(
+            "/finalize_custom_client",
+            json.dumps(
+                {
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                    "filename": "client",
+                }
+            ),
+            content_type="application/json",
+            **self._bearer(),
+        )
+        self.assertEqual(finalize_response.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "success")
+        self.assertEqual(self.run.artifact_file_count, 2)
+
+    def test_dispatch_failure_cannot_be_revived_by_late_upload(self):
+        self.run.status = "dispatch_failed"
+        self.run.save(update_fields=["status"])
+
+        response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b"late-package"),
+            },
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "dispatch_failed")
+        self.assertFalse((self.exe_dir / "client.exe").exists())
+        self.assertIsNone(self.run.artifact_uploaded_at)
+        self.assertFalse(self.run.quota_counted)
+
+    def test_upload_does_not_overwrite_concurrent_failure(self):
+        original_filter = GithubRun.objects.filter
+        injected_failure = False
+
+        def filter_after_failure(*args, **kwargs):
+            nonlocal injected_failure
+            if kwargs.get("pk") == self.run.pk and not injected_failure:
+                injected_failure = True
+                original_filter(pk=self.run.pk).update(status="failure")
+            return original_filter(*args, **kwargs)
+
+        with patch.object(
+            GithubRun.objects,
+            "filter",
+            side_effect=filter_after_failure,
+        ):
+            response = self.client.post(
+                "/save_custom_client",
+                {
+                    "uuid": self.run_uuid,
+                    "file": SimpleUploadedFile("client.exe", b"package-data"),
+                },
+                **self._bearer(),
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "failure")
+        self.assertFalse((self.exe_dir / "client.exe").exists())
+        self.assertIsNone(self.run.artifact_uploaded_at)
+        self.assertFalse(self.run.quota_counted)
+
+    def test_different_same_name_retry_is_rejected_without_overwrite(self):
+        self.assertEqual(
+            self.client.post(
+                "/save_custom_client",
+                {
+                    "uuid": self.run_uuid,
+                    "file": SimpleUploadedFile("client.exe", b"original"),
+                },
+                **self._bearer(),
+            ).status_code,
+            200,
+        )
+
+        response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b"replacement"),
+            },
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual((self.exe_dir / "client.exe").read_bytes(), b"original")
+        self.assertFalse(list(self.exe_dir.glob(".upload-*.part")))
+
+    def test_windows_upload_rejects_filename_outside_persisted_contract(self):
+        response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("spoofed.exe", b"package-data"),
+            },
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse((self.exe_dir / "spoofed.exe").exists())
+        self.assertFalse(GeneratedArtifact.objects.filter(run=self.run).exists())
+
+    def test_zero_byte_retry_does_not_truncate_committed_artifact(self):
+        self.assertEqual(
+            self.client.post(
+                "/save_custom_client",
+                {
+                    "uuid": self.run_uuid,
+                    "file": SimpleUploadedFile("client.exe", b"original"),
+                },
+                **self._bearer(),
+            ).status_code,
+            200,
+        )
+
+        response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b""),
+            },
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((self.exe_dir / "client.exe").read_bytes(), b"original")
+        self.assertFalse(list(self.exe_dir.glob(".upload-*.part")))
+
+    def test_identical_retry_repairs_committed_disk_copy(self):
+        self.assertEqual(
+            self.client.post(
+                "/save_custom_client",
+                {
+                    "uuid": self.run_uuid,
+                    "file": SimpleUploadedFile("client.exe", b"original"),
+                },
+                **self._bearer(),
+            ).status_code,
+            200,
+        )
+        (self.exe_dir / "client.exe").write_bytes(b"corrupted")
+
+        response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b"original"),
+            },
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((self.exe_dir / "client.exe").read_bytes(), b"original")
+        self.assertFalse(list(self.exe_dir.glob(".upload-*.part")))
+
+    def test_staging_files_are_not_listed_or_downloadable(self):
+        self.exe_dir.mkdir(parents=True, exist_ok=True)
+        staging_file = self.exe_dir / ".upload-incomplete.part"
+        staging_file.write_bytes(b"partial-data")
+        self.run.status = "success"
+        self.run.save(update_fields=["status"])
+        self.client.force_login(self.run.owner)
+
+        generated_response = self.client.get(
+            "/check_for_file",
+            {
+                "filename": "client",
+                "uuid": self.run_uuid,
+                "platform": "windows",
+            },
+        )
+        download_response = self.client.get(
+            "/download",
+            {"filename": staging_file.name, "uuid": self.run_uuid},
+        )
+
+        self.assertNotContains(generated_response, staging_file.name)
+        self.assertEqual(download_response.status_code, 404)
+
+    def test_orphan_final_name_is_not_listed_for_contracted_run(self):
+        self.exe_dir.mkdir(parents=True, exist_ok=True)
+        orphan = self.exe_dir / "client.exe"
+        orphan.write_bytes(b"orphaned-before-db-commit")
+        self.run.status = "success"
+        self.run.save(update_fields=["status"])
+        self.client.force_login(self.run.owner)
+
+        generated_response = self.client.get(
+            "/check_for_file",
+            {
+                "filename": "client",
+                "uuid": self.run_uuid,
+                "platform": "windows",
+            },
+        )
+        download_response = self.client.get(
+            "/download",
+            {"filename": orphan.name, "uuid": self.run_uuid},
+        )
+
+        self.assertNotContains(generated_response, orphan.name)
+        self.assertEqual(download_response.status_code, 404)
 
     def test_deferred_windows_upload_waits_for_exe_and_msi_finalize(self):
         owner = self.run.owner
@@ -230,8 +594,8 @@ class MachineEndpointTests(TestCase):
             json.dumps(
                 {
                     "uuid": self.run_uuid,
-                    "platform": "windows",
-                    "filename": "client",
+                    "platform": "android",
+                    "filename": "spoofed",
                 }
             ),
             content_type="application/json",
@@ -289,7 +653,7 @@ class MachineEndpointTests(TestCase):
         self.run.refresh_from_db()
         self.assertEqual(self.run.status, ARTIFACT_INCOMPLETE_STATUS)
         self.assertTemplateUsed(response, "failure.html")
-        self.assertContains(response, "client.exe")
+        self.assertNotContains(response, "client.exe")
 
         second_response = self.client.get(
             "/check_for_file",
