@@ -123,9 +123,30 @@ class MachineEndpointTests(TestCase):
             **self._bearer(),
         )
 
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 200)
         self.run.refresh_from_db()
         self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
+    def test_finalize_cannot_resurrect_a_failed_run(self):
+        self.run.status = "failure"
+        self.run.save(update_fields=["status"])
+
+        response = self.client.post(
+            "/finalize_custom_client",
+            json.dumps(
+                {
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                    "filename": "client",
+                }
+            ),
+            content_type="application/json",
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "failure")
 
     def test_upload_requires_token_and_saves_only_under_run_directory(self):
         upload = SimpleUploadedFile("client.exe", b"client-data")

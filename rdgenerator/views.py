@@ -888,7 +888,10 @@ def update_github_run(request):
     if error:
         return error
     if mystatus == "success" and run.status == ARTIFACT_PENDING_STATUS:
-        return HttpResponse("Required artifacts are not finalized", status=409)
+        # The build can report its own success before the upload step has
+        # confirmed both Windows installers. Keep the callback successful so
+        # it cannot break the workflow, but leave finalization authoritative.
+        return HttpResponse("")
     run.status = mystatus
     run.save(update_fields=["status"])
     if mystatus in FAILED_TERMINAL_RUN_STATUSES and not run.artifact_uploaded_at:
@@ -1032,7 +1035,7 @@ def save_custom_client(request):
         mark_artifact_uploaded(run)
         if not defer_completion:
             run.status = "success"
-        elif run.status != "success":
+        elif run.status not in TERMINAL_RUN_STATUSES:
             run.status = ARTIFACT_PENDING_STATUS
     run.save(update_fields=["status"])
     return HttpResponse("File saved successfully!")
@@ -1049,6 +1052,8 @@ def finalize_custom_client(request):
     run, error = _machine_run(request, data.get("uuid"))
     if error:
         return error
+    if run.status not in {ARTIFACT_PENDING_STATUS, "success"}:
+        return HttpResponse("Run is not awaiting artifacts", status=409)
     if data.get("platform") != "windows":
         return HttpResponse("Unsupported platform", status=400)
 
