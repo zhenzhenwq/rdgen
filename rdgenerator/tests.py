@@ -141,6 +141,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         )
 
         self.assertTrue(dispatch_url.endswith("/actions/workflows/generator-windows.yml/dispatches"))
+        self.assertEqual(GithubRun.objects.get().status, "artifacts_pending")
         expected_true_flags = [
             "delayFix",
             "hideNetworkSetting",

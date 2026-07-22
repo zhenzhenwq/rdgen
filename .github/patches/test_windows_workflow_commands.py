@@ -30,6 +30,22 @@ class WindowsWorkflowCommandTests(unittest.TestCase):
                 self.assertIn("python remove_new_version_notif.py", step)
                 self.assertNotIn("wget ", step)
 
+    def test_windows_x64_requires_and_finalizes_both_installers(self):
+        for workflow_name in WINDOWS_WORKFLOWS:
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                msi_step = named_step(workflow, "Build msi")
+                rename_step = named_step(workflow, "rename rustdesk.msi to filename.msi")
+                upload_step = named_step(workflow, "send file to rdgen server")
+
+                self.assertNotIn("continue-on-error: true", msi_step)
+                self.assertNotIn("continue-on-error: true", rename_step)
+                self.assertIn('test -s "./SignOutput/${{ env.filename }}.exe"', upload_step)
+                self.assertIn('test -s "./SignOutput/${{ env.filename }}.msi"', upload_step)
+                self.assertEqual(upload_step.count('-F "defer_completion=true"'), 2)
+                self.assertIn("/finalize_custom_client", upload_step)
+                self.assertNotIn('if [[ -f "./SignOutput/${{ env.filename }}.msi" ]]', upload_step)
+
 
 if __name__ == "__main__":
     unittest.main()

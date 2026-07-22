@@ -13,7 +13,12 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from .models import GithubRun
-from .views import STATUS_UPDATE_SALT, ZIP_DOWNLOAD_SALT
+from .views import (
+    ARTIFACT_INCOMPLETE_STATUS,
+    ARTIFACT_PENDING_STATUS,
+    STATUS_UPDATE_SALT,
+    ZIP_DOWNLOAD_SALT,
+)
 
 
 class MachineEndpointTests(TestCase):
@@ -107,6 +112,21 @@ class MachineEndpointTests(TestCase):
             "failure",
         )
 
+    def test_success_status_cannot_bypass_deferred_artifact_finalize(self):
+        self.run.status = ARTIFACT_PENDING_STATUS
+        self.run.save(update_fields=["status"])
+
+        response = self.client.post(
+            "/updategh",
+            json.dumps({"uuid": self.run_uuid, "status": "success"}),
+            content_type="application/json",
+            **self._bearer(),
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
     def test_upload_requires_token_and_saves_only_under_run_directory(self):
         upload = SimpleUploadedFile("client.exe", b"client-data")
 
@@ -126,6 +146,139 @@ class MachineEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual((self.exe_dir / "client.exe").read_bytes(), b"client-data")
+
+    def test_deferred_windows_upload_waits_for_exe_and_msi_finalize(self):
+        owner = self.run.owner
+        self.client.force_login(owner)
+
+        exe_response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.exe", b"exe-data"),
+                "defer_completion": "true",
+            },
+            **self._bearer(),
+        )
+        self.run.refresh_from_db()
+
+        self.assertEqual(exe_response.status_code, 200)
+        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+        pending_response = self.client.get(
+            "/check_for_file",
+            {
+                "filename": "client",
+                "uuid": self.run_uuid,
+                "platform": "windows",
+            },
+        )
+        self.assertTemplateUsed(pending_response, "waiting.html")
+
+        early_finalize = self.client.post(
+            "/finalize_custom_client",
+            json.dumps(
+                {
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                    "filename": "client",
+                }
+            ),
+            content_type="application/json",
+            **self._bearer(),
+        )
+        self.assertEqual(early_finalize.status_code, 409)
+        self.assertEqual(early_finalize.json()["missing"], ["client.msi"])
+
+        msi_response = self.client.post(
+            "/save_custom_client",
+            {
+                "uuid": self.run_uuid,
+                "file": SimpleUploadedFile("client.msi", b"msi-data"),
+                "defer_completion": "true",
+            },
+            **self._bearer(),
+        )
+        self.assertEqual(msi_response.status_code, 200)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_PENDING_STATUS)
+
+        finalize_response = self.client.post(
+            "/finalize_custom_client",
+            json.dumps(
+                {
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                    "filename": "client",
+                }
+            ),
+            content_type="application/json",
+            **self._bearer(),
+        )
+        self.assertEqual(finalize_response.status_code, 200)
+        self.assertEqual(
+            finalize_response.json()["files"],
+            ["client.exe", "client.msi"],
+        )
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, "success")
+
+        generated_response = self.client.get(
+            "/check_for_file",
+            {
+                "filename": "client",
+                "uuid": self.run_uuid,
+                "platform": "windows",
+            },
+        )
+        self.assertTemplateUsed(generated_response, "generated.html")
+        self.assertContains(generated_response, "client.exe")
+        self.assertContains(generated_response, "client.msi")
+
+    def test_completed_github_run_without_finalize_is_not_reported_successful(self):
+        self.run.status = ARTIFACT_PENDING_STATUS
+        self.run.github_run_id = 123456
+        self.run.save(update_fields=["status", "github_run_id"])
+        (self.exe_dir / "client.exe").parent.mkdir(parents=True, exist_ok=True)
+        (self.exe_dir / "client.exe").write_bytes(b"exe-only")
+        self.client.force_login(self.run.owner)
+        github_response = type(
+            "GithubResponse",
+            (),
+            {
+                "status_code": 200,
+                "json": lambda self: {
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            },
+        )()
+
+        with patch("rdgenerator.views.requests.get", return_value=github_response):
+            response = self.client.get(
+                "/check_for_file",
+                {
+                    "filename": "client",
+                    "uuid": self.run_uuid,
+                    "platform": "windows",
+                },
+            )
+
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_INCOMPLETE_STATUS)
+        self.assertTemplateUsed(response, "failure.html")
+        self.assertContains(response, "client.exe")
+
+        second_response = self.client.get(
+            "/check_for_file",
+            {
+                "filename": "client",
+                "uuid": self.run_uuid,
+                "platform": "windows",
+            },
+        )
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.status, ARTIFACT_INCOMPLETE_STATUS)
+        self.assertTemplateUsed(second_response, "failure.html")
 
     def test_cleanup_requires_token_and_deletes_only_matching_archive(self):
         matching = self.temp_dir / f"secrets_{self.run_uuid}_build.zip"

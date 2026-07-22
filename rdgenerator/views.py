@@ -47,8 +47,11 @@ TERMINAL_RUN_STATUSES = {
     "timed_out",
     "skipped",
     "action_required",
+    "artifact_incomplete",
 }
 FAILED_TERMINAL_RUN_STATUSES = TERMINAL_RUN_STATUSES - {"success"}
+ARTIFACT_PENDING_STATUS = "artifacts_pending"
+ARTIFACT_INCOMPLETE_STATUS = "artifact_incomplete"
 VALID_ARTIFACT_SUFFIXES = (
     ".exe",
     ".msi",
@@ -688,7 +691,11 @@ def generator_view(request):
                         except ValueError as e:
                             print(f"GitHub dispatch returned non-JSON success body: {e}")
                     new_github_run.github_run_id = github_data.get('workflow_run_id')
-                    new_github_run.status = "in_progress"
+                    new_github_run.status = (
+                        ARTIFACT_PENDING_STATUS
+                        if platform == "windows"
+                        else "in_progress"
+                    )
                     new_github_run.save(update_fields=["github_run_id", "status"])
 
                     log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
@@ -731,7 +738,7 @@ def check_for_file(request):
     else:
         github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
 
-    if gh_run.github_run_id and current_status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
+    if gh_run.github_run_id and current_status not in TERMINAL_RUN_STATUSES:
         headers = {
             "Authorization": f"Bearer {_settings.GHBEARER}",
             "Accept": "application/vnd.github+json"
@@ -744,8 +751,13 @@ def check_for_file(request):
                 gh_data = gh_response.json()
                 
                 if gh_data['status'] == 'completed':
-                    gh_run.status = gh_data['conclusion']
-                    gh_run.save()
+                    conclusion = gh_data['conclusion']
+                    if conclusion == "success" and current_status == ARTIFACT_PENDING_STATUS:
+                        # A deferred workflow must explicitly confirm that every
+                        # required installer reached this server.
+                        conclusion = ARTIFACT_INCOMPLETE_STATUS
+                    gh_run.status = conclusion
+                    gh_run.save(update_fields=["status"])
                     current_status = (gh_run.status or '').lower()
         except Exception as e:
             print(f"Error checking GitHub: {e}")
@@ -764,7 +776,7 @@ def check_for_file(request):
             **_delivery_context(gh_run, files),
         })
         
-    elif current_status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
+    elif current_status in FAILED_TERMINAL_RUN_STATUSES:
         files = list_generated_files(run_uuid)
         return render(request, 'failure.html', {
             'log_url': github_log_url, 
@@ -875,6 +887,8 @@ def update_github_run(request):
     run, error = _status_run(request, myuuid)
     if error:
         return error
+    if mystatus == "success" and run.status == ARTIFACT_PENDING_STATUS:
+        return HttpResponse("Required artifacts are not finalized", status=409)
     run.status = mystatus
     run.save(update_fields=["status"])
     if mystatus in FAILED_TERMINAL_RUN_STATUSES and not run.artifact_uploaded_at:
@@ -993,6 +1007,12 @@ def save_custom_client(request):
     run, error = _machine_run(request, myuuid)
     if error:
         return error
+    defer_completion = str(
+        request.POST.get("defer_completion", "false")
+    ).strip().lower()
+    if defer_completion not in {"true", "false"}:
+        return HttpResponse("Invalid completion mode", status=400)
+    defer_completion = defer_completion == "true"
     filename = _safe_output_filename(file.name)
     output_root = (Path("exe") / run.uuid).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
@@ -1010,9 +1030,58 @@ def save_custom_client(request):
     )
     if is_valid_artifact:
         mark_artifact_uploaded(run)
-        run.status = "success"
+        if not defer_completion:
+            run.status = "success"
+        elif run.status != "success":
+            run.status = ARTIFACT_PENDING_STATUS
     run.save(update_fields=["status"])
     return HttpResponse("File saved successfully!")
+
+
+@csrf_exempt
+@require_POST
+def finalize_custom_client(request):
+    try:
+        data = json.loads(request.body or b"{}")
+    except (TypeError, ValueError):
+        return HttpResponse("Invalid JSON", status=400)
+
+    run, error = _machine_run(request, data.get("uuid"))
+    if error:
+        return error
+    if data.get("platform") != "windows":
+        return HttpResponse("Unsupported platform", status=400)
+
+    artifact_stem = str(data.get("filename") or "")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", artifact_stem):
+        return HttpResponse("Invalid artifact name", status=400)
+
+    expected_files = [f"{artifact_stem}.exe", f"{artifact_stem}.msi"]
+    output_root = (Path("exe") / run.uuid).resolve()
+    missing_files = []
+    for filename in expected_files:
+        file_path = (output_root / filename).resolve()
+        try:
+            file_path.relative_to(output_root)
+        except ValueError:
+            return HttpResponse("Invalid artifact path", status=400)
+        if not file_path.is_file() or not file_path.stat().st_size:
+            missing_files.append(filename)
+
+    if missing_files:
+        return JsonResponse(
+            {
+                "error": "Required artifacts are missing",
+                "missing": missing_files,
+            },
+            status=409,
+        )
+    if run.artifact_uploaded_at is None:
+        return HttpResponse("No valid artifact upload recorded", status=409)
+
+    run.status = "success"
+    run.save(update_fields=["status"])
+    return JsonResponse({"status": "success", "files": expected_files})
 
 @csrf_exempt
 @require_POST

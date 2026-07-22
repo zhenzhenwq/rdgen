@@ -612,7 +612,6 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build msi
-        continue-on-error: true
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           $myappname = "${{ env.appname }}" -replace '\s','_'
@@ -626,7 +625,6 @@ jobs:
           sha256sum ../../SignOutput/rustdesk.msi
 
       - name: zip exe and msi
-        continue-on-error: true
         shell: pwsh
         run: |
           Compress-Archive -Path ./SignOutput/*.exe, ./SignOutput/*.msi -DestinationPath ./SignOutput/unsigned_files.zip -CompressionLevel Fastest
@@ -659,7 +657,6 @@ jobs:
           }
 
       - name: unzip exe and msi
-        continue-on-error: true
         shell: pwsh
         run: |
           Expand-Archive -Path ./SignOutput/signed_files.zip -DestinationPath ./SignOutput/ -Force
@@ -671,9 +668,8 @@ jobs:
           mv ./SignOutput/rustdesk.exe "./SignOutput/${{ env.filename }}.exe" || echo "rustdesk"
 
       - name: rename rustdesk.msi to filename.msi
-        continue-on-error: true
         run: |
-          mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi" || echo "rustdesk"
+          mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi"
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
@@ -684,10 +680,11 @@ jobs:
           shell: bash
           command: |
             set -euo pipefail
-            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            if [[ -f "./SignOutput/${{ env.filename }}.msi" ]]; then
-              curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            fi
+            test -s "./SignOutput/${{ env.filename }}.exe"
+            test -s "./SignOutput/${{ env.filename }}.msi"
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" -F "defer_completion=true" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" -F "defer_completion=true" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail --connect-timeout 30 --max-time 300 --retry 3 --retry-delay 10 -i -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${{ env.token }}" --data '{"uuid":"${{ env.uuid }}","platform":"windows","filename":"${{ env.filename }}"}' ${{ secrets.GENURL }}/finalize_custom_client
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
