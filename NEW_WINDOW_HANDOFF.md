@@ -59,7 +59,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
-- Current application release: `7e3c9fd` (`Refresh generator UI and harden account management`, tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`). This is the application source deployed on the generator server.
+- Current deployed application release: `276fb0c016c64336b1b1845ebbb2d1ec9fdf5ce4` (`Keep password validation messages in Chinese`, tree `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`). It includes the account-entitlement release plus the relaxed minimum-six-character password policy and version-independent Chinese validation messages.
 - At deployment time the new local commits had not been pushed; `origin/master` still pointed to `d80c3e5`. Pushing `master` separately starts `docker-build.yml`.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
@@ -79,9 +79,9 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Screenshots: `output/playwright/resume-149-desktop.png` and `output/playwright/resume-149-mobile.png`.
 - `data/` and `output/` are ignored runtime directories and must not be committed.
 - Authentication and task security add Django sessions/CSRF, administrator-created accounts, strict per-user task ownership, callback bearer tokens, signed expiring downloads, and POST-only logout. Public registration is intentionally absent.
-- Django `5.2.16`: 73 tests pass. The candidate image passed the same suite, production security check, migration-drift check, and a migration rehearsal against an online copy of the production database.
+- Django `5.2.16`: 99 tests pass. The candidate image passed the same suite, password-policy runtime assertions, production security check, migration-drift check, and a rehearsal against an online copy of the production database.
 - Desktop, 768px tablet, and 390px mobile layouts passed Playwright checks across Windows, Windows x86, Android, standard/custom Linux, and macOS visibility states. Imported PNG previews now use strict base64 validation plus DOM node creation; a malicious JSON import was verified not to execute while valid PNG previews still render.
-- The live generator was deployed from tree `c35ec1d2bf48fe05b13946ba645600ff6310fc1b`. Anonymous generator access redirects to `/login/`; authenticated generator, `/users/`, and delete-confirmation rendering were verified without submitting the generator form or deleting an account.
+- The live generator was deployed from tree `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`. Anonymous generator access redirects to `/login/`; authenticated generator, `/users/`, creation, reset, personal password-change, and delete-confirmation rendering were verified without submitting the generator form or deleting an account.
 
 Important Linux/Flatpak boundaries:
 
@@ -94,18 +94,18 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `80f255ac1bddd5a71401afa4fcd80594297fff0d`; application tree: `fab056c083c4714dbfc37389e14926c61232e3a4`.
-- Deployment ID: `20260722-103341-80f255ac1bdd`.
-- Source archive SHA-256: `8f07129d6e1c3cce0300cddffe10bafccddfff7a520d73f95d0d498b2df63c52`.
-- Live image: `sha256:523119eb6245e22b365e39a210a5c9632ba887fa9ae6095e5a2040ab60764765`.
-- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints.
+- Application source commit: `276fb0c016c64336b1b1845ebbb2d1ec9fdf5ce4`; application tree: `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`.
+- Deployment ID: `20260722-110755-276fb0c016c6`.
+- Source archive SHA-256: `c690078b033bb60c4141a32170d4e755d4668186a2e87dbde53bf24fb00c061d`.
+- Live image: `sha256:934bc6a9342d3d93d1b36cdbf2142ad22047de8c84bc26e44b9fc99a4108e66c`.
+- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
-- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0004`-`0006` are applied, and SQLite `quick_check` passed with 2 users, 2 entitlement rows, and all 26 task rows retained.
+- Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0004`-`0006` are applied, and SQLite `quick_check` passed with 3 users, 3 entitlement rows, and all 27 task rows retained.
 - Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
 - `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
-- Root-only rollback material is under `/opt/rdgen-backups/20260722-103341-80f255ac1bdd`, `/opt/rdgen-previous-20260722-103341-80f255ac1bdd`, and `rdgen-rollback:20260722-103341-80f255ac1bdd`. The 2026-07-21 and both earlier 2026-07-15 rollback sets remain present.
-- One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`; no active client workflow was running during the switch.
+- Root-only rollback material is under `/opt/rdgen-backups/20260722-110755-276fb0c016c6`, `/opt/rdgen-previous-20260722-110755-276fb0c016c6`, and `rdgen-rollback:20260722-110755-276fb0c016c6`. The preceding `20260722-103341-80f255ac1bdd` set and earlier rollback sets remain present.
+- One legacy database row still says `in_progress`, but its GitHub Actions run `28490195929` is already `completed/cancelled`. User run `29886880669` completed successfully with two uploaded installers before the switch; no active client workflow remained.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
 
 ## Not Yet Verified

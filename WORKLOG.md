@@ -745,3 +745,14 @@ User constraint recorded:
 - Installed `/etc/cron.d/rdgen-cleanup` with hourly `flock` protection. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no generated installer and no quota reservation; a follow-up dry-run reported zero pending removals.
 - Current rollback material is `/opt/rdgen-backups/20260722-103341-80f255ac1bdd`, `/opt/rdgen-previous-20260722-103341-80f255ac1bdd`, and image tag `rdgen-rollback:20260722-103341-80f255ac1bdd`.
 - No live generator form was submitted and no GitHub client workflow was dispatched during deployment. The single legacy `in_progress` database row still maps to a GitHub run already completed as cancelled.
+
+### Relaxed Password Policy And Chinese Validation
+
+- Replaced Django's similarity, common-password, and numeric-password restrictions with one minimum-length rule of 6 characters. Six-digit numeric passwords, common combinations, and passwords matching the username are accepted; five-character passwords remain rejected.
+- Set the Django language to Simplified Chinese and added a project-owned minimum-length validator so creation, administrator reset, and personal password-change guidance/errors stay Chinese under the production Django `5.2.16` runtime.
+- Added regression coverage for all three password paths, the relaxed cases, the 5/6-character boundary, Chinese help, and Chinese mismatch errors. Local and candidate-image suites pass 99/99 tests with no migration drift.
+- The first isolated candidate correctly caught that Django `5.2.16` left the short-password error in English; that candidate never reached production. Commit `276fb0c016c64336b1b1845ebbb2d1ec9fdf5ce4` (tree `cf337c395443d4fb9d28fba4dd2a4a8d9883d125`) adds the version-independent Chinese validator.
+- Deployed source archive SHA-256 `c690078b033bb60c4141a32170d4e755d4668186a2e87dbde53bf24fb00c061d` under ID `20260722-110755-276fb0c016c6`; live image is `sha256:934bc6a9342d3d93d1b36cdbf2142ad22047de8c84bc26e44b9fc99a4108e66c`.
+- Deployment waited for user build run `29886880669` to finish. Its two installers (49,280,160 bytes total) uploaded successfully and its quota reservation settled before the container switch.
+- Production verification passed for HTTPS, authenticated password pages, explicit Chinese validation, SQLite integrity, persistent inode preservation, clean logs, container health, and zero restarts. The live database retained 3 users, 3 entitlement rows, and 27 tasks.
+- Current rollback material is `/opt/rdgen-backups/20260722-110755-276fb0c016c6`, `/opt/rdgen-previous-20260722-110755-276fb0c016c6`, and image tag `rdgen-rollback:20260722-110755-276fb0c016c6`.
