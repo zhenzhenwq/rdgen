@@ -12,6 +12,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import ManagedSetPasswordForm, ManagedUserCreationForm, ManagedUserEditForm
+from .models import UserEntitlement
 
 
 User = get_user_model()
@@ -46,6 +47,19 @@ def user_list(request):
     users = User.objects.order_by("username")
     if not request.user.is_superuser:
         users = users.filter(Q(is_staff=False) | Q(pk=request.user.pk))
+    users = list(users.select_related("entitlement"))
+    missing_entitlements = [
+        UserEntitlement(user_id=user.pk)
+        for user in users
+        if not hasattr(user, "entitlement")
+    ]
+    if missing_entitlements:
+        UserEntitlement.objects.bulk_create(missing_entitlements, ignore_conflicts=True)
+        users = list(
+            User.objects.filter(pk__in=[user.pk for user in users])
+            .order_by("username")
+            .select_related("entitlement")
+        )
     return render(request, "users/user_list.html", {"users": users})
 
 

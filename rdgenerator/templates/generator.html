@@ -734,6 +734,23 @@
         .workspace-page .form-link:hover { color: #1746ac; text-decoration: underline; }
         .workspace-page .capability-note { display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; border: 1px solid #c9d9f6; border-radius: 6px; background: #f3f7ff; color: #425b85; font-size: 12px; line-height: 1.55; }
         .workspace-page .capability-note i { margin-top: 3px; color: #3277f6; }
+        .workspace-page .delivery-card { padding: 16px; border: 1px solid #dce5f0; border-radius: 8px; background: #f8faff; }
+        .workspace-page .delivery-card + .delivery-card { margin-top: 12px; }
+        .workspace-page .delivery-card__title { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; color: #26354d; font-size: 13px; font-weight: 800; }
+        .workspace-page .delivery-card__title i { color: #3277f6; }
+        .workspace-page .delivery-card__hint { margin: 0 0 13px; color: #7d8aa1; font-size: 11px; line-height: 1.55; }
+        .workspace-page .delivery-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+        .workspace-page .delivery-option { display: flex; align-items: flex-start; gap: 9px; min-height: 60px; margin: 0; padding: 10px 11px; border: 1px solid #dce5f0; border-radius: 7px; background: #fff; color: #526079; cursor: pointer; }
+        .workspace-page .delivery-option:has(input:checked) { border-color: #8eb5ff; background: #edf3ff; color: #1d56d8; }
+        .workspace-page .delivery-option input { margin-top: 3px; flex: 0 0 auto; }
+        .workspace-page .delivery-option strong { display: block; margin-bottom: 2px; color: inherit; font-size: 12px; }
+        .workspace-page .delivery-option small { display: block; color: #7d8aa1; font-size: 10px; font-weight: 600; line-height: 1.45; }
+        .workspace-page .delivery-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.2fr); align-items: center; gap: 12px; margin-top: 13px; }
+        .workspace-page .delivery-field label { margin: 0; color: #526079; font-size: 12px; font-weight: 800; }
+        .workspace-page .delivery-field select { margin: 0; }
+        .workspace-page .delivery-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 13px; padding: 10px 11px; border: 1px solid #c9d9f6; border-radius: 7px; background: #f3f7ff; color: #425b85; font-size: 11px; line-height: 1.55; }
+        .workspace-page .delivery-note i { margin-top: 3px; color: #3277f6; }
+        @media (max-width: 640px) { .workspace-page .delivery-options, .workspace-page .delivery-field { grid-template-columns: 1fr; } }
         .workspace-page #id_direction { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin: 0; padding: 0; }
         .workspace-page #id_direction > div label { display: flex; align-items: center; min-height: 40px; margin: 0; padding: 8px 10px; border: 1px solid #e2e8f2; border-radius: 6px; background: #f8faff; }
         .workspace-page label { color: #526079; font-size: 12px; font-weight: 700; }
@@ -829,6 +846,7 @@
                     <a href="#build-brand" data-section-link><i class="fas fa-paint-brush" aria-hidden="true"></i> 品牌</a>
                     <a href="#build-permissions" data-section-link><i class="fas fa-lock" aria-hidden="true"></i> 权限</a>
                     <a href="#build-advanced" data-section-link><i class="fas fa-code" aria-hidden="true"></i> 高级</a>
+                    <a href="#build-delivery" data-section-link><i class="fas fa-share-nodes" aria-hidden="true"></i> 交付</a>
                 </div>
                 <div class="builder-nav__tools">
                     <button type="button" onclick="saveFormData()" title="保存配置" aria-label="保存配置"><i class="fas fa-download" aria-hidden="true"></i><span>保存</span></button>
@@ -1149,9 +1167,41 @@
                     </div>
                 </section>
 
+                <section id="build-delivery" class="builder-section">
+                    <header class="builder-section__header">
+                        <span class="builder-section__index">07</span>
+                        <h2>交付</h2>
+                    </header>
+                    <div class="builder-section__content">
+                        <div class="delivery-card">
+                            <h3 class="delivery-card__title"><i class="fas fa-link" aria-hidden="true"></i> 下载权限</h3>
+                            <p class="delivery-card__hint">每次生成单独设置。链接只允许访问本次生成的安装包，不会改变客户端中的更新下载地址。</p>
+                            <div class="delivery-options" role="radiogroup" aria-label="下载权限">
+                                <label class="delivery-option" for="deliveryAccessLogin">
+                                    <input id="deliveryAccessLogin" type="radio" name="download_access" value="login"{% if form.download_access.value == 'login' or not form.download_access.value %} checked{% endif %}>
+                                    <span><strong>登录后下载</strong><small>仅生成者与管理员可以打开链接</small></span>
+                                </label>
+                                <label class="delivery-option" for="deliveryAccessPublic">
+                                    <input id="deliveryAccessPublic" type="radio" name="download_access" value="public"{% if form.download_access.value == 'public' %} checked{% endif %}>
+                                    <span><strong>无需登录</strong><small>拿到链接即可下载，直到链接过期</small></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="delivery-card">
+                            <h3 class="delivery-card__title"><i class="fas fa-clock" aria-hidden="true"></i> 链接有效期</h3>
+                            <p class="delivery-card__hint">从第一个安装包上传成功开始计时，服务器上的安装包最多保留 7 天。</p>
+                            <div class="delivery-field">
+                                <label for="{{ form.download_ttl_hours.id_for_label }}">保存时间</label>
+                                {{ form.download_ttl_hours }}
+                            </div>
+                            <div class="delivery-note"><i class="fas fa-shield-halved" aria-hidden="true"></i><span>可选 1 小时、1 天、3 天或 7 天。链接过期后不能继续下载，清理任务会移除服务器文件。</span></div>
+                        </div>
+                    </div>
+                </section>
+
                 <div class="platform action-bar">
                     <div class="section form-actions">
-                        <span id="buildSummary" class="build-summary">Windows 64 位 · 1.4.9</span>
+                        <span id="buildSummary" class="build-summary">Windows 64 位 · 1.4.9 · 登录后下载 · 保存 7 天</span>
                         <button type="submit"><i class="fas fa-rocket" aria-hidden="true"></i> 生成自定义客户端</button>
                     </div>
                 </div>
@@ -1215,6 +1265,8 @@
             ['macos', 'macOS'],
         ]);
         const exenameInput = document.getElementById("{{ form.exename.id_for_label }}");
+        const deliveryAccessInputs = Array.from(document.querySelectorAll('input[name="download_access"]'));
+        const deliveryTtlSelect = document.getElementById("{{ form.download_ttl_hours.id_for_label }}");
 
         function syncSectionNavigation() {
             sectionLinks.forEach(link => {
@@ -1236,8 +1288,20 @@
             if (exenameInput?.value.trim()) {
                 parts.push(exenameInput.value.trim());
             }
+            const access = deliveryAccessInputs.find(input => input.checked)?.value;
+            if (access) {
+                parts.push(access === 'public' ? '无需登录下载' : '登录后下载');
+            }
+            const ttl = deliveryTtlSelect?.value;
+            if (ttl) {
+                const ttlLabels = {'1': '1 小时', '24': '1 天', '72': '3 天', '168': '7 天'};
+                parts.push(`保存 ${ttlLabels[ttl] || `${ttl} 小时`}`);
+            }
             document.getElementById('buildSummary').textContent = parts.join(' · ');
         }
+
+        deliveryAccessInputs.forEach(input => input.addEventListener('change', updateBuildSummary));
+        deliveryTtlSelect?.addEventListener('change', updateBuildSummary);
 
         function focusFirstFormError() {
             const errorFields = Array.from(document.querySelectorAll('[data-error-field]'));
@@ -1476,6 +1540,7 @@
             updateHideCmDefaultVisibility(this.checked);
         });
         syncPlatformIconState();
+        updateBuildSummary();
         updateDesktopBehaviorVisibility();
         focusFirstFormError();
         document.getElementById("{{ form.iconfile.id_for_label }}").addEventListener('change', function(event) {
@@ -1760,6 +1825,7 @@
                             }
                             syncPlatformIconState();
                             updateDesktopBehaviorVisibility();
+                            updateBuildSummary();
                         } catch (error) {
                             alert("配置导入失败：JSON 文件无效。");
                         }

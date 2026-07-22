@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="pageTitle">正在生成客户端</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --page: #f5f9ff;
@@ -110,6 +111,10 @@
         .log-link:hover {
             text-decoration: underline;
         }
+        .delivery-summary { display: grid; gap: 8px; max-width: 360px; margin: 18px auto 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.88); text-align: left; }
+        .delivery-summary__title { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 12px; font-weight: 800; }
+        .delivery-summary__title i { color: var(--blue); }
+        .delivery-summary__copy { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
     </style>
 </head>
 <body>
@@ -190,6 +195,10 @@
                 查看 GitHub Actions 日志
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
             </a>
+        </div>
+        <div class="delivery-summary">
+            <div class="delivery-summary__title"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i> 下载交付设置</div>
+            <p class="delivery-summary__copy">{% if download_access == 'public' %}无需登录即可下载{% else %}登录后下载（生成者和管理员）{% endif %} · 首个安装包上传后保存 {% if download_ttl_hours == 1 %}1 小时{% elif download_ttl_hours == 24 %}1 天{% elif download_ttl_hours == 72 %}3 天{% else %}7 天{% endif %}，服务器文件最长保留 7 天。</p>
         </div>
     </div>
 

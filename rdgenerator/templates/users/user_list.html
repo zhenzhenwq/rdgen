@@ -21,6 +21,7 @@
                 <th scope="col">联系信息</th>
                 <th scope="col">角色</th>
                 <th scope="col">状态</th>
+                <th scope="col">生成额度</th>
                 <th scope="col">最近登录</th>
                 <th scope="col">创建时间</th>
                 <th scope="col">操作</th>
@@ -38,6 +39,19 @@
                     <td data-label="联系信息">{% if managed_user.email %}{{ managed_user.email }}{% else %}<span class="user-cell__meta">未填写</span>{% endif %}</td>
                     <td data-label="角色"><span class="role-badge">{% if managed_user.is_superuser %}超级管理员{% elif managed_user.is_staff %}管理员{% else %}普通用户{% endif %}</span></td>
                     <td data-label="状态"><span class="status{% if not managed_user.is_active %} status--off{% endif %}">{% if managed_user.is_active %}正常{% else %}已停用{% endif %}</span></td>
+                    <td data-label="生成额度">
+                        {% with entitlement=managed_user.entitlement %}
+                            {% if entitlement.expiration_mode == 'count' %}
+                                <span class="role-badge"><i class="fa-solid fa-box" aria-hidden="true"></i> {{ entitlement.generations_used }}/{{ entitlement.generation_limit }}</span>
+                                {% if entitlement.reserved_generations %}<span class="user-cell__meta">已预留 {{ entitlement.reserved_generations }}</span>{% endif %}
+                            {% elif entitlement.expires_at %}
+                                <span class="user-cell__meta">有效至 {{ entitlement.expires_at|date:"Y-m-d H:i" }}</span>
+                            {% else %}
+                                <span class="role-badge"><i class="fa-solid fa-infinity" aria-hidden="true"></i> 永久</span>
+                            {% endif %}
+                            {% if entitlement.is_expired %}<span class="status status--off">已到期</span>{% endif %}
+                        {% endwith %}
+                    </td>
                     <td data-label="最近登录">{{ managed_user.last_login|date:"Y-m-d H:i"|default:"-" }}</td>
                     <td data-label="创建时间">{{ managed_user.date_joined|date:"Y-m-d H:i" }}</td>
                     <td data-label="操作">
@@ -59,7 +73,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7"><span class="user-cell__meta">暂无账号。</span></td></tr>
+                <tr><td colspan="8"><span class="user-cell__meta">暂无账号。</span></td></tr>
             {% endfor %}
         </tbody>
     </table>

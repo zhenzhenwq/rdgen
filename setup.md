@@ -32,6 +32,28 @@
   * REPONAME="rdgen" *optional - defaults to "rdgen", change this if you renamed the repo when you forked it
 5. Now just run ```docker compose up -d```
 
+### Retaining generated packages for at most seven days
+
+Generated packages are stored in the mounted `exe/` directory. The application
+does not run a scheduler inside Gunicorn, so invoke the cleanup command from
+the host once per hour (the command is idempotent and keeps task records in
+SQLite):
+
+```cron
+0 * * * * cd /opt/rdgen && docker compose exec -T rdgen python manage.py purge_generated_files >> /var/log/rdgen-cleanup.log 2>&1
+```
+
+For a manually hosted installation, use the same command through the virtual
+environment:
+
+```cron
+0 * * * * cd /opt/rdgen && /opt/rdgen/.venv/bin/python manage.py purge_generated_files >> /var/log/rdgen-cleanup.log 2>&1
+```
+
+The command removes generated `exe/` and `png/` task directories after their
+seven-day artifact window, and removes stale files in `temp_zips/`. Use
+`--dry-run` to inspect what would be deleted before enabling the schedule.
+
 
 ## Use a self hosted github runner for faster client generation (Windows only right now)
 

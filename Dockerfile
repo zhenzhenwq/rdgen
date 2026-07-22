@@ -5,7 +5,7 @@ ARG PIP_TRUSTED_HOST=
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache su-exec tzdata
 RUN adduser -D user
 
 WORKDIR /opt/rdgen

@@ -1,8 +1,11 @@
 import io
 import hashlib
+import hmac
+import mimetypes
 from datetime import timedelta
 from pathlib import Path
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
 from django.http import Http404, HttpResponse, JsonResponse
@@ -19,9 +22,16 @@ import base64
 import json
 import uuid
 import pyzipper
+from urllib.parse import urlencode
 from django.conf import settings as _settings
 from .forms import GenerateForm
-from .models import GithubRun
+from .models import (
+    create_github_run_with_reservation,
+    GenerationQuotaExceeded,
+    GithubRun,
+    mark_artifact_uploaded,
+    release_generation_reservation,
+)
 from PIL import Image
 
 
@@ -30,6 +40,26 @@ ZIP_DOWNLOAD_SALT = "rdgenerator.get_zip"
 STATUS_UPDATE_MAX_AGE = 24 * 60 * 60
 STATUS_UPDATE_SALT = "rdgenerator.update_status"
 CALLBACK_TOKEN_MAX_AGE = timedelta(hours=24)
+TERMINAL_RUN_STATUSES = {
+    "success",
+    "failure",
+    "cancelled",
+    "timed_out",
+    "skipped",
+    "action_required",
+}
+FAILED_TERMINAL_RUN_STATUSES = TERMINAL_RUN_STATUSES - {"success"}
+VALID_ARTIFACT_SUFFIXES = (
+    ".exe",
+    ".msi",
+    ".apk",
+    ".deb",
+    ".rpm",
+    ".appimage",
+    ".flatpak",
+    ".dmg",
+    ".pkg.tar.zst",
+)
 
 
 def _canonical_run_uuid(value):
@@ -62,6 +92,30 @@ def _safe_output_filename(value):
 
 def _callback_token_hash(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def download_token_for_run(run_uuid):
+    """Return a deterministic per-run share token without storing plaintext."""
+    return hmac.new(
+        str(_settings.SECRET_KEY).encode("utf-8"),
+        str(run_uuid).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _valid_artifact_filename(filename, platform=None):
+    platform_suffixes = {
+        "windows": (".exe", ".msi"),
+        "windows-x86": (".exe",),
+        "android": (".apk",),
+        "macos": (".dmg",),
+        "linux": (".deb", ".rpm", ".appimage", ".flatpak", ".pkg.tar.zst"),
+    }
+    allowed_suffixes = platform_suffixes.get(platform, VALID_ARTIFACT_SUFFIXES)
+    return bool(
+        filename
+        and filename.lower().endswith(allowed_suffixes)
+    )
 
 
 def _request_token(request):
@@ -152,6 +206,36 @@ def list_generated_files(run_uuid):
         next((idx for idx, suffix in enumerate(android_order) if name.endswith(suffix)), len(android_order)),
         name.lower(),
     ))
+
+
+def _download_links(run, files):
+    """Build task-scoped links without exposing a token for login-only files."""
+    expires_at = run.download_expires_at
+    token = download_token_for_run(run.uuid) if run.download_token_hash else ""
+    links = []
+    for filename in files:
+        params = {"filename": filename, "uuid": run.uuid}
+        if run.download_access == "public" and token:
+            params["token"] = token
+        links.append(
+            {
+                "filename": filename,
+                "url": f"/download?{urlencode(params)}",
+                "requires_login": run.download_access != "public",
+                "expires_at": expires_at,
+            }
+        )
+    return links
+
+
+def _delivery_context(run, files):
+    return {
+        "files": files,
+        "download_links": _download_links(run, files),
+        "download_access": run.download_access,
+        "download_ttl_hours": run.download_ttl_hours,
+        "download_expires_at": run.download_expires_at,
+    }
 
 @login_required
 def generator_view(request):
@@ -528,19 +612,19 @@ def generator_view(request):
             }
 
             Path("temp_zips").mkdir(parents=True, exist_ok=True)
-            temp_json_path = os.path.join("temp_zips", f"data_{uuid.uuid4()}.json")
             zip_filename = f"secrets_{myuuid}_{uuid.uuid4()}.zip"
             zip_path = os.path.join("temp_zips", zip_filename)
 
-            with open(temp_json_path, "w", encoding="utf-8") as f:
-                json.dump(inputs_raw, f)
-
-            with pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zf:
+            # Write the JSON directly into the encrypted archive. This avoids
+            # a plaintext secret file and Windows file-lock races in cleanup.
+            with pyzipper.AESZipFile(
+                zip_path,
+                "w",
+                compression=pyzipper.ZIP_LZMA,
+                encryption=pyzipper.WZ_AES,
+            ) as zf:
                 zf.setpassword(_settings.ZIP_PASSWORD.encode())
-                zf.write(temp_json_path, arcname="secrets.json")
-
-            if os.path.exists(temp_json_path):
-                os.remove(temp_json_path)
+                zf.writestr("secrets.json", json.dumps(inputs_raw).encode("utf-8"))
 
             zipJson = {}
             zipJson['url'] = full_url
@@ -567,12 +651,31 @@ def generator_view(request):
                 'Authorization': 'Bearer '+_settings.GHBEARER,
                 'X-GitHub-Api-Version': '2026-03-10'
             }
-            new_github_run = GithubRun(
-                uuid=myuuid,
-                status="Starting generator...please wait",
-                owner=request.user,
-                callback_token_hash=_callback_token_hash(callback_token),
+            download_access = form.cleaned_data.get("download_access") or "login"
+            download_ttl_hours = min(
+                max(int(form.cleaned_data.get("download_ttl_hours") or 168), 1),
+                168,
             )
+            download_token = download_token_for_run(myuuid)
+            try:
+                new_github_run = create_github_run_with_reservation(
+                    request.user,
+                    uuid=myuuid,
+                    status="Starting generator...please wait",
+                    callback_token_hash=_callback_token_hash(callback_token),
+                    download_access=download_access,
+                    download_ttl_hours=download_ttl_hours,
+                    download_token_hash=_callback_token_hash(download_token),
+                )
+            except GenerationQuotaExceeded:
+                # The form has already been normalized and temporary files
+                # may exist; do not dispatch a workflow when the entitlement
+                # is exhausted or expired.
+                form.add_error(None, "当前账号的生成额度已用尽或已过期，无法开始新的生成任务。")
+                return render(request, "generator.html", {"form": form})
+
+            # Persist the run before dispatch so any rejected/failed request
+            # can release a count reservation atomically.
             try:
                 response = requests.post(url, json=data, headers=headers)
                 print(response)
@@ -586,15 +689,28 @@ def generator_view(request):
                             print(f"GitHub dispatch returned non-JSON success body: {e}")
                     new_github_run.github_run_id = github_data.get('workflow_run_id')
                     new_github_run.status = "in_progress"
-                    new_github_run.save()
+                    new_github_run.save(update_fields=["github_run_id", "status"])
 
                     log_url = github_data.get('html_url') or f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
-                    return render(request, 'waiting.html', {'filename':filename, 'uuid':myuuid, 'status':"Starting generator...please wait", 'platform':platform, 'log_url': log_url})
+                    return render(request, 'waiting.html', {
+                        'filename': filename,
+                        'uuid': myuuid,
+                        'status': "Starting generator...please wait",
+                        'platform': platform,
+                        'log_url': log_url,
+                        'download_access': download_access,
+                        'download_ttl_hours': download_ttl_hours,
+                        'download_token': download_token,
+                    })
                 else:
-                    #new_github_run.delete()
+                    release_generation_reservation(new_github_run)
+                    new_github_run.status = "dispatch_failed"
+                    new_github_run.save(update_fields=["status"])
                     return JsonResponse({"error": "GitHub rejected the start request", "details": response.text}, status=500)
             except Exception as e:
-                #new_github_run.delete()
+                release_generation_reservation(new_github_run)
+                new_github_run.status = "dispatch_failed"
+                new_github_run.save(update_fields=["status"])
                 return JsonResponse({"error": f"Connection error: {str(e)}"}, status=500)
     else:
         form = GenerateForm()
@@ -633,23 +749,30 @@ def check_for_file(request):
                     current_status = (gh_run.status or '').lower()
         except Exception as e:
             print(f"Error checking GitHub: {e}")
+
+    if current_status in FAILED_TERMINAL_RUN_STATUSES and not gh_run.artifact_uploaded_at:
+        # A failed/cancelled workflow must not hold a reserved count forever.
+        release_generation_reservation(gh_run)
+        gh_run.refresh_from_db()
     
     if current_status == "success":
+        files = list_generated_files(run_uuid)
         return render(request, 'generated.html', {
             'filename': filename, 
             'uuid': run_uuid,
             'platform': platform,
-            'files': list_generated_files(run_uuid)
+            **_delivery_context(gh_run, files),
         })
         
     elif current_status in ['failure', 'cancelled', 'timed_out', 'skipped', 'action_required']:
+        files = list_generated_files(run_uuid)
         return render(request, 'failure.html', {
             'log_url': github_log_url, 
             'filename': filename, 
             'uuid': run_uuid,
             'platform': platform,
             'status': gh_run.status,
-            'files': list_generated_files(run_uuid)
+            **_delivery_context(gh_run, files),
         })
         
     else:
@@ -658,20 +781,56 @@ def check_for_file(request):
             'uuid': run_uuid,
             'status': gh_run.status, 
             'platform': platform, 
-            'log_url': github_log_url
+            'log_url': github_log_url,
+            'download_access': gh_run.download_access,
+            'download_ttl_hours': gh_run.download_ttl_hours,
         })
 
-@login_required
 @require_GET
 def download(request):
     filename = _safe_output_filename(request.GET.get('filename'))
-    run_uuid = request.GET.get('uuid')
-    _user_run_or_404(request, run_uuid)
+    run_uuid = _canonical_run_uuid(request.GET.get('uuid'))
+    run = get_object_or_404(GithubRun, uuid=run_uuid)
+
+    # A public link is authorized solely by its per-run token. The token is
+    # deterministic so result pages can reconstruct it, while only its hash is
+    # persisted for request-time verification.
+    supplied_token = (request.GET.get("token") or "").strip()
+    if run.download_access == "public" and run.download_token_hash:
+        expected_hash = run.download_token_hash
+        if not supplied_token or not secrets.compare_digest(
+            _callback_token_hash(supplied_token),
+            expected_hash,
+        ):
+            raise Http404("Download link not found")
+    elif run.download_access == "public":
+        # Legacy public rows cannot be safely shared because they have no
+        # persisted token.  Treat them as unavailable rather than falling back
+        # to UUID-only access.
+        raise Http404("Download link not found")
+    else:
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        if run.owner_id != request.user.pk and not (
+            request.user.is_staff or request.user.is_superuser
+        ):
+            raise Http404("Download link not found")
+
+    now = timezone.now()
+    if run.download_expires_at and now >= run.download_expires_at:
+        return HttpResponse("Download link expired", status=410)
+    artifact_expires_at = run.artifact_expires_at or (
+        run.created_at + timedelta(days=7)
+    )
+    if now >= artifact_expires_at:
+        return HttpResponse("Generated file expired", status=410)
+
     file_path = _generated_file_or_404(run_uuid, filename)
     with open(file_path, 'rb') as file:
         content = file.read()
+    content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
     response = HttpResponse(content, headers={
-        'Content-Type': 'application/vnd.microsoft.portable-executable',
+        'Content-Type': content_type,
         'Content-Disposition': f'attachment; filename="{filename}"'
     })
     return response
@@ -718,6 +877,8 @@ def update_github_run(request):
         return error
     run.status = mystatus
     run.save(update_fields=["status"])
+    if mystatus in FAILED_TERMINAL_RUN_STATUSES and not run.artifact_uploaded_at:
+        release_generation_reservation(run)
     return HttpResponse("")
 
 def resize_and_encode_icon(imagefile):
@@ -844,7 +1005,12 @@ def save_custom_client(request):
         for chunk in file.chunks():
             f.write(chunk)
 
-    run.status = "success"
+    is_valid_artifact = bool(
+        file_save_path.stat().st_size and _valid_artifact_filename(filename)
+    )
+    if is_valid_artifact:
+        mark_artifact_uploaded(run)
+        run.status = "success"
     run.save(update_fields=["status"])
     return HttpResponse("File saved successfully!")
 

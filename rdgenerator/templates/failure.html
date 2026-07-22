@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="pageTitle">客户端生成失败</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --surface: #ffffff;
@@ -24,7 +25,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
+            height: auto;
+            padding: 40px 16px;
             margin: 0;
             text-align: center;
             background:
@@ -72,10 +75,19 @@
             padding: 15px;
             border-radius: 10px;
             border: 1px dashed #ccc;
+            text-align: left;
         }
+        .download-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: var(--text); font-size: 13px; font-weight: 700; }
+        .download-heading span { color: var(--muted); font-size: 10px; font-weight: 500; }
+        .download-item { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #e7eef8; }
+        .download-item:first-of-type { border-top: 0; }
+        .download-name { min-width: 0; color: var(--text); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+        .download-meta { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 500; }
         .download-link {
-            display: block;
-            margin: 10px 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
             padding: 12px;
             background: linear-gradient(180deg, var(--blue), var(--blue-strong));
             color: white;
@@ -86,6 +98,9 @@
         .download-link:hover {
             opacity: 0.8;
         }
+        .copy-link { display: inline-grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--blue-strong); cursor: pointer; }
+        .copy-link:hover { border-color: var(--blue); background: #f3f7ff; }
+        .download-actions { display: flex; align-items: center; gap: 6px; }
         .log-link {
             display: inline-block;
             margin-top: 15px;
@@ -113,9 +128,14 @@
         </div>
 
         <div class="download-section">
-            {% if files %}
+            <div class="download-heading"><strong>已生成文件</strong>{% if download_expires_at %}<span>链接有效至 {{ download_expires_at|date:"Y-m-d H:i" }}</span>{% endif %}</div>
+            {% if download_links %}
+                {% for link in download_links %}
+                    <div class="download-item"><div class="download-name">{{ link.filename }}<span class="download-meta">{% if link.requires_login %}<i class="fa-solid fa-lock" aria-hidden="true"></i> 登录后下载{% else %}<i class="fa-solid fa-link" aria-hidden="true"></i> 无需登录{% endif %}{% if link.expires_at %} · {{ link.expires_at|date:"Y-m-d H:i" }} 失效{% endif %}</span></div><div class="download-actions"><button type="button" class="copy-link" data-copy-url="{{ link.url }}" title="复制下载链接" aria-label="复制 {{ link.filename }} 下载链接"><i class="fa-solid fa-copy" aria-hidden="true"></i></button><a href="{{ link.url }}" class="download-link" rel="noreferrer"><i class="fa-solid fa-download" aria-hidden="true"></i> 下载</a></div></div>
+                {% endfor %}
+            {% elif files %}
                 {% for file in files %}
-                    <a href='/download?filename={{file}}&uuid={{uuid}}' class="download-link">下载 {{file}}</a>
+                    <div class="download-item"><div class="download-name">{{ file }}</div><a href="/download?filename={{ file|urlencode }}&amp;uuid={{ uuid|urlencode }}" class="download-link"><i class="fa-solid fa-download" aria-hidden="true"></i> 下载</a></div>
                 {% endfor %}
             {% else %}
                 <p>暂无可下载的生成文件。</p>
@@ -151,6 +171,19 @@
             }
         }
         updatePlatformUI();
+        document.querySelectorAll('[data-copy-url]').forEach(button => {
+            button.addEventListener('click', async () => {
+                const url = new URL(button.dataset.copyUrl, window.location.href).href;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    button.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+                    button.title = '已复制';
+                    setTimeout(() => { button.innerHTML = '<i class="fa-solid fa-copy" aria-hidden="true"></i>'; button.title = '复制下载链接'; }, 1400);
+                } catch (error) {
+                    window.prompt('复制下载链接', url);
+                }
+            });
+        });
     </script>
 </body>
 </html>

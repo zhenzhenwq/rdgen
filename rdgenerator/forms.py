@@ -3,8 +3,11 @@ import re
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
+from django.utils import timezone
 from django.core.validators import RegexValidator, URLValidator
 from PIL import Image
+
+from .models import UserEntitlement, get_user_entitlement
 
 
 User = get_user_model()
@@ -35,6 +38,26 @@ class ManagedUserCreationForm(UserCreationForm):
     last_name = forms.CharField(label="姓", max_length=150, required=False)
     is_staff = forms.BooleanField(label="管理员", required=False)
     is_active = forms.BooleanField(label="允许登录", required=False, initial=True)
+    expiration_mode = forms.ChoiceField(
+        label="生成额度类型",
+        choices=UserEntitlement.EXPIRATION_CHOICES,
+        initial=UserEntitlement.EXPIRATION_TIME,
+        required=False,
+    )
+    expires_at = forms.DateTimeField(
+        label="过期时间（北京时间）",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"type": "datetime-local"},
+        ),
+    )
+    generation_limit = forms.IntegerField(
+        label="可生成次数",
+        required=False,
+        min_value=1,
+    )
 
     class Meta(UserCreationForm.Meta):
         model = User
@@ -45,6 +68,9 @@ class ManagedUserCreationForm(UserCreationForm):
             "first_name",
             "is_staff",
             "is_active",
+            "expiration_mode",
+            "expires_at",
+            "generation_limit",
         )
 
     def __init__(self, *args, actor=None, **kwargs):
@@ -62,7 +88,17 @@ class ManagedUserCreationForm(UserCreationForm):
             user.is_staff = False
         if commit:
             user.save()
+            self._save_entitlement(user)
         return user
+
+    def clean(self):
+        cleaned = super().clean()
+        _clean_entitlement_fields(self, cleaned)
+        return cleaned
+
+    def _save_entitlement(self, user):
+        entitlement, _created = UserEntitlement.objects.get_or_create(user=user)
+        _apply_entitlement_fields(entitlement, self.cleaned_data)
 
 
 class ManagedUserEditForm(forms.ModelForm):
@@ -71,6 +107,25 @@ class ManagedUserEditForm(forms.ModelForm):
     last_name = forms.CharField(label="姓", max_length=150, required=False)
     is_staff = forms.BooleanField(label="管理员", required=False)
     is_active = forms.BooleanField(label="允许登录", required=False)
+    expiration_mode = forms.ChoiceField(
+        label="生成额度类型",
+        choices=UserEntitlement.EXPIRATION_CHOICES,
+        required=False,
+    )
+    expires_at = forms.DateTimeField(
+        label="过期时间（北京时间）",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"type": "datetime-local"},
+        ),
+    )
+    generation_limit = forms.IntegerField(
+        label="可生成次数",
+        required=False,
+        min_value=1,
+    )
 
     class Meta:
         model = User
@@ -81,14 +136,37 @@ class ManagedUserEditForm(forms.ModelForm):
             "first_name",
             "is_staff",
             "is_active",
+            "expiration_mode",
+            "expires_at",
+            "generation_limit",
         )
         labels = {"username": "用户名"}
 
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.actor = actor
+        entitlement = get_user_entitlement(self.instance)
+        self.initial.update(
+            {
+                "expiration_mode": entitlement.expiration_mode,
+                "expires_at": entitlement.expires_at,
+                "generation_limit": entitlement.generation_limit,
+            }
+        )
         if not actor or not actor.is_superuser:
             self.fields.pop("is_staff", None)
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            entitlement, _created = UserEntitlement.objects.get_or_create(user=user)
+            _apply_entitlement_fields(entitlement, self.cleaned_data)
+        return user
+
+    def clean(self):
+        cleaned = super().clean()
+        _clean_entitlement_fields(self, cleaned)
+        return cleaned
 
     def clean_is_active(self):
         is_active = self.cleaned_data["is_active"]
@@ -108,6 +186,44 @@ class ManagedUserEditForm(forms.ModelForm):
         if self.instance.is_superuser and not is_staff:
             raise forms.ValidationError("超级管理员必须保留管理员权限。")
         return is_staff
+
+
+def _clean_entitlement_fields(form, cleaned):
+    mode = cleaned.get("expiration_mode") or UserEntitlement.EXPIRATION_TIME
+    cleaned["expiration_mode"] = mode
+    expires_at = cleaned.get("expires_at")
+    generation_limit = cleaned.get("generation_limit")
+    if mode == UserEntitlement.EXPIRATION_TIME:
+        if expires_at and timezone.is_naive(expires_at):
+            cleaned["expires_at"] = timezone.make_aware(expires_at)
+        cleaned["generation_limit"] = None
+    elif mode == UserEntitlement.EXPIRATION_COUNT:
+        if not generation_limit or generation_limit < 1:
+            form.add_error("generation_limit", "按生成次数时必须填写大于 0 的次数。")
+        cleaned["expires_at"] = None
+    return cleaned
+
+
+def _apply_entitlement_fields(entitlement, cleaned):
+    previous_mode = entitlement.expiration_mode
+    entitlement.expiration_mode = (
+        cleaned.get("expiration_mode") or UserEntitlement.EXPIRATION_TIME
+    )
+    entitlement.expires_at = cleaned.get("expires_at")
+    entitlement.generation_limit = cleaned.get("generation_limit")
+    if previous_mode != entitlement.expiration_mode:
+        entitlement.generations_used = 0
+        entitlement.reserved_generations = 0
+    entitlement.save(
+        update_fields=[
+            "expiration_mode",
+            "expires_at",
+            "generation_limit",
+            "generations_used",
+            "reserved_generations",
+            "updated_at",
+        ]
+    )
 
 
 class ManagedSetPasswordForm(SetPasswordForm):
@@ -209,6 +325,30 @@ class GenerateForm(forms.Form):
     )
     delayFix = forms.BooleanField(initial=True, required=False)
     beijingCustom = forms.BooleanField(label="北京 Linux 定制", initial=False, required=False)
+
+    # Delivery policy for generated packages. The artifact upload callback
+    # starts both retention clocks; values are persisted on GithubRun.
+    download_access = forms.ChoiceField(
+        label="下载权限",
+        choices=[
+            ("login", "必须登录下载"),
+            ("public", "无需登录下载"),
+        ],
+        initial="login",
+        required=False,
+    )
+    download_ttl_hours = forms.TypedChoiceField(
+        label="下载链接有效期",
+        choices=[
+            (1, "1 小时"),
+            (24, "1 天"),
+            (72, "3 天"),
+            (168, "7 天"),
+        ],
+        coerce=int,
+        initial=168,
+        required=False,
+    )
 
     #General
     exename = forms.CharField(

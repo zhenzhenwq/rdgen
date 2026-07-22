@@ -67,11 +67,11 @@ class TaskAccessTests(TestCase):
         self.assertEqual(self.client.get(self._status_url()).status_code, 404)
         self.assertEqual(self.client.get(self._download_url()).status_code, 404)
 
-    def test_staff_cannot_access_another_users_task_by_guessing_uuid(self):
+    def test_staff_can_download_but_cannot_view_another_users_task_status(self):
         self.client.force_login(self.staff)
 
         self.assertEqual(self.client.get(self._status_url()).status_code, 404)
-        self.assertEqual(self.client.get(self._download_url()).status_code, 404)
+        self.assertEqual(self.client.get(self._download_url()).status_code, 200)
 
     def test_legacy_task_without_owner_is_not_exposed(self):
         legacy_uuid = str(uuid.uuid4())
