@@ -61,7 +61,7 @@
             {% if form.expiration_mode.help_text %}<span class="policy-help">{{ form.expiration_mode.help_text|safe }}</span>{% endif %}
         </div>
         <div id="timePolicyField" class="policy-field">
-            <label for="{{ form.expires_at.id_for_label }}">过期时间</label>
+            <label for="{{ form.expires_at.id_for_label }}">过期时间（北京时间）</label>
             {{ form.expires_at }}
             {{ form.expires_at.errors }}
             <span class="policy-help">留空表示永久有效。</span>
