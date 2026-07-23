@@ -57,10 +57,11 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - The core batch was committed as `8e33770`; `cd2c358` separated hidden-window capability from its default state, and `23d1cf3` completed the compatibility follow-up. Use the latest `master` commit for subsequent fixes.
 - The batch changes the form and platform workflows, ports strict optional patch chains, and hardens Linux packaging, macOS signing, uploads, and build inputs.
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
-- Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux, macOS, or Android build has been verified for this batch.
+- Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux or Android build has been verified for this batch. macOS was compiled on real GitHub-hosted macOS runners for both Intel and Apple Silicon in validation run `29975374837`.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
 - The current deployed application release is `4da7e535f35a4aeefda2faf4bef6585856fe2e44` (tree `539488f3f0b7627f820c756138ddb396230bd4ac`). It retains the persisted EXE/MSI and entitlement behavior while replacing the unavailable Font Awesome CDN with embedded local icon assets.
-- `origin/master` was non-force fast-forwarded through `4da7e53`, with the deployed commit and tree verified. Push-triggered Docker run `29920197862` failed only at the repository's existing Docker Hub login step; it did not dispatch a client build and does not affect the directly deployed server image.
+- The live application remains deployed from `4da7e53`; later workflow-only commits do not change the server image. `origin/master` contains macOS validation implementation commit `5694553478ccde3967446c460e734ae719f278d6`. Push-triggered Docker failures remain limited to the repository's existing Docker Hub login step and do not dispatch client builds or affect the directly deployed server image.
+- GitHub Actions run `29975374837` passed the complete validation matrix for `x86_64` and `aarch64`: customization validation, compilation, embedded configuration packaging, ad-hoc code signing, bundle metadata and architecture checks, DMG creation, `hdiutil verify`, and artifact upload. Validation mode skipped production upload and cleanup callbacks by design.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
@@ -78,6 +79,14 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 
 ## Historical Verified Outputs
 
+- macOS dual-architecture validation:
+  - implementation commit: `5694553478ccde3967446c460e734ae719f278d6`
+  - GitHub Actions run: `29975374837`
+  - outputs: `MacAudit-x86_64.dmg` and `MacAudit-aarch64.dmg` as separate architecture-specific images, not a Universal binary
+  - both app bundles passed architecture, ad-hoc codesign, and DMG checksum verification on real macOS runners
+  - local SHA-256: x86_64 `25151cb4d1349fa2055f98393547174c05c7f536bb391d4ba962e072333e234e`; aarch64 `849022e5ca9a84b24cbb7ef233cbb253e0fee8e24a3d1b05b85d18207662eb67`
+  - local archive directory: `D:\rustdesk-生成器\rdgen\output\macos-validation-29975374837`
+  - production P12 signing, notarization, and stapling were not exercised
 - Windows self-signed signing test:
   - filename: `SignTest`
   - UUID: `82f5ea38-c4ab-461e-a090-4e03f5d014bd`

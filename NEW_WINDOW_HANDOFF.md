@@ -62,7 +62,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
 - Current deployed application release: `4da7e535f35a4aeefda2faf4bef6585856fe2e44` (`Embed local generator icons`, tree `539488f3f0b7627f820c756138ddb396230bd4ac`). It includes the prior account/download/artifact and entitlement behavior plus self-contained local icon rendering.
-- `origin/master` was independently verified at deployed application commit `4da7e53`. Push-triggered Docker run `29920197862` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
+- The live application remains deployed from `4da7e53`. `origin/master` contains the later macOS workflow validation implementation at `5694553478ccde3967446c460e734ae719f278d6`; those workflow-only commits were not deployed to the generator server. Push-triggered Docker failures remain at the known Docker Hub login step and do not dispatch RustDesk client workflows.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -86,6 +86,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Desktop, 768px tablet, and 390px mobile layouts passed Playwright checks across Windows, Windows x86, Android, standard/custom Linux, and macOS visibility states. Imported PNG previews now use strict base64 validation plus DOM node creation; a malicious JSON import was verified not to execute while valid PNG previews still render.
 - The live generator was deployed from tree `539488f3f0b7627f820c756138ddb396230bd4ac`. Windows x64 task success still requires exact persisted `.exe` and `.msi` receipts whose size and SHA-256 match the final files; uploads are staged and atomically committed, retries cannot replace immutable content, and terminal status callbacks cannot revive or bypass finalization.
 - The generator, account, waiting, generated, and failure templates no longer load Font Awesome from Cloudflare. `local_icons.html` embeds a minimal Font Awesome 6.4.0 WOFF2 subset and three generated transparent PNG masks. All 43 glyph mappings, conditional entitlement/user/download icons, the JavaScript copy/check transition, desktop and 390x844 mobile layouts were visually verified without missing-glyph boxes, horizontal overflow, or Font Awesome CDN requests.
+- macOS validation run `29975374837` succeeded on real GitHub-hosted macOS runners for both `x86_64` and `aarch64`. Each matrix job passed customization validation, RustDesk compilation, embedded configuration packaging, ad-hoc signing, bundle metadata and architecture checks, DMG creation, `hdiutil verify`, and artifact upload. The outputs are two architecture-specific DMGs, not one Universal image; validation mode skipped all production callbacks. Local copies are under `output/macos-validation-29975374837`; SHA-256 is `25151cb4d1349fa2055f98393547174c05c7f536bb391d4ba962e072333e234e` for x86_64 and `849022e5ca9a84b24cbb7ef233cbb253e0fee8e24a3d1b05b85d18207662eb67` for aarch64.
 
 Important Linux/Flatpak boundaries:
 
@@ -116,9 +117,9 @@ Important Linux/Flatpak boundaries:
 
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
 - No fresh public Windows generation has been intentionally submitted against `fe7ee96`; task 27 verifies legacy EXE/MSI rendering, while artifact and entitlement enforcement are covered by backend/workflow tests. A real generation remains an explicit user-approved follow-up.
-- No real Linux, macOS, or Android client compilation has been verified for this batch.
+- No real Linux or Android client compilation has been verified for this batch. macOS Intel and Apple Silicon compilation is covered by run `29975374837`.
 - Docker image runs, including `29406597406`, `29907047085`, and latest push run `29911513230`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
-- macOS P12 signing is structurally validated but still needs a real macOS runner with configured signing secrets.
+- macOS ad-hoc signing is verified on real runners. Production P12 signing with configured secrets, Apple notarization, and stapling remain unverified.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
 ## Resume Checklist

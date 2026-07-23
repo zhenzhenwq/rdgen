@@ -808,3 +808,14 @@ User constraint recorded:
 - The production database retained 3 users, 27 task rows, 3 entitlement rows, and 0 artifact receipts. Pre-deployment and stop-time snapshots both passed `quick_check`; database and GitHub client-build gates were zero before and after the switch.
 - Current rollback material is `/opt/rdgen-backups/20260722-204633-4da7e535f35a`, `/opt/rdgen-previous-20260722-204633-4da7e535f35a`, and image tag `rdgen-rollback:20260722-204633-4da7e535f35a`. The preceding entitlement deployment remains available.
 - `origin/master` was fast-forwarded to `4da7e53`. Push-triggered Docker run `29920197862` failed only at the repository's existing Docker Hub login step and did not dispatch a client build. No live generator form was submitted during deployment or verification.
+
+## 2026-07-23
+
+### macOS Dual-Architecture Workflow Validation
+
+- Fixed macOS customization so the requested application name is applied to the validated Cargo metadata without renaming RustDesk package or binary identifiers. Added focused workflow and customization regression tests.
+- Added an isolated `validation_mode` to `.github/workflows/generator-macos.yml`. It uses fixed non-production configuration, keeps signing secrets out of global environment state, forces ad-hoc signing, validates bundle metadata and the expected Mach-O architecture, verifies the DMG, uploads one-day artifacts, and skips all production upload and cleanup callbacks.
+- Workflow implementation commit `5694553478ccde3967446c460e734ae719f278d6` passed GitHub Actions run `29975374837`. The `aarch64` job reported `Built executable architectures: arm64`; the Intel job reported `Built executable architectures: x86_64`. Both app bundles passed `codesign --verify`, and both DMGs passed `hdiutil verify`.
+- The generated outputs are `MacAudit-aarch64.dmg` (25,787,953 bytes, SHA-256 `849022e5ca9a84b24cbb7ef233cbb253e0fee8e24a3d1b05b85d18207662eb67`) and `MacAudit-x86_64.dmg` (32,348,623 bytes, SHA-256 `25151cb4d1349fa2055f98393547174c05c7f536bb391d4ba962e072333e234e`). Both downloaded files have the expected UDIF `koly` trailer and are archived under `D:\rustdesk-生成器\rdgen\output\macos-validation-29975374837`. They are separate architecture-specific images rather than a Universal binary. Production P12 signing, notarization, and stapling were not exercised.
+- Local verification before dispatch passed 36 patch tests, all 134 Django tests, Django system and migration-drift checks, workflow YAML parsing, `actionlint`, the RustDesk 1.4.9 macOS patch-chain smoke test, and `git diff --check`.
+- This was a workflow-only validation. The generator server remained on application commit `4da7e53`; no production generator form, upload callback, cleanup callback, or server deployment was triggered.
