@@ -93,7 +93,7 @@ jobs:
         run: echo "STATUS_URL=${{ secrets.GENURL }}/updategh?signature=${{ env.status_signature }}" >> $GITHUB_ENV
 
       - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
+        if: ${{ always() && env.rdgen == 'true' }}
         continue-on-error: true
         uses: fjogeleit/http-request-action@v1
         with:
@@ -755,6 +755,15 @@ jobs:
             echo "No DMG file found matching the pattern"
             exit 1
           fi
+
+      - name: Upload macOS DMG artifact
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.filename }}-${{ matrix.job.arch }}-dmg
+          path: ${{ github.workspace }}/${{ env.filename }}-${{ matrix.job.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 1
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}

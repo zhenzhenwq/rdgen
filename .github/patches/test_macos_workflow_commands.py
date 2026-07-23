@@ -72,11 +72,30 @@ class MacOSWorkflowCommandTests(unittest.TestCase):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         create_step = named_step(workflow, "Create DMG")
         rename_step = named_step(workflow, "Rename rustdesk")
+        upload_step = named_step(workflow, "Upload macOS DMG artifact")
 
         self.assertIn("x86_64-apple-darwin", workflow)
         self.assertIn("aarch64-apple-darwin", workflow)
         self.assertIn('${{ env.appname }}-${{ matrix.job.arch }}.dmg', create_step)
         self.assertIn('${{ env.filename }}-${{ matrix.job.arch }}.dmg', rename_step)
+        self.assertIn("uses: actions/upload-artifact@v4", upload_step)
+        self.assertIn(
+            "name: ${{ env.filename }}-${{ matrix.job.arch }}-dmg",
+            upload_step,
+        )
+        self.assertIn(
+            "path: ${{ github.workspace }}/${{ env.filename }}-${{ matrix.job.arch }}.dmg",
+            upload_step,
+        )
+        self.assertIn("retention-days: 1", upload_step)
+
+    def test_generator_cleanup_only_calls_back_for_rdgen_tasks(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        cleanup_step = named_step(workflow, "Finalize and Cleanup zip/json")
+
+        self.assertIn("always()", cleanup_step)
+        self.assertIn("env.rdgen == 'true'", cleanup_step)
+        self.assertIn("continue-on-error: true", cleanup_step)
 
 
 if __name__ == "__main__":
