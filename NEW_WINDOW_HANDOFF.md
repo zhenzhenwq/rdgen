@@ -61,8 +61,8 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
-- Current deployed application release: `fe7ee968c91a0eead6e5d31267e41cc013522eb9` (`Show generation entitlements on workspace`, tree `057845f4718b4987e01eb634cad3a58dbe9127de`). It includes the prior account/download/artifact hardening plus visible ordinary-user entitlement summaries and exhausted/expired generation controls.
-- `origin/master` was independently verified at documentation commit `c620190`, containing deployed application commit `fe7ee96`. Push-triggered Docker run `29911513230` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
+- Current deployed application release: `4da7e535f35a4aeefda2faf4bef6585856fe2e44` (`Embed local generator icons`, tree `539488f3f0b7627f820c756138ddb396230bd4ac`). It includes the prior account/download/artifact and entitlement behavior plus self-contained local icon rendering.
+- `origin/master` was independently verified at deployed application commit `4da7e53`. Push-triggered Docker run `29920197862` failed at the known Docker Hub login step; no RustDesk client workflow was dispatched.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -84,7 +84,8 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Django `5.2.16`: 134 tests pass locally and in the candidate release path. The entitlement matrix covers count availability/reservations/exhaustion/missing limits, permanent/time/under-24-hour/expired memberships, administrators, invalid forms, and forged POST rejection. System checks, migration-drift checks, and `git diff --check` pass.
 - Entitlement UI screenshots passed at 1440px desktop, 900px tablet, and 390px mobile with no page-level horizontal overflow or overlap. Desktop uses the sidebar account area; narrower layouts use a navigation-under status strip with two-column mobile metrics.
 - Desktop, 768px tablet, and 390px mobile layouts passed Playwright checks across Windows, Windows x86, Android, standard/custom Linux, and macOS visibility states. Imported PNG previews now use strict base64 validation plus DOM node creation; a malicious JSON import was verified not to execute while valid PNG previews still render.
-- The live generator was deployed from tree `057845f4718b4987e01eb634cad3a58dbe9127de`. Windows x64 task success still requires exact persisted `.exe` and `.msi` receipts whose size and SHA-256 match the final files; uploads are staged and atomically committed, retries cannot replace immutable content, and terminal status callbacks cannot revive or bypass finalization.
+- The live generator was deployed from tree `539488f3f0b7627f820c756138ddb396230bd4ac`. Windows x64 task success still requires exact persisted `.exe` and `.msi` receipts whose size and SHA-256 match the final files; uploads are staged and atomically committed, retries cannot replace immutable content, and terminal status callbacks cannot revive or bypass finalization.
+- The generator, account, waiting, generated, and failure templates no longer load Font Awesome from Cloudflare. `local_icons.html` embeds a minimal Font Awesome 6.4.0 WOFF2 subset and three generated transparent PNG masks. All 43 glyph mappings, conditional entitlement/user/download icons, the JavaScript copy/check transition, desktop and 390x844 mobile layouts were visually verified without missing-glyph boxes, horizontal overflow, or Font Awesome CDN requests.
 
 Important Linux/Flatpak boundaries:
 
@@ -97,17 +98,17 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `fe7ee968c91a0eead6e5d31267e41cc013522eb9`; application tree: `057845f4718b4987e01eb634cad3a58dbe9127de`.
-- Deployment ID: `20260722-180717-fe7ee968c91a`.
-- Source archive SHA-256: `cb7133b2f8c48fb1f3566317a7987dbefec2ee11dae5cd5c7cc4ae627abd9b5e`.
-- Live image: `sha256:2d89717ea403ccc92c639254b28695c489ebf5bc72586844269130395bb64c50`.
+- Application source commit: `4da7e535f35a4aeefda2faf4bef6585856fe2e44`; application tree: `539488f3f0b7627f820c756138ddb396230bd4ac`.
+- Deployment ID: `20260722-204633-4da7e535f35a`.
+- Source archive SHA-256: `e483f9c7728b56248b8a8df797f509bb58af1fd701dc80bdcb74b69a87a394c4`.
+- Live image: `sha256:26d2c7e458024868899adc85505e05632cd20988cfbf40a834074303bc8342e7`.
 - Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero traceback/critical/worker-timeout log fingerprints. Ordinary users now see their actual entitlement on the generator workspace; unavailable entitlements disable submission, while administrators remain unlimited and have no entitlement panel. Windows x64 tasks stay pending until exact EXE/MSI receipts and final disk hashes pass explicit finalization. Passwords require only 6 characters; numeric/common/username-matching values are allowed, and all password guidance/errors are Chinese.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
 - Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite data were preserved. `.env` remains mode `600`; migration `0007_githubrun_artifact_contract_generatedartifact` is applied, and SQLite `quick_check` passed with 3 users and all 27 task rows retained. The receipt table began empty so historical tasks continue through the legacy file fallback.
 - Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
 - `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
-- Root-only rollback material is under `/opt/rdgen-backups/20260722-180717-fe7ee968c91a`, `/opt/rdgen-previous-20260722-180717-fe7ee968c91a`, and `rdgen-rollback:20260722-180717-fe7ee968c91a`. The preceding `20260722-163349-c92c48cc71d6` and earlier rollback sets remain present.
+- Root-only rollback material is under `/opt/rdgen-backups/20260722-204633-4da7e535f35a`, `/opt/rdgen-previous-20260722-204633-4da7e535f35a`, and `rdgen-rollback:20260722-204633-4da7e535f35a`. The preceding `20260722-180717-fe7ee968c91a` and earlier rollback sets remain present.
 - The hourly cleanup converted the former cancelled legacy `in_progress` row to `timed_out`. Current database and GitHub gates report zero active client workflows.
 - Existing task 27 was verified to render both `21313.exe` and `21313.msi`; SQLite retained 3 users and all 27 tasks. No live generator form was submitted and no client workflow was dispatched during deployment.
 

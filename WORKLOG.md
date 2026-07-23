@@ -793,3 +793,18 @@ User constraint recorded:
 - Current rollback material is `/opt/rdgen-backups/20260722-180717-fe7ee968c91a`, `/opt/rdgen-previous-20260722-180717-fe7ee968c91a`, and image tag `rdgen-rollback:20260722-180717-fe7ee968c91a`. The previous atomic-artifact deployment remains available.
 - No live generator form was submitted and no client workflow was dispatched during deployment or verification.
 - GitHub `master` was non-force fast-forwarded through `c620190` with all blob/tree/commit identities verified. Push-triggered Docker run `29911513230` failed only at the existing Docker Hub login step and did not dispatch a client build.
+
+### Embedded Local Generator Icons
+
+- Replaced the five Cloudflare Font Awesome loaders with `templates/includes/local_icons.html`, which embeds a minimal Font Awesome 6.4.0 WOFF2 subset and its OFL license. Corrected all 43 CSS glyph escapes and changed the success message to the included `U+F00C` check glyph.
+- Generated three transparent PNG masks for the client-generator navigation item, user-management navigation item, and bottom generate-client action. The final project assets are `client-generator.png`, `user-management.png`, and `generate-client.png`; generation intermediates were removed and no endpoint or credential was stored in the repository.
+- Verified every mapped solid/brand glyph, conditional entitlement and user-management states, download icons, and the JavaScript copy/check transition. Desktop, user-management, bottom-action, and 390x844 mobile screenshots showed no missing-glyph boxes, horizontal overflow, or Font Awesome CDN requests.
+- Django `5.2.16` passed 134/134 tests locally and in the candidate image. `manage.py check`, migration-drift detection, archive-content checks, production template rendering, browser console/network inspection, and `git diff --check` all passed.
+
+### Local Icon Production Deployment
+
+- Committed application release `4da7e535f35a4aeefda2faf4bef6585856fe2e44` (`Embed local generator icons`, tree `539488f3f0b7627f820c756138ddb396230bd4ac`) and deployed archive SHA-256 `e483f9c7728b56248b8a8df797f509bb58af1fd701dc80bdcb74b69a87a394c4` under ID `20260722-204633-4da7e535f35a`.
+- Live image `sha256:26d2c7e458024868899adc85505e05632cd20988cfbf40a834074303bc8342e7` is `running`, `healthy`, restart count `0`. Nginx validation, HTTPS health/login behavior, loopback-only port 8000, migrations, SQLite `quick_check`, icon file hashes, clean logs, and persisted-directory preservation passed.
+- The production database retained 3 users, 27 task rows, 3 entitlement rows, and 0 artifact receipts. Pre-deployment and stop-time snapshots both passed `quick_check`; database and GitHub client-build gates were zero before and after the switch.
+- Current rollback material is `/opt/rdgen-backups/20260722-204633-4da7e535f35a`, `/opt/rdgen-previous-20260722-204633-4da7e535f35a`, and image tag `rdgen-rollback:20260722-204633-4da7e535f35a`. The preceding entitlement deployment remains available.
+- `origin/master` was fast-forwarded to `4da7e53`. Push-triggered Docker run `29920197862` failed only at the repository's existing Docker Hub login step and did not dispatch a client build. No live generator form was submitted during deployment or verification.
