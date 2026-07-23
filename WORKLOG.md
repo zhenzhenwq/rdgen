@@ -819,3 +819,20 @@ User constraint recorded:
 - The generated outputs are `MacAudit-aarch64.dmg` (25,787,953 bytes, SHA-256 `849022e5ca9a84b24cbb7ef233cbb253e0fee8e24a3d1b05b85d18207662eb67`) and `MacAudit-x86_64.dmg` (32,348,623 bytes, SHA-256 `25151cb4d1349fa2055f98393547174c05c7f536bb391d4ba962e072333e234e`). Both downloaded files have the expected UDIF `koly` trailer and are archived under `D:\rustdesk-生成器\rdgen\output\macos-validation-29975374837`. They are separate architecture-specific images rather than a Universal binary. Production P12 signing, notarization, and stapling were not exercised.
 - Local verification before dispatch passed 36 patch tests, all 134 Django tests, Django system and migration-drift checks, workflow YAML parsing, `actionlint`, the RustDesk 1.4.9 macOS patch-chain smoke test, and `git diff --check`.
 - This was a workflow-only validation. The generator server remained on application commit `4da7e53`; no production generator form, upload callback, cleanup callback, or server deployment was triggered.
+
+### Hide Tray Setting And Wallpaper Default
+
+- Added a dedicated “隐藏系统托盘图标” option under Advanced / Other Settings. Selected desktop builds serialize `override-settings.hide-tray=Y`; Android and standard Linux combinations are rejected server-side.
+- Changed “传入会话期间移除壁纸” from default-on to explicit opt-in. Both controls render unchecked on new forms.
+- Legacy `hide-tray` and RustDesk-equivalent `hide_tray` entries are normalized from either manual textarea into the dedicated toggle. Override settings take precedence over default settings, duplicate lines are removed, and unsupported imported configurations retain their line so a Chinese validation error is shown instead of silently losing the value.
+- Local browser checks covered Windows legacy import, Android rejection, unsupported Beijing Linux versions, default unchecked state, and browser console errors. Django `5.2.16` passed all 144 tests; system, migration-drift, archive, and whitespace checks passed.
+
+### Hide Tray Production Deployment
+
+- The first deployment candidate from `465f29b` passed 139 tests and isolated-container checks but failed a post-switch markup assertion. The signal-aware deployment script restored the prior source, image, and final SQLite snapshot; follow-up checks confirmed the old service healthy with 3 users, 27 tasks, and zero active client builds.
+- Independent review then found manual `defaultManual` and underscore-alias bypasses plus an unsupported Linux-version import edge. These were fixed before release and covered by the final 144-test suite.
+- Deployed application commit `e7e4740f698643c3acfc7f4e3ee015290a45bc7e` (tree `b64fe2c202a97762496fa0f6991353047c76d534`) from archive SHA-256 `ab2afb959829927dc1484768df9ccd258bdaf9e1739027e354e9aa47a4c269b5` under ID `20260723-162446-e7e4740f6986`.
+- Candidate image `sha256:0caa747a28c97703f3c6568582800d7ead2d55e352e3425584a3e74f3fe9715c` passed all 144 tests, migration and security checks, copied-production SQLite integrity, authenticated RequestFactory rendering, and a healthy isolated instance on `127.0.0.1:18000` before cutover.
+- Production `rdgen-rdgen-1` is `running`, `healthy`, restart count `0`. Public HTTP/HTTPS, login, health, HSTS, Nginx, database snapshots, entitlement rendering, hide-tray alias parsing, clean logs, and zero active GitHub client runs were independently rechecked. The database retained 3 users and all 27 task rows.
+- Current rollback material is `/opt/rdgen-backups/20260723-162446-e7e4740f6986`, `/opt/rdgen-previous-20260723-162446-e7e4740f6986`, and image tag `rdgen-rollback:20260723-162446-e7e4740f6986`. The previous icon deployment rollback set remains available.
+- No live generator form was submitted and no client workflow was dispatched during deployment or verification.
