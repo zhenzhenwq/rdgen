@@ -506,6 +506,7 @@ def generator_view(request):
             enableRecording = form.cleaned_data['enableRecording']
             enableBlockingInput = form.cleaned_data['enableBlockingInput']
             enableRemoteModi = form.cleaned_data['enableRemoteModi']
+            hideTray = form.cleaned_data['hideTray'] and platform in desktop_platforms and linuxCustomAllowed
             removeWallpaper = form.cleaned_data['removeWallpaper']
             defaultManual = form.cleaned_data['defaultManual']
             overrideManual = form.cleaned_data['overrideManual']
@@ -666,6 +667,11 @@ def generator_view(request):
                         continue
                     k, _separator, value = line.partition('=')
                     decodedCustom['override-settings'][k.strip()] = value.strip()
+
+            # Legacy manual hide-tray lines are promoted to this field by the
+            # form, leaving one authoritative setting in the generated config.
+            if hideTray:
+                decodedCustom['override-settings']['hide-tray'] = 'Y'
 
             hidecm_settings = (
                 'approve-mode',

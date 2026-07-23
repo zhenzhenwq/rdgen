@@ -231,9 +231,9 @@ class GeneratorFeaturePayloadTests(TestCase):
         return post_mock.call_args.args[0], inputs_raw, custom_config
 
     def test_windows_all_features_are_serialized_for_generation(self):
-        dispatch_url, inputs_raw, custom_config = self._post_and_read_inputs(
-            self._feature_payload(platform="windows", direction="incoming")
-        )
+        data = self._feature_payload(platform="windows", direction="incoming")
+        data["hideTray"] = "on"
+        dispatch_url, inputs_raw, custom_config = self._post_and_read_inputs(data)
 
         self.assertTrue(dispatch_url.endswith("/actions/workflows/generator-windows.yml/dispatches"))
         run = GithubRun.objects.get()
@@ -289,6 +289,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(default_settings["approve-mode"], "password")
         self.assertEqual(default_settings["verification-method"], "use-permanent-password")
         self.assertEqual(default_settings["allow-hide-cm"], "Y")
+        self.assertEqual(default_settings["allow-remove-wallpaper"], "Y")
         self.assertEqual(default_settings["allow-remote-config-modification"], "Y")
         self.assertEqual(default_settings["direct-server"], "Y")
         self.assertEqual(default_settings["custom-option"], "Y")
@@ -296,7 +297,114 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertNotIn("approve-mode", override_settings)
         self.assertNotIn("verification-method", override_settings)
         self.assertNotIn("allow-hide-cm", override_settings)
+        self.assertEqual(override_settings["hide-tray"], "Y")
         self.assertEqual(override_settings["override-option"], "N")
+
+    def test_other_settings_start_disabled_and_serialize_as_opt_in(self):
+        form = GenerateForm()
+        self.assertFalse(form.fields["hideTray"].initial)
+        self.assertFalse(form.fields["removeWallpaper"].initial)
+        self.assertNotIn("checked", str(form["hideTray"]))
+        self.assertNotIn("checked", str(form["removeWallpaper"]))
+
+        data = self._feature_payload(platform="windows")
+        data.pop("removeWallpaper")
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertNotIn("hide-tray", custom_config["override-settings"])
+        self.assertEqual(
+            custom_config["default-settings"]["allow-remove-wallpaper"],
+            "N",
+        )
+
+    def test_legacy_manual_hide_tray_setting_migrates_to_toggle(self):
+        data = self._feature_payload(platform="windows")
+        data["overrideManual"] = (
+            "override-option=N\nhide-tray=maybe\nhide-tray=Y"
+        )
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(custom_config["override-settings"]["hide-tray"], "Y")
+        self.assertEqual(custom_config["override-settings"]["override-option"], "N")
+
+    def test_default_manual_hide_tray_setting_migrates_to_override_toggle(self):
+        data = self._feature_payload(platform="windows")
+        data["defaultManual"] = "default-option=Y\nhide_tray=Y"
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(custom_config["default-settings"]["default-option"], "Y")
+        self.assertNotIn("hide-tray", custom_config["default-settings"])
+        self.assertNotIn("hide_tray", custom_config["default-settings"])
+        self.assertEqual(custom_config["override-settings"]["hide-tray"], "Y")
+
+    def test_override_manual_hide_tray_takes_precedence_over_default_manual(self):
+        data = self._feature_payload(platform="windows")
+        data["hideTray"] = "on"
+        data["defaultManual"] = "default-option=Y\nhide-tray=Y"
+        data["overrideManual"] = "override-option=N\nhide-tray=N"
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(custom_config["default-settings"]["default-option"], "Y")
+        self.assertEqual(custom_config["override-settings"]["override-option"], "N")
+        self.assertNotIn("hide-tray", custom_config["default-settings"])
+        self.assertNotIn("hide-tray", custom_config["override-settings"])
+
+    def test_manual_hide_tray_n_clears_checked_toggle(self):
+        data = self._feature_payload(platform="windows")
+        data["hideTray"] = "on"
+        data["overrideManual"] = "hide-tray=N"
+        form = GenerateForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["hideTray"])
+        self.assertEqual(form.cleaned_data["overrideManual"], "")
+
+    def test_manual_hide_tray_rejects_unknown_value(self):
+        data = self._feature_payload(platform="windows")
+        data["overrideManual"] = "hide-tray=maybe"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("overrideManual", form.errors)
+
+    def test_default_manual_hide_tray_rejects_unknown_value(self):
+        data = self._feature_payload(platform="windows")
+        data["defaultManual"] = "hide-tray=maybe"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("defaultManual", form.errors)
+
+    def test_android_rejects_hide_tray_toggle(self):
+        data = self._feature_payload(platform="android")
+        data["hideSettingsMenu"] = ""
+        data["hideTray"] = "on"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("hideTray", form.errors)
+
+    def test_android_rejects_manual_hide_tray_setting(self):
+        data = self._feature_payload(platform="android")
+        data["hideSettingsMenu"] = ""
+        data["defaultManual"] = "hide_tray=Y"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("defaultManual", form.errors)
+        self.assertIn("Android 不支持系统托盘图标。", form.errors["defaultManual"])
+
+    def test_standard_linux_rejects_manual_hide_tray_setting(self):
+        data = self._feature_payload(platform="linux")
+        data["beijingCustom"] = ""
+        data["overrideManual"] = "hide-tray=Y"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("overrideManual", form.errors)
 
     def test_hide_connection_window_capability_starts_disabled_without_password(self):
         data = self._feature_payload(platform="windows")

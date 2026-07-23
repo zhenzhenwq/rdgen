@@ -1226,7 +1226,10 @@
                             </div>
                             <div class="section">
                                 <h3 class="section-subtitle"><i class="fas fa-cog" aria-hidden="true"></i> 其他设置</h3>
-                                <label class="option-toggle" for="{{ form.removeWallpaper.id_for_label }}">{{ form.removeWallpaper }} 传入会话期间移除壁纸</label>
+                                <div class="option-stack">
+                                    <label id="hideTrayOption" class="option-toggle" for="{{ form.hideTray.id_for_label }}">{{ form.hideTray }} 隐藏系统托盘图标</label>
+                                    <label class="option-toggle" for="{{ form.removeWallpaper.id_for_label }}">{{ form.removeWallpaper }} 传入会话期间移除壁纸</label>
+                                </div>
                                 <a class="form-link" href="https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/" target="_blank" rel="noopener noreferrer">查看默认/覆盖配置项列表 <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
                             </div>
                             <div class="section section--full advanced-manual-section">
@@ -1327,6 +1330,10 @@
         const hideCmToggle = document.getElementById("{{ form.hidecm.id_for_label }}");
         const hideCmDefaultEnabledWrapper = document.getElementById('hidecmDefaultEnabledWrapper');
         const hideCmDefaultEnabledToggle = document.getElementById("{{ form.hidecmDefaultEnabled.id_for_label }}");
+        const hideTrayOption = document.getElementById('hideTrayOption');
+        const hideTrayToggle = document.getElementById("{{ form.hideTray.id_for_label }}");
+        const defaultManualInput = document.getElementById("{{ form.defaultManual.id_for_label }}");
+        const overrideManualInput = document.getElementById("{{ form.overrideManual.id_for_label }}");
         const passwordRequirement = document.getElementById('passwordRequirement');
         const permanentPasswordInput = document.getElementById("{{ form.permanentPassword.id_for_label }}");
         const passApproveModeSelect = document.getElementById("{{ form.passApproveMode.id_for_label }}");
@@ -1346,6 +1353,48 @@
         const exenameInput = document.getElementById("{{ form.exename.id_for_label }}");
         const deliveryAccessInputs = Array.from(document.querySelectorAll('input[name="download_access"]'));
         const deliveryTtlSelect = document.getElementById("{{ form.download_ttl_hours.id_for_label }}");
+
+        function readManualHideTraySetting(input) {
+            let manualValue = null;
+            const lines = input.value.split(/\r?\n/);
+            lines.forEach(line => {
+                const separator = line.indexOf('=');
+                const key = line.slice(0, separator).trim().replace(/_/g, '-');
+                if (separator >= 0 && key === 'hide-tray') {
+                    manualValue = line.slice(separator + 1).trim();
+                }
+            });
+            return {input, lines, value: manualValue};
+        }
+
+        function migrateManualHideTraySetting() {
+            const settings = [
+                readManualHideTraySetting(defaultManualInput),
+                readManualHideTraySetting(overrideManualInput),
+            ];
+            const foundSettings = settings.filter(setting => setting.value !== null);
+            if (!foundSettings.length || foundSettings.some(setting => !['Y', 'N'].includes(setting.value))) {
+                return;
+            }
+            const linuxCustomAllowed = platformSelect.value !== 'linux' || (
+                beijingLinuxVersions.has(versionSelect.value) && beijingCustomToggle.checked
+            );
+            if (!desktopPlatforms.has(platformSelect.value) || !linuxCustomAllowed) {
+                return;
+            }
+            const overrideSetting = foundSettings.find(setting => setting.input === overrideManualInput);
+            const selectedSetting = overrideSetting || foundSettings[0];
+            hideTrayToggle.checked = selectedSetting.value === 'Y';
+            settings.forEach(setting => {
+                setting.input.value = setting.lines.filter(line => {
+                    const separator = line.indexOf('=');
+                    const key = line.slice(0, separator).trim().replace(/_/g, '-');
+                    return separator < 0 || key !== 'hide-tray';
+                }).join('\n');
+            });
+        }
+
+        generatorForm.addEventListener('submit', migrateManualHideTraySetting);
 
         function syncSectionNavigation() {
             sectionLinks.forEach(link => {
@@ -1579,6 +1628,7 @@
             setOptionAvailability(copyIdPasswordButtonOption, supportsFlutterDesktop && linuxCustomAllowed);
             setOptionAvailability(manualTemporaryPasswordOption, supportsFlutterDesktop && linuxCustomAllowed);
             setOptionAvailability(removeRecentSessionsOption, isDesktop && linuxCustomAllowed);
+            setOptionAvailability(hideTrayOption, isDesktop && linuxCustomAllowed);
             setOptionAvailability(startOnBootOption, platformSelect.value === 'windows');
             const compactLayoutAvailable = supportsCompactLayout && isIncomingOnly &&
                 linuxCustomAllowed && supportsVersion('1.4.2');
@@ -1618,6 +1668,7 @@
         hideCmDefaultEnabledToggle.addEventListener('change', function() {
             updateHideCmDefaultVisibility(this.checked);
         });
+        migrateManualHideTraySetting();
         syncPlatformIconState();
         updateBuildSummary();
         updateDesktopBehaviorVisibility();
@@ -1746,6 +1797,8 @@
                 document.getElementById("filenameError").textContent = "";
                 exenameInput.removeAttribute('aria-invalid');
             }
+
+            migrateManualHideTraySetting();
 
             const formData = {};
             const form = document.getElementById("myForm"); // Get the form element
@@ -1902,6 +1955,7 @@
                                     });
                                 }
                             }
+                            migrateManualHideTraySetting();
                             syncPlatformIconState();
                             updateDesktopBehaviorVisibility();
                             updateBuildSummary();

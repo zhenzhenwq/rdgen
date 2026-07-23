@@ -316,6 +316,19 @@ def parse_manual_settings(value):
     return settings
 
 
+def extract_manual_setting(value, target_key):
+    setting_value = None
+    retained_lines = []
+    for raw_line in (value or "").splitlines():
+        key, separator, value_part = raw_line.partition("=")
+        normalized_key = key.strip().replace('_', '-')
+        if separator and normalized_key == target_key:
+            setting_value = value_part.strip()
+        else:
+            retained_lines.append(raw_line)
+    return setting_value, "\n".join(retained_lines)
+
+
 def version_at_least(value, minimum):
     if value == 'master':
         return True
@@ -490,7 +503,8 @@ class GenerateForm(forms.Form):
     enableTerminal = forms.BooleanField(initial=True, required=False)
 
     #Other
-    removeWallpaper = forms.BooleanField(initial=True, required=False)
+    hideTray = forms.BooleanField(initial=False, required=False)
+    removeWallpaper = forms.BooleanField(initial=False, required=False)
 
     defaultManual = forms.CharField(widget=forms.Textarea, required=False)
     overrideManual = forms.CharField(widget=forms.Textarea, required=False)
@@ -516,6 +530,37 @@ class GenerateForm(forms.Form):
         cleaned = super().clean()
         platform = cleaned.get('platform')
         version = cleaned.get('version')
+        manual_hide_tray_values = {}
+        normalized_manual_settings = {}
+        manual_hide_tray_invalid = False
+        for field in ('defaultManual', 'overrideManual'):
+            value, normalized = extract_manual_setting(
+                cleaned.get(field),
+                'hide-tray',
+            )
+            normalized_manual_settings[field] = normalized
+            if value is None:
+                continue
+            if value not in {'Y', 'N'}:
+                self.add_error(
+                    field,
+                    'hide-tray 仅支持 Y 或 N，请使用“隐藏系统托盘图标”开关。',
+                )
+                manual_hide_tray_invalid = True
+                continue
+            manual_hide_tray_values[field] = value
+        manual_hide_tray_source = None
+        if manual_hide_tray_values and not manual_hide_tray_invalid:
+            for field, normalized in normalized_manual_settings.items():
+                cleaned[field] = normalized
+            manual_hide_tray_source = (
+                'overrideManual'
+                if 'overrideManual' in manual_hide_tray_values
+                else 'defaultManual'
+            )
+            cleaned['hideTray'] = (
+                manual_hide_tray_values[manual_hide_tray_source] == 'Y'
+            )
         legacy_hidecm_submission = (
             cleaned.get('hidecm')
             and 'hidecmDefaultEnabled' not in self.data
@@ -607,8 +652,24 @@ class GenerateForm(forms.Form):
                 if cleaned.get(field):
                     self.add_error(field, f'Windows 32 位不支持{label}。')
 
-        if platform == 'android' and cleaned.get('hideSettingsMenu'):
-            self.add_error('hideSettingsMenu', 'Android 不支持隐藏主界面设置菜单。')
+        if platform == 'android':
+            if cleaned.get('hideSettingsMenu'):
+                self.add_error('hideSettingsMenu', 'Android 不支持隐藏主界面设置菜单。')
+            if cleaned.get('hideTray'):
+                self.add_error(
+                    manual_hide_tray_source or 'hideTray',
+                    'Android 不支持系统托盘图标。',
+                )
+
+        if (
+            platform == 'linux'
+            and not cleaned.get('beijingCustom')
+            and cleaned.get('hideTray')
+        ):
+            self.add_error(
+                manual_hide_tray_source or 'hideTray',
+                '标准 Linux 构建暂不支持系统托盘图标。',
+            )
 
         return cleaned
 
