@@ -15,6 +15,19 @@ def named_step(workflow: str, name: str) -> str:
     return step.split("      - name:", 1)[0]
 
 
+def named_job(workflow: str, name: str) -> str:
+    marker = f"  {name}:\n"
+    if marker not in workflow:
+        raise AssertionError(f"Missing workflow job: {name}")
+    job = workflow.split(marker, 1)[1]
+    lines = []
+    for line in job.splitlines():
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 class MacOSWorkflowCommandTests(unittest.TestCase):
     def test_cargo_branding_is_applied_before_customization_validation(self):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -96,6 +109,83 @@ class MacOSWorkflowCommandTests(unittest.TestCase):
         self.assertIn("always()", cleanup_step)
         self.assertIn("env.rdgen == 'true'", cleanup_step)
         self.assertIn("continue-on-error: true", cleanup_step)
+
+    def test_isolated_validation_mode_skips_secrets_and_production_callbacks(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        validate_inputs_job = named_job(workflow, "validate-inputs")
+        setup_job = named_job(workflow, "setup")
+        build_job = named_job(workflow, "build-for-macos")
+        cleanup_job = named_job(workflow, "cleanup")
+        validation_step = named_step(workflow, "Load isolated validation inputs")
+        download_step = workflow.split("      - uses: actions/download-artifact@v4\n", 1)[1]
+        download_step = download_step.split("      - name:", 1)[0]
+        load_secrets_step = named_step(workflow, "Load Secrets")
+        detect_signing_step = named_step(workflow, "Detect macOS signing certificate")
+        default_status_step = named_step(workflow, "Set default status URL")
+        rdgen_upload_step = named_step(workflow, "send file to rdgen server")
+        api_upload_step = named_step(workflow, "send file to api server")
+        global_env = workflow.split("env:\n", 1)[1].split("\njobs:\n", 1)[0]
+
+        self.assertIn("validation_mode:", workflow)
+        self.assertIn("type: boolean", workflow)
+        self.assertIn("zip_url is required unless validation_mode is enabled", validate_inputs_job)
+        self.assertIn("needs: validate-inputs", setup_job)
+        self.assertIn("if: ${{ !inputs.validation_mode }}", setup_job)
+        self.assertIn("inputs.validation_mode", build_job)
+        self.assertIn("needs.validate-inputs.result == 'success'", build_job)
+        self.assertIn("needs.setup.result == 'skipped'", build_job)
+        self.assertIn("if: ${{ !inputs.validation_mode }}", download_step)
+        self.assertIn("if: ${{ !inputs.validation_mode }}", load_secrets_step)
+        self.assertIn("if: ${{ inputs.validation_mode }}", validation_step)
+        self.assertIn("rdgen=validation", validation_step)
+        self.assertIn("appname=MacAudit", validation_step)
+        self.assertIn("server=relay.audit.example", validation_step)
+        self.assertNotIn("secrets.MACOS_P12_BASE64", global_env)
+        self.assertNotIn("secrets.ANDROID_SIGNING_KEY", global_env)
+        self.assertNotIn("secrets.SIGN_BASE_URL", global_env)
+        self.assertIn("if: ${{ !inputs.validation_mode }}", detect_signing_step)
+        self.assertIn("MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}", detect_signing_step)
+        self.assertIn("if: ${{ !inputs.validation_mode }}", default_status_step)
+        self.assertIn("secrets.GENURL", default_status_step)
+        self.assertIn("if: ${{ env.rdgen == 'true' }}", rdgen_upload_step)
+        self.assertIn("if: ${{ env.rdgen == 'false' }}", api_upload_step)
+        self.assertIn("!inputs.validation_mode", cleanup_job)
+
+    def test_app_bundle_and_dmg_are_verified_before_upload(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        verify_step = named_step(workflow, "Verify macOS app bundle")
+        create_step = named_step(workflow, "Create DMG")
+
+        self.assertIn("CFBundleName", verify_step)
+        self.assertIn("CFBundleDisplayName", verify_step)
+        self.assertIn("CFBundleIdentifier", verify_step)
+        self.assertIn("CFBundleExecutable", verify_step)
+        self.assertIn("lipo -archs", verify_step)
+        self.assertIn("grep -qw x86_64", verify_step)
+        self.assertIn("grep -qw arm64", verify_step)
+        self.assertIn("codesign --verify --deep --strict", verify_step)
+        self.assertIn("hdiutil verify", create_step)
+
+    def test_dmg_rename_is_safe_when_app_and_filename_match(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        rename_step = named_step(workflow, "Rename rustdesk")
+
+        self.assertIn('TARGET_FILE="${{ env.filename }}-${{ matrix.job.arch }}.dmg"', rename_step)
+        self.assertIn('[ "$DMG_FILE" != "./$TARGET_FILE" ]', rename_step)
+        self.assertIn("DMG already has the requested name", rename_step)
+        self.assertIn('test -s "$TARGET_FILE"', rename_step)
+
+    def test_production_p12_is_scoped_to_signing_steps(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        install_step = named_step(workflow, "Install rcodesign tool")
+        sign_step = named_step(workflow, "Sign macOS app bundle")
+        adhoc_step = named_step(workflow, "Ad-hoc sign macOS app bundle")
+
+        self.assertIn("env.HAS_MACOS_P12 == 'true'", install_step)
+        self.assertIn("env.HAS_MACOS_P12 == 'true'", sign_step)
+        self.assertIn("MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}", sign_step)
+        self.assertIn("/usr/bin/base64 -D", sign_step)
+        self.assertIn("env.HAS_MACOS_P12 != 'true'", adhoc_step)
 
 
 if __name__ == "__main__":
