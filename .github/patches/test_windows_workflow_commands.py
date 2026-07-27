@@ -7,6 +7,7 @@ WINDOWS_WORKFLOWS = (
     "generator-windows.yml",
     "sh-generator-windows.yml",
 )
+WINDOWS_UTF8_WORKFLOWS = WINDOWS_WORKFLOWS + ("generator-windows-x86.yml",)
 
 
 def named_step(workflow: str, name: str) -> str:
@@ -31,6 +32,39 @@ def named_job(workflow: str, name: str) -> str:
 
 
 class WindowsWorkflowCommandTests(unittest.TestCase):
+    def test_windows_python_uses_utf8_for_non_ascii_application_names(self):
+        for workflow_name in WINDOWS_UTF8_WORKFLOWS:
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                global_env = workflow.split("env:\n", 1)[1].split("\njobs:\n", 1)[0]
+                portable_step = named_step(workflow, "Build self-extracted executable")
+
+                self.assertIn('PYTHONUTF8: "1"', global_env)
+                self.assertIn('PYTHONIOENCODING: "utf-8"', global_env)
+                self.assertIn("python3 ./generate.py", portable_step)
+
+    def test_windows_x64_configures_msi_utf8_before_build(self):
+        for workflow_name in WINDOWS_WORKFLOWS:
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                configure_step = named_step(
+                    workflow,
+                    "Configure MSI UTF-8 codepage",
+                )
+
+                self.assertIn("shell: pwsh", configure_step)
+                self.assertNotIn("continue-on-error: true", configure_step)
+                self.assertIn(
+                    "https://raw.githubusercontent.com/${{ github.repository }}/"
+                    "${{ github.sha }}/.github/patches/configure_windows_msi_utf8.py",
+                    configure_step,
+                )
+                self.assertIn("python configure_windows_msi_utf8.py", configure_step)
+                self.assertLess(
+                    workflow.index("      - name: Configure MSI UTF-8 codepage"),
+                    workflow.index("      - name: Build msi"),
+                )
+
     def test_update_notification_patch_uses_windows_available_downloader(self):
         for workflow_name in WINDOWS_WORKFLOWS:
             with self.subTest(workflow=workflow_name):

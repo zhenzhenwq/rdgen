@@ -38,6 +38,8 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
 
 
 jobs:
@@ -685,6 +687,12 @@ jobs:
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe "./SignOutput/rustdesk.exe"
+
+      - name: Configure MSI UTF-8 codepage
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/configure_windows_msi_utf8.py -OutFile configure_windows_msi_utf8.py
+          python configure_windows_msi_utf8.py
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
