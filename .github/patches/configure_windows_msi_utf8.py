@@ -7,6 +7,9 @@ from xml.parsers.expat import ExpatError
 
 
 UTF8_CODEPAGE = "65001"
+SUMMARY_CODEPAGE = "1252"
+SUMMARY_DESCRIPTION = "Customized RustDesk client installer"
+SUMMARY_MANUFACTURER = "RDGen"
 PACKAGE_PATH = Path("res/msi/Package/Package.wxs")
 LOCALIZATION_PATH = Path("res/msi/Package/Language/Package.en-us.wxl")
 
@@ -58,6 +61,7 @@ def configure_msi_utf8(root: Path) -> bool:
     localization_document = _load_xml(localization_path)
 
     package = _single_element(package_document, "Package")
+    summary_information = _single_element(package_document, "SummaryInformation")
     localization = localization_document.documentElement
     if localization.localName != "WixLocalization":
         raise SystemExit(
@@ -73,18 +77,28 @@ def configure_msi_utf8(root: Path) -> bool:
     changes = (
         package.getAttribute("Codepage") != UTF8_CODEPAGE
         or localization.getAttribute("Codepage") != UTF8_CODEPAGE
-        or summary_codepage.getAttribute("Value") != UTF8_CODEPAGE
+        or localization.getAttribute("SummaryInformationCodepage")
+        != SUMMARY_CODEPAGE
+        or summary_codepage.getAttribute("Value") != SUMMARY_CODEPAGE
+        or summary_information.getAttribute("Description") != SUMMARY_DESCRIPTION
+        or summary_information.getAttribute("Manufacturer") != SUMMARY_MANUFACTURER
     )
     if not changes:
-        print("Windows MSI sources already use UTF-8 codepage 65001.")
+        print("Windows MSI sources already use Unicode-safe codepages.")
         return False
 
     package.setAttribute("Codepage", UTF8_CODEPAGE)
     localization.setAttribute("Codepage", UTF8_CODEPAGE)
-    summary_codepage.setAttribute("Value", UTF8_CODEPAGE)
+    localization.setAttribute("SummaryInformationCodepage", SUMMARY_CODEPAGE)
+    summary_codepage.setAttribute("Value", SUMMARY_CODEPAGE)
+    summary_information.setAttribute("Description", SUMMARY_DESCRIPTION)
+    summary_information.setAttribute("Manufacturer", SUMMARY_MANUFACTURER)
     _write_xml(package_document, package_path)
     _write_xml(localization_document, localization_path)
-    print("Configured Windows MSI package and localization for UTF-8 codepage 65001.")
+    print(
+        "Configured the Windows MSI database for UTF-8 and summary information "
+        "for ANSI-safe metadata."
+    )
     return True
 
 
