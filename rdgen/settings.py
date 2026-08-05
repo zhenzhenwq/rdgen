@@ -57,6 +57,42 @@ ALLOWED_HOSTS = env_list(
 )
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 
+# Registration email delivery. QQ Mail uses an SMTP authorization code rather
+# than the mailbox login password.
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.qq.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', 'True')
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', 'False')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
+EMAIL_FILE_PATH = os.environ.get('EMAIL_FILE_PATH', '')
+DEFAULT_FROM_EMAIL = (
+    os.environ.get('DEFAULT_FROM_EMAIL')
+    or EMAIL_HOST_USER
+    or 'webmaster@localhost'
+)
+
+EMAIL_VERIFICATION_CODE_TTL_SECONDS = int(
+    os.environ.get('EMAIL_VERIFICATION_CODE_TTL_SECONDS', '300')
+)
+EMAIL_VERIFICATION_RESEND_SECONDS = int(
+    os.environ.get('EMAIL_VERIFICATION_RESEND_SECONDS', '60')
+)
+EMAIL_VERIFICATION_EMAIL_HOURLY_LIMIT = int(
+    os.environ.get('EMAIL_VERIFICATION_EMAIL_HOURLY_LIMIT', '5')
+)
+EMAIL_VERIFICATION_IP_HOURLY_LIMIT = int(
+    os.environ.get('EMAIL_VERIFICATION_IP_HOURLY_LIMIT', '20')
+)
+EMAIL_VERIFICATION_MAX_ATTEMPTS = int(
+    os.environ.get('EMAIL_VERIFICATION_MAX_ATTEMPTS', '5')
+)
+
 # Application definition
 
 INSTALLED_APPS = [

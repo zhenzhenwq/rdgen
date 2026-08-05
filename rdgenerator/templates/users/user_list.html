@@ -42,8 +42,12 @@
                     <td data-label="生成额度">
                         {% with entitlement=managed_user.entitlement %}
                             {% if entitlement.expiration_mode == 'count' %}
-                                <span class="role-badge"><i class="fa-solid fa-box" aria-hidden="true"></i> {{ entitlement.generations_used }}/{{ entitlement.generation_limit }}</span>
-                                {% if entitlement.reserved_generations %}<span class="user-cell__meta">已预留 {{ entitlement.reserved_generations }}</span>{% endif %}
+                                {% if entitlement.generation_limit == None %}
+                                    <span class="status status--off">未开通会员</span>
+                                {% else %}
+                                    <span class="role-badge"><i class="fa-solid fa-box" aria-hidden="true"></i> {{ entitlement.generations_used }}/{{ entitlement.generation_limit }}</span>
+                                    {% if entitlement.reserved_generations %}<span class="user-cell__meta">已预留 {{ entitlement.reserved_generations }}</span>{% endif %}
+                                {% endif %}
                             {% elif entitlement.expires_at %}
                                 <span class="user-cell__meta">有效至 {{ entitlement.expires_at|date:"Y-m-d H:i" }}</span>
                             {% else %}

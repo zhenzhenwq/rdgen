@@ -1,8 +1,9 @@
 """Remove generated artifacts after their seven-day retention window.
 
 The web process does not run a scheduler, so production should invoke this
-command from a host cron/systemd timer.  Database rows are intentionally kept
-as audit metadata; only files on disk are removed.
+command from a host cron/systemd timer. Generated-task rows are intentionally
+kept as audit metadata; short-lived registration codes are removed after one
+day.
 """
 
 from datetime import timedelta, timezone as dt_timezone
@@ -13,7 +14,11 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from ...models import GithubRun, release_generation_reservation
+from ...models import (
+    GithubRun,
+    RegistrationEmailCode,
+    release_generation_reservation,
+)
 
 
 RETENTION_DAYS = 7
@@ -53,6 +58,14 @@ class Command(BaseCommand):
         removed_dirs = 0
         released_reservations = 0
         timed_out_runs = 0
+        removed_email_codes = 0
+
+        email_code_queryset = RegistrationEmailCode.objects.filter(
+            created_at__lte=now - timedelta(hours=24)
+        )
+        removed_email_codes = email_code_queryset.count()
+        if not dry_run:
+            email_code_queryset.delete()
 
         # Callback credentials expire after 24 hours. Runs still awaiting a
         # callback after that point can no longer deliver an artifact.
@@ -109,7 +122,8 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"{action} {removed_files} file(s), {removed_dirs} director(ies), "
                 f"{released_reservations} quota reservation(s), and "
-                f"timed out {timed_out_runs} stale run(s)."
+                f"timed out {timed_out_runs} stale run(s); "
+                f"{removed_email_codes} expired email code(s)."
             )
         )
 

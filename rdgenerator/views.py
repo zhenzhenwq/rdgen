@@ -320,7 +320,7 @@ def _entitlement_summary(user):
         can_generate = entitlement.can_generate
         if limit is None:
             status = "unconfigured"
-            status_label = "额度未配置"
+            status_label = "等待激活"
         elif can_generate:
             status = "active"
             status_label = "可生成"
@@ -329,7 +329,7 @@ def _entitlement_summary(user):
             status_label = "已用尽"
         return {
             "mode": UserEntitlement.EXPIRATION_COUNT,
-            "plan_label": "次数套餐",
+            "plan_label": "未开通会员" if limit is None else "次数会员",
             "status": status,
             "status_label": status_label,
             "can_generate": can_generate,
@@ -338,7 +338,11 @@ def _entitlement_summary(user):
                 if can_generate
                 else "count_unconfigured" if limit is None else "count_exhausted"
             ),
-            "submit_label": "生成自定义客户端" if can_generate else "生成次数已用尽",
+            "submit_label": (
+                "生成自定义客户端"
+                if can_generate
+                else "请先激活会员" if limit is None else "生成次数已用尽"
+            ),
             "generation_limit": limit,
             "generation_limit_configured": limit is not None,
             "generations_used": entitlement.generations_used,

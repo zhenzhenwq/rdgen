@@ -11,7 +11,12 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from .models import GeneratedArtifact, GithubRun, UserEntitlement
+from .models import (
+    GeneratedArtifact,
+    GithubRun,
+    RegistrationEmailCode,
+    UserEntitlement,
+)
 
 
 class GeneratedDownloadAccessTests(TestCase):
@@ -216,6 +221,27 @@ class GeneratedCleanupCommandTests(TestCase):
             call_command("purge_generated_files")
 
         self.assertFalse(archive.exists())
+
+    def test_purge_removes_email_verification_records_after_one_day(self):
+        old_code = RegistrationEmailCode.objects.create(
+            email="old-code@example.com",
+            code_hash="a" * 64,
+            expires_at=timezone.now() - timedelta(hours=23),
+        )
+        recent_code = RegistrationEmailCode.objects.create(
+            email="recent-code@example.com",
+            code_hash="b" * 64,
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        RegistrationEmailCode.objects.filter(pk=old_code.pk).update(
+            created_at=timezone.now() - timedelta(hours=25)
+        )
+
+        with self.settings(BASE_DIR=self.temp_root):
+            call_command("purge_generated_files")
+
+        self.assertFalse(RegistrationEmailCode.objects.filter(pk=old_code.pk).exists())
+        self.assertTrue(RegistrationEmailCode.objects.filter(pk=recent_code.pk).exists())
 
     def test_purge_releases_stale_count_reservation(self):
         entitlement = UserEntitlement.objects.create(

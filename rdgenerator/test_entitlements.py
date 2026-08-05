@@ -141,7 +141,7 @@ class GeneratorEntitlementSummaryTests(TestCase):
         self.assertEqual(summary["generations_used"], 3)
         self.assertEqual(summary["reserved_generations"], 2)
         self.assertEqual(summary["remaining_generations"], 5)
-        self.assertContains(response, "次数套餐")
+        self.assertContains(response, "次数会员")
         self.assertContains(response, "构建中")
         self.assertContains(response, "剩余次数")
         self.assertNotIn("disabled", self._button_tag(response))
@@ -178,7 +178,7 @@ class GeneratorEntitlementSummaryTests(TestCase):
         self.assertEqual(summary["block_reason"], "count_unconfigured")
         self.assertFalse(summary["generation_limit_configured"])
         self.assertIsNone(summary["remaining_generations"])
-        self.assertContains(response, "额度未配置")
+        self.assertContains(response, "未开通会员")
         panel = re.search(
             r'<section class="entitlement-panel.*?</section>',
             response.content.decode(),

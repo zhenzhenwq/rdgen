@@ -13,6 +13,9 @@
                 <a href="{% url 'users:list' %}"{% if request.path|slice:':7' == '/users/' %} aria-current="page"{% endif %}>
                     <span class="rd-generated-icon rd-generated-icon--users" aria-hidden="true"></span><span>用户管理</span>
                 </a>
+                <a href="{% url 'users:activation_codes' %}"{% if request.path|slice:':18' == '/activation-codes/' %} aria-current="page"{% endif %}>
+                    <i class="fa-solid fa-key" aria-hidden="true"></i><span>激活码管理</span>
+                </a>
             {% endif %}
         </nav>
         {% if entitlement_summary %}
@@ -41,6 +44,15 @@
                         {% endif %}
                     </div>
                 {% endif %}
+                <form class="activation-form" method="post" action="{% url 'users:activate' %}">
+                    {% csrf_token %}
+                    <label for="membershipActivationCode">激活会员 / 续期</label>
+                    <div class="activation-form__row">
+                        <input id="membershipActivationCode" name="code" type="text" maxlength="64" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="填写激活码">
+                        <button type="submit">激活</button>
+                    </div>
+                    <span>激活码仅可使用一次，时长卡支持续期叠加。</span>
+                </form>
             </section>
         {% endif %}
         <div class="app-account">

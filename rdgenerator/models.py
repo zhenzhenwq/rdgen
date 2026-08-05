@@ -76,6 +76,138 @@ class UserEntitlement(models.Model):
         )
 
 
+class RegistrationEmailCode(models.Model):
+    """Short-lived, one-time verification code for public registration.
+
+    The six-digit bearer value is never persisted. Only a keyed digest is
+    stored so a database leak cannot be used to complete registration.
+    """
+
+    email = models.EmailField(db_index=True)
+    code_hash = models.CharField(max_length=64, editable=False)
+    request_ip = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    invalidated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        indexes = [
+            models.Index(
+                fields=("email", "created_at"),
+                name="rdgen_reg_email_created_idx",
+            ),
+        ]
+        verbose_name = "注册邮箱验证码"
+        verbose_name_plural = "注册邮箱验证码"
+
+    @property
+    def is_available(self):
+        return bool(
+            self.consumed_at is None
+            and self.invalidated_at is None
+            and timezone.now() < self.expires_at
+        )
+
+    def __str__(self):
+        local, separator, domain = self.email.partition("@")
+        masked_local = f"{local[:2]}***" if local else "***"
+        masked_email = f"{masked_local}{separator}{domain}" if separator else masked_local
+        timestamp = (
+            self.created_at.strftime("%Y-%m-%d %H:%M")
+            if self.created_at
+            else "未发送"
+        )
+        return f"{masked_email} · {timestamp}"
+
+
+class ActivationCode(models.Model):
+    """One-time membership code.
+
+    Only a keyed digest and a short hint are persisted. The bearer value is
+    returned to an administrator once when it is generated.
+    """
+
+    PLAN_SINGLE = "single"
+    PLAN_THREE_DAY = "3day"
+    PLAN_WEEK = "week"
+    PLAN_MONTH = "month"
+    PLAN_LIFETIME = "lifetime"
+    PLAN_CHOICES = (
+        (PLAN_SINGLE, "次卡（1 次生成）"),
+        (PLAN_THREE_DAY, "3 日卡"),
+        (PLAN_WEEK, "周卡（7 天）"),
+        (PLAN_MONTH, "月卡（30 天）"),
+        (PLAN_LIFETIME, "终身卡"),
+    )
+
+    code_hash = models.CharField(max_length=64, unique=True, editable=False)
+    code_hint = models.CharField(max_length=4, editable=False)
+    plan = models.CharField(max_length=12, choices=PLAN_CHOICES, db_index=True)
+    batch_label = models.CharField(max_length=80, blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="activation_codes_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    redeemed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="activation_codes_redeemed",
+    )
+    redeemed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="activation_codes_revoked",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        verbose_name = "会员激活码"
+        verbose_name_plural = "会员激活码"
+
+    @property
+    def status(self):
+        if self.redeemed_at:
+            return "redeemed"
+        if self.revoked_at:
+            return "revoked"
+        return "unused"
+
+    @property
+    def status_label(self):
+        return {
+            "redeemed": "已使用",
+            "revoked": "已作废",
+            "unused": "未使用",
+        }[self.status]
+
+    @property
+    def masked_code(self):
+        prefix = {
+            self.PLAN_SINGLE: "1X",
+            self.PLAN_THREE_DAY: "3D",
+            self.PLAN_WEEK: "7D",
+            self.PLAN_MONTH: "30D",
+            self.PLAN_LIFETIME: "LIFE",
+        }.get(self.plan, "CODE")
+        return f"RD-{prefix}-••••-••••-••••-{self.code_hint}"
+
+    def __str__(self):
+        return f"{self.get_plan_display()} · {self.masked_code}"
+
+
 def get_user_entitlement(user):
     entitlement, _created = UserEntitlement.objects.get_or_create(user=user)
     return entitlement

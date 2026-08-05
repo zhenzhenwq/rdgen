@@ -38,8 +38,9 @@
                     {{ form.password.errors }}
                 </div>
                 <input type="hidden" name="next" value="{{ next }}">
-                <button class="button" type="submit"><i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> 登录控制台</button>
+                <button class="button button--block" type="submit"><i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> 登录控制台</button>
             </form>
+            <p class="auth-switch">还没有账号？<a href="{% url 'users:register' %}">立即注册</a></p>
         </div>
     </section>
 </div>

@@ -30,7 +30,16 @@
   * ZIP_PASSWORD="the same password that you entered as a github secret"
   * PROTOCOL="https" *optional - defaults to "https", change to "http" if you need to
   * REPONAME="rdgen" *optional - defaults to "rdgen", change this if you renamed the repo when you forked it
+  * EMAIL_HOST_USER="your QQ email address" - required for public registration
+  * EMAIL_HOST_PASSWORD="your QQ Mail SMTP authorization code" - do not use the QQ login password
+  * EMAIL_HOST="smtp.qq.com", EMAIL_PORT="465", EMAIL_USE_SSL="True"
 5. Now just run ```docker compose up -d```
+
+Public registration requires a six-digit email verification code. The defaults
+use QQ Mail SMTP over SSL, keep each code valid for five minutes, enforce a
+60-second resend interval, and never store the raw verification code in the
+database. Keep the SMTP authorization code only in the server `.env` file; do
+not commit it to Git.
 
 ### Retaining generated packages for at most seven days
 

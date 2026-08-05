@@ -4,11 +4,19 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, UserCreationForm
+from django.db import transaction
 from django.utils import timezone
 from django.core.validators import RegexValidator, URLValidator
 from PIL import Image
 
-from .models import UserEntitlement, get_user_entitlement
+from .email_verification import (
+    EmailVerificationError,
+    consume_registration_email_code,
+    normalize_registration_email,
+    validate_registration_email_code,
+)
+from .membership import normalize_activation_code
+from .models import ActivationCode, UserEntitlement, get_user_entitlement
 from .validators import minimum_password_help_text
 
 
@@ -34,6 +42,149 @@ class UsernameAuthenticationForm(AuthenticationForm):
         strip=False,
         error_messages={"required": "请输入密码。"},
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+
+
+class PublicRegistrationForm(UserCreationForm):
+    error_messages = {
+        "password_mismatch": "两次输入的密码不一致。",
+    }
+
+    email = forms.EmailField(
+        label="邮箱",
+        required=True,
+        help_text="用于接收注册验证码，每个邮箱只能注册一个账号。",
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )
+    verification_code = forms.CharField(
+        label="邮箱验证码",
+        max_length=6,
+        min_length=6,
+        strip=True,
+        error_messages={"required": "请输入邮箱验证码。"},
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+                "pattern": "[0-9]{6}",
+                "placeholder": "6 位验证码",
+            }
+        ),
+    )
+    field_order = ("username", "email", "verification_code", "password1", "password2")
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].label = "用户名"
+        self.fields["username"].widget.attrs.update(
+            {"autofocus": True, "autocomplete": "username"}
+        )
+        self.fields["password1"].label = "密码"
+        self.fields["password1"].help_text = PASSWORD_HELP_TEXT
+        self.fields["password1"].widget.attrs["autocomplete"] = "new-password"
+        self.fields["password2"].label = "确认密码"
+        self.fields["password2"].help_text = PASSWORD_CONFIRM_HELP_TEXT
+        self.fields["password2"].widget.attrs["autocomplete"] = "new-password"
+
+    def clean_email(self):
+        email = normalize_registration_email(self.cleaned_data.get("email", ""))
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("该邮箱已被其他账号使用。")
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        email = cleaned.get("email")
+        verification_code = cleaned.get("verification_code")
+        if email and verification_code:
+            try:
+                validate_registration_email_code(
+                    email=email,
+                    raw_code=verification_code,
+                )
+            except EmailVerificationError as exc:
+                self.add_error("verification_code", str(exc))
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data.get("email", "")
+        if not commit:
+            return user
+        with transaction.atomic():
+            consume_registration_email_code(
+                email=user.email,
+                raw_code=self.cleaned_data["verification_code"],
+            )
+            user.save()
+            UserEntitlement.objects.create(
+                user=user,
+                expiration_mode=UserEntitlement.EXPIRATION_COUNT,
+                generation_limit=None,
+            )
+        return user
+
+
+class RegistrationEmailCodeRequestForm(forms.Form):
+    email = forms.EmailField(
+        label="邮箱",
+        required=True,
+        error_messages={
+            "required": "请输入邮箱地址。",
+            "invalid": "请输入有效的邮箱地址。",
+        },
+    )
+
+    def clean_email(self):
+        email = normalize_registration_email(self.cleaned_data["email"])
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("该邮箱已被其他账号使用。")
+        return email
+
+
+class ActivationCodeForm(forms.Form):
+    code = forms.CharField(
+        label="会员激活码",
+        max_length=64,
+        strip=True,
+        error_messages={"required": "请输入激活码。"},
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "autocapitalize": "characters",
+                "spellcheck": "false",
+                "placeholder": "RD-XXXX-XXXX-XXXX-XXXX",
+            }
+        ),
+    )
+
+    def clean_code(self):
+        raw_code = self.cleaned_data["code"]
+        normalized = normalize_activation_code(raw_code)
+        if not normalized.startswith("RD") or not 20 <= len(normalized) <= 22:
+            raise forms.ValidationError("激活码格式不正确。")
+        return raw_code
+
+
+class ActivationCodeGenerationForm(forms.Form):
+    request_token = forms.CharField(widget=forms.HiddenInput)
+    plan = forms.ChoiceField(label="卡种", choices=ActivationCode.PLAN_CHOICES)
+    quantity = forms.IntegerField(
+        label="生成数量",
+        min_value=1,
+        max_value=100,
+        initial=1,
+        widget=forms.NumberInput(attrs={"min": 1, "max": 100}),
+    )
+    batch_label = forms.CharField(
+        label="批次备注",
+        max_length=80,
+        required=False,
+        widget=forms.TextInput(attrs={"placeholder": "例如：闲鱼 8 月第一批"}),
     )
 
 
