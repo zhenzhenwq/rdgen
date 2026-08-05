@@ -836,3 +836,26 @@ User constraint recorded:
 - Production `rdgen-rdgen-1` is `running`, `healthy`, restart count `0`. Public HTTP/HTTPS, login, health, HSTS, Nginx, database snapshots, entitlement rendering, hide-tray alias parsing, clean logs, and zero active GitHub client runs were independently rechecked. The database retained 3 users and all 27 task rows.
 - Current rollback material is `/opt/rdgen-backups/20260723-162446-e7e4740f6986`, `/opt/rdgen-previous-20260723-162446-e7e4740f6986`, and image tag `rdgen-rollback:20260723-162446-e7e4740f6986`. The previous icon deployment rollback set remains available.
 - No live generator form was submitted and no client workflow was dispatched during deployment or verification.
+
+## 2026-08-05
+
+### Membership, Activation Codes, And Verified Registration
+
+- Added public registration with username, unique email, password, and a required email verification code. Registration codes are normalized per email, stored only as salted digests, expire after five minutes, enforce resend, per-email, per-IP, and failed-attempt limits, and are consumed atomically when the account is created.
+- Newly registered accounts start without membership and cannot generate clients until activated. Existing administrator behavior remains unlimited.
+- Added hashed membership activation codes for one generation, 3 days, 7 days, 30 days, and lifetime. Activation is transactional, prevents reuse and conflicting plans, and updates the user's entitlement from the generator workspace.
+- Added a staff-only activation-code console for controlled batch generation, masked listing/filtering, redemption metadata, and revocation of unused codes. Plaintext codes are returned only once in the generation response and are never stored in the database.
+- Added QQ SMTP configuration support and the user-facing send-code control on `/register/`. The mailbox and authorization value are intentionally absent from repository files and this log.
+- Added migrations `0008_activationcode` and `0009_registrationemailcode`, cleanup for expired verification rows, responsive account/registration templates, navigation entries, administrator registrations, and focused security/lifecycle tests.
+- Application commit `16389d36cd355089ff72d7030648567644a7fca0` (`Add memberships and verified registration`, tree `7b1d52640717ff2ad9a8ed7bda89d45d3157e1dc`) was fast-forwarded to `origin/master`. Push-triggered Docker run `30992470460` failed at the repository's existing Docker Hub login step and did not dispatch a client build.
+
+### Production Deployment
+
+- Deployed source archive SHA-256 `bc131b2efd9bcbc86137beb78a1a48bc6a9c6a9c65b873d2158098ceb653d907` under ID `20260805-171543-16389d36cd35`. The server built candidate image `sha256:bbae70fc379f02227cba3c6cfab37e781e2cf30b325d4fd3ead3eda2c5078fd0` using the configured Alibaba PyPI mirror.
+- Local and candidate-image Django `5.2.16` suites passed all 169 tests. The first candidate test invocation inherited the production HTTPS setting and therefore exposed only 301 test-client redirects; rerunning the same image with test-only HTTPS and in-memory-mail overrides passed 169/169. The copied production database, both new migrations, isolated login/registration pages, and QQ SMTP authentication also passed before cutover.
+- The first cutover reached a responding new container but treated Docker's initial `starting` health state as failure. Its signal-aware handler restored the previous source, image, environment, and final SQLite snapshot; the old service returned healthy with 3 users, 39 runs, and migrations only through `0007`.
+- The corrected cutover waited for Docker `healthy`, repeated both stop-time database and GitHub activity gates, applied `0008` and `0009`, and completed at 2026-08-05 17:55 China time. Live `rdgen-rdgen-1` is `running`, `healthy`, restart count `0`, and uses the candidate image.
+- Public HTTPS checks passed for `/healthz`, `/login/`, and `/register/`; GET on `/register/email-code/` returns 405, HTTP redirects to HTTPS, and HSTS remains enabled. The production container successfully authenticated to QQ SMTP over SSL port 465 without sending a post-deploy message.
+- SQLite `quick_check` and `migrate --check` pass with all 3 users and 39 historical runs retained. Activation-code and registration-email-code tables began empty, persistent `data`, database, `exe`, `png`, and `temp_zips` inodes were preserved, and post-deploy logs contain no error fingerprints.
+- Current rollback material is `/opt/rdgen-backups/20260805-171543-16389d36cd35`, `/opt/rdgen-previous-20260805-171543-16389d36cd35`, and image tag `rdgen-rollback:20260805-171543-16389d36cd35`. The backup set includes online and both stop-time SQLite snapshots, prior environment, source archive, build/test logs, and image metadata.
+- Database and GitHub gates reported zero active client workflows before, during, and after the switch. No live generator form was submitted and no client workflow was dispatched during deployment or verification.
