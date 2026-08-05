@@ -120,7 +120,7 @@ Important Linux/Flatpak boundaries:
 - Public Actions history contains successful manually dispatched Windows generator runs `29318081070` at `8e33770` and `29326063260` at `cd2c358`. They were not push-triggered; their artifacts and runtime behavior have not been audited here, and the public API cannot distinguish a GitHub UI dispatch from a generator/API dispatch.
 - No fresh public client generation has been intentionally submitted against `16389d36`; registration, activation, hide-tray, artifact, and entitlement enforcement are covered by backend/workflow and isolated production-candidate checks. A real generation remains an explicit user-approved follow-up.
 - No real Linux or Android client compilation has been verified for this batch. macOS Intel and Apple Silicon compilation is covered by run `29975374837`.
-- Docker image runs, including latest push run `30992470460`, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
+- Docker image runs, including application push run `30992470460` and subsequent documentation-only pushes, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS ad-hoc signing is verified on real runners. Production P12 signing with configured secrets, Apple notarization, and stapling remain unverified.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
 
