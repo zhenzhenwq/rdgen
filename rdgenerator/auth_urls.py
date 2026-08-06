@@ -34,6 +34,7 @@ urlpatterns = [
         name="password_change",
     ),
     path("password/changed/", account_views.password_changed, name="password_change_done"),
+    path("build-records/", account_views.build_record_list, name="build_records"),
     path("users/", account_views.user_list, name="list"),
     path(
         "activation-codes/",

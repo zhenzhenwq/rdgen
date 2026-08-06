@@ -9,6 +9,9 @@
             <a href="/"{% if request.path == '/' or request.path == '/generator' %} aria-current="page"{% endif %}>
                 <span class="rd-generated-icon rd-generated-icon--client" aria-hidden="true"></span><span>客户端生成</span>
             </a>
+            <a href="{% url 'users:build_records' %}"{% if request.path|slice:':15' == '/build-records/' %} aria-current="page"{% endif %}>
+                <i class="fa-solid fa-clock" aria-hidden="true"></i><span>构建记录</span>
+            </a>
             {% if request.user.is_staff %}
                 <a href="{% url 'users:list' %}"{% if request.path|slice:':7' == '/users/' %} aria-current="page"{% endif %}>
                     <span class="rd-generated-icon rd-generated-icon--users" aria-hidden="true"></span><span>用户管理</span>

@@ -1,6 +1,8 @@
+from datetime import timedelta
 from functools import wraps
 import ipaddress
 import secrets
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, update_session_auth_hash
@@ -15,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import (
     ActivationCodeForm,
@@ -37,11 +39,50 @@ from .membership import (
     generate_activation_codes,
     redeem_activation_code,
 )
-from .models import ActivationCode, UserEntitlement
+from .models import ActivationCode, GithubRun, UserEntitlement
 
 
 User = get_user_model()
 ACTIVATION_GENERATION_TOKENS_SESSION_KEY = "activation_generation_tokens"
+BUILD_STATUS_CHOICES = (
+    ("queued", "排队中"),
+    ("starting", "准备中"),
+    ("in_progress", "构建中"),
+    ("artifacts_pending", "等待文件"),
+    ("success", "构建成功"),
+    ("failure", "构建失败"),
+    ("artifact_incomplete", "文件不完整"),
+    ("dispatch_failed", "提交失败"),
+    ("cancelled", "已取消"),
+    ("timed_out", "已超时"),
+    ("skipped", "已跳过"),
+    ("action_required", "需要处理"),
+    ("completed", "已完成"),
+    ("finished", "已结束"),
+)
+BUILD_PLATFORM_CHOICES = (
+    ("windows", "Windows 64 位"),
+    ("windows-x86", "Windows 32 位"),
+    ("linux", "Linux"),
+    ("android", "Android"),
+    ("macos", "macOS"),
+)
+BUILD_PERIOD_CHOICES = (
+    ("24h", "最近 24 小时", 1),
+    ("7d", "最近 7 天", 7),
+    ("30d", "最近 30 天", 30),
+    ("90d", "最近 90 天", 90),
+)
+BUILD_FAILED_STATUSES = {
+    "failure",
+    "artifact_incomplete",
+    "dispatch_failed",
+    "cancelled",
+    "timed_out",
+    "skipped",
+    "action_required",
+}
+BUILD_TERMINAL_STATUSES = BUILD_FAILED_STATUSES | {"success", "completed", "finished"}
 
 
 def staff_required(view_func):
@@ -219,6 +260,119 @@ def user_list(request):
             .select_related("entitlement")
         )
     return render(request, "users/user_list.html", {"users": users})
+
+
+@never_cache
+@login_required
+@require_GET
+def build_record_list(request):
+    scoped_runs = GithubRun.objects.select_related("owner").order_by(
+        "-created_at", "-pk"
+    )
+    if not request.user.is_staff:
+        scoped_runs = scoped_runs.filter(owner=request.user)
+
+    summary = {
+        "total": scoped_runs.count(),
+        "success": scoped_runs.filter(status="success").count(),
+        "active": scoped_runs.exclude(status__in=BUILD_TERMINAL_STATUSES).count(),
+        "failed": scoped_runs.filter(status__in=BUILD_FAILED_STATUSES).count(),
+    }
+
+    runs = scoped_runs
+    query = request.GET.get("q", "").strip()[:100]
+    selected_status = request.GET.get("status", "").strip()
+    selected_platform = request.GET.get("platform", "").strip()
+    selected_period = request.GET.get("period", "").strip()
+    selected_owner = request.GET.get("owner", "").strip() if request.user.is_staff else ""
+
+    valid_statuses = {value for value, _label in BUILD_STATUS_CHOICES}
+    valid_platforms = {value for value, _label in BUILD_PLATFORM_CHOICES}
+    period_days = {value: days for value, _label, days in BUILD_PERIOD_CHOICES}
+
+    if query:
+        query_filter = (
+            Q(uuid__icontains=query)
+            | Q(artifact_stem__icontains=query)
+            | Q(owner__username__icontains=query)
+        )
+        if query.isdigit():
+            query_filter |= Q(github_run_id=int(query))
+        runs = runs.filter(query_filter)
+    if selected_status in valid_statuses:
+        runs = runs.filter(status=selected_status)
+    else:
+        selected_status = ""
+    if selected_platform in valid_platforms:
+        runs = runs.filter(platform=selected_platform)
+    else:
+        selected_platform = ""
+    if selected_period in period_days:
+        runs = runs.filter(
+            created_at__gte=timezone.now() - timedelta(days=period_days[selected_period])
+        )
+    else:
+        selected_period = ""
+
+    filter_users = User.objects.none()
+    if request.user.is_staff:
+        filter_users = User.objects.order_by("username").only("id", "username")
+        if selected_owner == "deleted":
+            runs = runs.filter(owner__isnull=True)
+        elif selected_owner.isdigit() and filter_users.filter(pk=int(selected_owner)).exists():
+            runs = runs.filter(owner_id=int(selected_owner))
+        else:
+            selected_owner = ""
+
+    page_obj = Paginator(runs, 30).get_page(request.GET.get("page"))
+    status_labels = dict(BUILD_STATUS_CHOICES)
+    platform_labels = dict(BUILD_PLATFORM_CHOICES)
+    for build_run in page_obj.object_list:
+        build_run.status_label = status_labels.get(
+            build_run.status,
+            build_run.status or "未知状态",
+        )
+        if build_run.status == "success":
+            build_run.status_tone = "success"
+        elif build_run.status == "action_required":
+            build_run.status_tone = "warning"
+        elif build_run.status in BUILD_FAILED_STATUSES:
+            build_run.status_tone = "danger"
+        else:
+            build_run.status_tone = "pending"
+        build_run.platform_label = platform_labels.get(
+            build_run.platform,
+            build_run.platform or "未记录",
+        )
+
+    filter_values = [
+        ("q", query),
+        ("owner", selected_owner),
+        ("status", selected_status),
+        ("platform", selected_platform),
+        ("period", selected_period),
+    ]
+    filter_query = urlencode([(key, value) for key, value in filter_values if value])
+
+    return render(
+        request,
+        "users/build_record_list.html",
+        {
+            "page_obj": page_obj,
+            "summary": summary,
+            "query": query,
+            "filter_users": filter_users,
+            "status_choices": BUILD_STATUS_CHOICES,
+            "platform_choices": BUILD_PLATFORM_CHOICES,
+            "period_choices": BUILD_PERIOD_CHOICES,
+            "selected_owner": selected_owner,
+            "selected_status": selected_status,
+            "selected_platform": selected_platform,
+            "selected_period": selected_period,
+            "filter_query": filter_query,
+            "now": timezone.now(),
+        },
+    )
 
 
 @never_cache
