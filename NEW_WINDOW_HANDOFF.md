@@ -61,8 +61,8 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - First capability-state follow-up: `cd2c358` (`Decouple hide window capability from default state`).
 - Compatibility follow-up: `23d1cf3` (`Fix hide window capability compatibility`).
 - Auth and task-security release: `13408fb` (`Add authenticated user management`, tree `c1b8bd7ed1dd30209a13f6e59fbf42297aaf3056`).
-- Current deployed application release: `c304e1573be862d719f9a3454b5304b267182f35` (`Add scoped build history dashboard`, tree `bf3dd672afd11af6c8c300a7a15864a3a23e061c`). It adds read-only, filtered, paginated build history for all authenticated users; staff see every task and members only see their own.
-- The live application is built from `c304e15`. Documentation-only commits after that application commit do not change the server image. Push-triggered Docker failures remain at the known Docker Hub login step and do not dispatch RustDesk client workflows.
+- Current deployed application release: `11bd5bd3f877ef02c702096dbb2a606302d136f9` (`Use full width for management pages`, tree `0f5b6f760ced089e1b82ee540c9777a879ccc9c9`). Build records, user management, and activation-code management now fill the desktop workspace to the right of the sidebar; form panels remain deliberately constrained.
+- The live application is built from `11bd5bd`. Documentation-only commits after that application commit do not change the server image. Push-triggered Docker failures remain at the known Docker Hub login step and do not dispatch RustDesk client workflows.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
 
 ## Verified State
@@ -100,18 +100,18 @@ Important Linux/Flatpak boundaries:
 ## Live Deployment
 
 - URL: `https://120.55.0.199/` (`http://120.55.0.199/` redirects to HTTPS; public port 8000 is closed).
-- Application source commit: `c304e1573be862d719f9a3454b5304b267182f35`; application tree: `bf3dd672afd11af6c8c300a7a15864a3a23e061c`.
-- Deployment ID: `20260806-112556-c304e1573be8`.
-- Source archive SHA-256: `b9899fd6cc2ae87ecf0ad7af080e0a879cc55a7db7b0b343b09bc81388e85a85`.
-- Live image: `sha256:c22c67d9dd83c555f04688d02ff0a9afc4521c80514cf7a476fbd99e14f1af6d`.
-- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero post-deploy traceback/critical/worker-timeout fingerprints. The new login page and its exact CSS/PNG assets are live. Public registration, email verification, membership activation, staff activation-code management, entitlement, hide-tray, platform validation, exact Windows EXE/MSI finalization, relaxed Chinese password guidance, and administrator-unlimited behavior remain intact.
+- Application source commit: `11bd5bd3f877ef02c702096dbb2a606302d136f9`; application tree: `0f5b6f760ced089e1b82ee540c9777a879ccc9c9`.
+- Deployment ID: `20260806-114847-11bd5bd3f877`.
+- Source archive SHA-256: `e496589895e3e69e8f8071fb859bd3d28281f9b1d143ae84586b280e31538b94`.
+- Live image: `sha256:3661f8b5f014a789656915bb18cbc719aa1575bb0c61ed9c549c311ae0e9a63f`.
+- Live container is `rdgen-rdgen-1`, verified `running`, `healthy`, restart count `0`, with zero post-deploy traceback/critical/worker-timeout fingerprints. Online RequestFactory checks confirmed full-width rendering for build records, user management, and activation-code management, while build-record member scoping still passes. Public registration, email verification, membership activation, entitlement, platform validation, and administrator-unlimited behavior remain intact.
 - Nginx terminates TLS and rate-limits `/login/`; the container binds only `127.0.0.1:8000`. The trusted Let's Encrypt IP certificate is renewed by the enabled `rdgen-certbot-renew.timer`; staging renewal passed.
 - The production `admin` superuser exists. Never add its password to Git, memory files, shell history, or chat summaries.
 - Persistent `.env`, `data`, `exe`, `png`, `temp_zips`, and SQLite inodes were preserved. `.env` remains mode `600`; migrations `0008_activationcode` and `0009_registrationemailcode` are applied, and SQLite `quick_check` passes with 4 users and all 39 task rows retained.
 - Production uses QQ SMTP over SSL on port 465. The live container authenticated successfully without sending a post-deploy message; the mailbox and authorization value are secrets and must never be copied into Git, memory files, commands that print them, or answers.
 - Account expiry now supports permanent/time-based and successful-package-count policies. Download delivery supports creator/admin login or public token access with 1-hour, 1-day, 3-day, or 7-day expiry beginning at the first valid installer upload. Quota reservation creation and artifact settlement are atomic and guard administrative mode changes.
 - `/etc/cron.d/rdgen-cleanup` runs hourly with `flock`. Initial enforcement removed 13 expired secret ZIPs and one empty directory, no installer and no reservation; the immediate post-run dry-run reported zero pending removals.
-- Root-only rollback material is under `/opt/rdgen-backups/20260806-112556-c304e1573be8`, `/opt/rdgen-previous-20260806-112556-c304e1573be8`, and `rdgen-rollback:20260806-112556-c304e1573be8`. The backup contains online/final SQLite snapshots plus the prior environment, Nginx configuration, source, build/test logs, and image metadata. The immediately preceding `20260806-095234-519e12ac7652` and earlier rollback sets remain present.
+- Root-only rollback material is under `/opt/rdgen-backups/20260806-114847-11bd5bd3f877`, `/opt/rdgen-previous-20260806-114847-11bd5bd3f877`, and `rdgen-rollback:20260806-114847-11bd5bd3f877`. The backup contains online/final SQLite snapshots plus the prior environment, Nginx configuration, source, build/test logs, and image metadata. The immediately preceding `20260806-112556-c304e1573be8` and earlier rollback sets remain present.
 - The hourly cleanup converted the former cancelled legacy `in_progress` row to `timed_out`. Current database and GitHub gates report zero active client workflows.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
 
