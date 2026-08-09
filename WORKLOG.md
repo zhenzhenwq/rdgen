@@ -894,3 +894,12 @@ User constraint recorded:
 - Local browser geometry checks covered all three management routes without horizontal overflow; the complete local and candidate-image Django suites passed 177/177 tests, along with system checks, migration-drift checks, compile checks, copied-production migration rehearsal, authenticated rendering, and build-record permission isolation.
 - Application commit `11bd5bd3f877ef02c702096dbb2a606302d136f9` (tree `0f5b6f760ced089e1b82ee540c9777a879ccc9c9`) was deployed from archive SHA-256 `e496589895e3e69e8f8071fb859bd3d28281f9b1d143ae84586b280e31538b94` under ID `20260806-114847-11bd5bd3f877`. Live image `sha256:3661f8b5f014a789656915bb18cbc719aa1575bb0c61ed9c549c311ae0e9a63f` is `running`, `healthy`, and has restart count `0`.
 - Production preserved 4 users and all 39 historical tasks, with SQLite `quick_check=ok`, zero active builds, all three management-page full-width assertions passing, and no recent error fingerprints. No generator form or client workflow was submitted. Current rollback material is `/opt/rdgen-backups/20260806-114847-11bd5bd3f877`, `/opt/rdgen-previous-20260806-114847-11bd5bd3f877`, and `rdgen-rollback:20260806-114847-11bd5bd3f877`.
+
+## 2026-08-09
+
+### Official RustDesk Client Source Sync
+
+- Reused the clean official clone at `D:\rustdesk-生成器\rustdesk-src` rather than creating another duplicate. It previously pointed at detached tag `1.4.6`; the separate dirty `rustdesk-src-147-inspect` and `rustdesk-src-149-inspect` patch-test trees were inspected read-only and left untouched.
+- Fetched the official `https://github.com/rustdesk/rustdesk.git` default branch with proxy overrides and created local tracking branch `upstream-master`. Local HEAD and the independently queried official remote HEAD both equal `11190fa54e45fd244ad46b46052f92be6a01d3c5` (`docs: fix comma splice gui tutorial in README.md (#15787)`, 2026-08-08 09:33:58 +0800).
+- Fetched and recorded latest stable tag `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747`. Current master declares `version = "1.4.9"` in `Cargo.toml` and `1.4.9+67` in `flutter/pubspec.yaml`.
+- Initialized `libs/hbb_common` recursively at `69cea8dafee147848ae88702029f4bf7df7224c3`. Verified the main worktree and submodule are clean, required Rust/Flutter manifests exist, and the main repository plus submodule contain 984 tracked entries. The clone remains intentionally shallow/partial (`blob:none`); additional history can be fetched if later source questions require it.

@@ -19,6 +19,15 @@ Do not submit the live generator form unless the user explicitly asks. A push to
 
 The full generator path requires public GitHub Actions callbacks. Local Docker cannot provide meaningful end-to-end generation coverage and is not a release prerequisite; use local services only for UI/form inspection unless the user explicitly requests local container work.
 
+## Upstream RustDesk Client Source Reference
+
+- Clean current-source directory: `D:\rustdesk-生成器\rustdesk-src`.
+- Official remote: `https://github.com/rustdesk/rustdesk.git`; branch `upstream-master` tracks `origin/master`.
+- Verified against the official remote HEAD on 2026-08-09 at `11190fa54e45fd244ad46b46052f92be6a01d3c5`, committed 2026-08-08 09:33:58 +0800 with subject `docs: fix comma splice gui tutorial in README.md (#15787)`.
+- Latest stable tag observed is `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747`. The current master manifests declare `1.4.9` / Flutter `1.4.9+67`.
+- `libs/hbb_common` is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3`. The clone is shallow and partial but the current source working tree is complete and clean; fetch additional history on demand.
+- Use this directory for later questions about the latest official client. Do not confuse it with the dirty, preserved patch-test directories `rustdesk-src-147-inspect` and `rustdesk-src-149-inspect`, and do not edit any of the three without a user-requested source change.
+
 ## Current Release Batch
 
 The active batch adapts the generator to RustDesk `1.4.9` while retaining `1.4.7` and `1.4.8` compatibility for strict optional patches.
