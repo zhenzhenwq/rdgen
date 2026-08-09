@@ -19,7 +19,9 @@ Do not submit the live generator form unless the user explicitly asks. A push to
 
 The full generator path requires public GitHub Actions callbacks. Local Docker cannot provide meaningful end-to-end generation coverage and is not a release prerequisite; use local services only for UI/form inspection unless the user explicitly requests local container work.
 
-## Upstream RustDesk Client Source Reference
+## Upstream RustDesk Source References
+
+### Client
 
 - Clean current-source directory: `D:\rustdesk-生成器\rustdesk-src`.
 - Official remote: `https://github.com/rustdesk/rustdesk.git`; branch `upstream-master` tracks `origin/master`.
@@ -27,6 +29,15 @@ The full generator path requires public GitHub Actions callbacks. Local Docker c
 - Latest stable tag observed is `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747`. The current master manifests declare `1.4.9` / Flutter `1.4.9+67`.
 - `libs/hbb_common` is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3`. The clone is shallow and partial but the current source working tree is complete and clean; fetch additional history on demand.
 - Use this directory for later questions about the latest official client. Do not confuse it with the dirty, preserved patch-test directories `rustdesk-src-147-inspect` and `rustdesk-src-149-inspect`, and do not edit any of the three without a user-requested source change.
+
+### OSS Server
+
+- Clean current-source directory: `D:\rustdesk-生成器\rustdesk-server-src`.
+- Official remote: `https://github.com/rustdesk/rustdesk-server.git`; local `master` tracks `origin/master`.
+- Verified against official remote HEAD on 2026-08-09 at `a7736be5e40f85bfc141120dce587e836e5d4b80`, committed 2026-08-07 16:56:36 +0800 with subject `Delete .github/dependabot.yml`.
+- Latest stable tag observed is `1.1.16` at `73523b31cfd25d77dee862e6fc9f5e1fb5e485ef`; current master declares development version `1.1.17`.
+- `libs/hbb_common` is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3`. The shallow/partial clone has a complete and clean current worktree containing the `hbbs`, `hbbr`, Docker, systemd, Debian, and Kubernetes sources.
+- Use this directory for later questions about the official OSS rendezvous/relay server. Read its repository-local `AGENTS.md` before editing and keep it unchanged unless the user requests a source modification.
 
 ## Current Release Batch
 

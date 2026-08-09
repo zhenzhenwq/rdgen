@@ -903,3 +903,11 @@ User constraint recorded:
 - Fetched the official `https://github.com/rustdesk/rustdesk.git` default branch with proxy overrides and created local tracking branch `upstream-master`. Local HEAD and the independently queried official remote HEAD both equal `11190fa54e45fd244ad46b46052f92be6a01d3c5` (`docs: fix comma splice gui tutorial in README.md (#15787)`, 2026-08-08 09:33:58 +0800).
 - Fetched and recorded latest stable tag `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747`. Current master declares `version = "1.4.9"` in `Cargo.toml` and `1.4.9+67` in `flutter/pubspec.yaml`.
 - Initialized `libs/hbb_common` recursively at `69cea8dafee147848ae88702029f4bf7df7224c3`. Verified the main worktree and submodule are clean, required Rust/Flutter manifests exist, and the main repository plus submodule contain 984 tracked entries. The clone remains intentionally shallow/partial (`blob:none`); additional history can be fetched if later source questions require it.
+
+### Official RustDesk OSS Server Source Sync
+
+- Cloned `https://github.com/rustdesk/rustdesk-server.git` into the independent sibling directory `D:\rustdesk-生成器\rustdesk-server-src` using a shallow partial clone with recursively initialized submodules.
+- Local `master` and an independent official remote HEAD query both resolve to `a7736be5e40f85bfc141120dce587e836e5d4b80` (`Delete .github/dependabot.yml`, 2026-08-07 16:56:36 +0800). The worktree and submodule are clean.
+- Fetched and recorded latest stable tag `1.1.16` at `73523b31cfd25d77dee862e6fc9f5e1fb5e485ef`; current master declares development version `1.1.17` in `Cargo.toml`.
+- Initialized `libs/hbb_common` at `69cea8dafee147848ae88702029f4bf7df7224c3`. The main repository plus submodule contain 144 tracked entries, including the `hbbs` default binary source in `src/main.rs`, `hbbr` in `src/hbbr.rs`, and Docker/systemd/Debian/Kubernetes deployment material.
+- Recorded this directory as the clean, read-only-by-default OSS server reference. Its repository-local `AGENTS.md` must be read before future edits and requires semantic-only diffs plus explicit error handling in production Rust code.

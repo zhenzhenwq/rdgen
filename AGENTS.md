@@ -36,7 +36,9 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Treat it as strictly read-only. Do not write, edit, format, move, delete, clean, or generate files inside this old project.
 - Useful generic fixes may be ported, but avoid copying personal overlay behavior tied to `zhenzhen122/rustdesk`.
 
-## Upstream RustDesk Client Source Reference
+## Upstream RustDesk Source References
+
+### Client
 
 - Current official client source reference: `D:\rustdesk-生成器\rustdesk-src`.
 - Remote: `https://github.com/rustdesk/rustdesk.git`; local branch `upstream-master` tracks `origin/master`.
@@ -44,6 +46,15 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Latest stable tag observed during that sync is `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747`; the synced master worktree currently declares RustDesk `1.4.9` in `Cargo.toml` and `1.4.9+67` in `flutter/pubspec.yaml`.
 - The `libs/hbb_common` submodule is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3` (`main`). The clone is intentionally shallow and partial (`blob:none`) but has a complete current working tree; fetch more history only when a later question needs it.
 - Treat this directory as the clean current-upstream reference for future source questions. Do not modify it unless the user explicitly asks for an upstream-source change. The dirty `rustdesk-src-147-inspect` and `rustdesk-src-149-inspect` trees are separate patch experiments and must not be cleaned or overwritten.
+
+### OSS Server
+
+- Current official OSS server source reference: `D:\rustdesk-生成器\rustdesk-server-src`.
+- Remote: `https://github.com/rustdesk/rustdesk-server.git`; local `master` tracks `origin/master`.
+- Synced on 2026-08-09 to official default-branch commit `a7736be5e40f85bfc141120dce587e836e5d4b80` (`Delete .github/dependabot.yml`, committed 2026-08-07 16:56:36 +0800).
+- Latest stable tag observed during the sync is `1.1.16` at `73523b31cfd25d77dee862e6fc9f5e1fb5e485ef`; current master declares development version `1.1.17` in `Cargo.toml`.
+- The `libs/hbb_common` submodule is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3`. The clone is intentionally shallow and partial (`blob:none`) with a complete, clean current working tree.
+- Treat this as the clean current OSS server reference for later `hbbs`/`hbbr` questions. Do not modify it unless explicitly requested, and read its own `AGENTS.md` before any future edit; it forbids production `unwrap()`/`expect()` outside stated exceptions and formatting-only churn.
 
 ## Current Session Handoff Rules
 
