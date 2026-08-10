@@ -81,23 +81,23 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Eleven new patch/test files under `.github/patches/` were tracked by the release commit; runtime workflows download patch helpers from the exact `${{ github.sha }}`.
 - Public Actions history contains successful manual Windows generator runs for `8e33770` and `cd2c358`, but their artifacts were not audited here. No Linux or Android build has been verified for this batch. macOS was compiled on real GitHub-hosted macOS runners for both Intel and Apple Silicon in validation run `29975374837`.
 - The automatic Docker runs for `8e33770` and `cd2c358` failed before image build because Docker Hub login inputs were unavailable.
-- The current deployed application release is `11bd5bd3f877ef02c702096dbb2a606302d136f9` (tree `0f5b6f760ced089e1b82ee540c9777a879ccc9c9`). It retains the scoped, read-only build-history dashboard and removes the shared 1180px desktop cap so build records, user management, and activation-code management use all space to the right of the 248px sidebar. Form panels retain their own narrower width limits.
+- The current deployed application release is `d4ec7e498a60f0996b9b10372b8ac0d1b365d10c` (tree `eba9444758cb4b1bc82fc5aef29c269633a4497e`). It retains the full-width management pages and adds server-managed relay selection: generated clients force an empty `override-settings.relay-server` by default so hbbs supplies the relay, while an advanced field can force one explicit hbbr address.
 - New registrations require a short-lived email code and start without membership. Staff can create, list, filter, and revoke unused codes for one generation, 3 days, 7 days, 30 days, or lifetime; plaintext activation codes are shown only at creation and stored as hashes. The production SMTP account and authorization value are intentionally absent from repository memory.
-- The server application is built from `11bd5bd`; later documentation-only commits do not change the live image. Push-triggered Docker failures remain limited to the repository's existing Docker Hub login step and do not dispatch client builds or affect the directly deployed server image.
+- The server application is built from `d4ec7e4`; later documentation-only commits do not change the live image. Push-triggered Docker run `31349924535` failed only at the repository's known Docker Hub login step; it did not dispatch a client build or affect the directly deployed server image.
 - GitHub Actions run `29975374837` passed the complete validation matrix for `x86_64` and `aarch64`: customization validation, compilation, embedded configuration packaging, ad-hoc code signing, bundle metadata and architecture checks, DMG creation, `hdiutil verify`, and artifact upload. Validation mode skipped production upload and cleanup callbacks by design.
 - A push to `master` starts `docker-build.yml`; it does not dispatch a RustDesk client generator workflow.
 - Confirm the current local and remote state with `git status --short --branch`, `git log --oneline -n 8 --decorate`, and a fresh remote query before follow-up release work.
 
 ## Current Deployment State
 
-- Deployment ID: `20260806-114847-11bd5bd3f877`.
-- Source archive SHA-256: `e496589895e3e69e8f8071fb859bd3d28281f9b1d143ae84586b280e31538b94`. Verified live image: `sha256:3661f8b5f014a789656915bb18cbc719aa1575bb0c61ed9c549c311ae0e9a63f`.
-- The service is `running`, `healthy`, restart count `0`, and has no post-deploy error fingerprints. The complete 177-test suite passed locally and again in the candidate image running Django `5.2.16`; the copied-production migration rehearsal, all three full-width management-page render checks, build-record permission checks, login/registration rendering, static-asset hashes, and isolated candidate instance also passed.
+- Deployment ID: `20260810-103245-d4ec7e498a60`.
+- Source archive SHA-256: `b5b2ff4cfa00ffcac5c9668618a71e6a0541d6c781fd2c9b89ea330e7bf577bb`. Verified live image: `sha256:d2358abecb4c7bf741e4a96d90bc766c9ad70e876fa27cfc78e29bee71c147c7`.
+- The service is `running`, `healthy`, restart count `0`, and has no post-deploy error fingerprints. The complete 189-test suite passed locally and again in the candidate image running Django `5.2.16`; migration rehearsal, relay-form/config assertions, authenticated page checks, static-asset hashes, and an isolated candidate instance also passed.
 - Production Nginx now serves only the two exact login assets at `/static/rdgenerator/login-modern.css` and `/static/rdgenerator/auth-build-flow.png`. The prior Nginx configuration is in the rollback backup, `nginx -t` passes, and the existing TLS, redirect, HSTS, login rate-limit, and application proxy rules remain unchanged.
 - Public `/login/`, `/register/`, both new static assets, and `/healthz` return 200; `/register/email-code/` rejects GET with 405, HTTP redirects to HTTPS, and anonymous generator access still redirects to `/login/`. Browser verification found the stylesheet and 1254×1254 illustration loaded, no horizontal overflow, and no console issues.
-- `.env`, `data`, `exe`, `png`, and `temp_zips` were preserved. `migrate --check` and SQLite `quick_check` pass with 4 users and all 39 historical task rows retained. Database and GitHub gates reported zero active client builds before, during, and after the switch.
-- Keep `/opt/rdgen-backups/20260806-114847-11bd5bd3f877`, `/opt/rdgen-previous-20260806-114847-11bd5bd3f877`, and image tag `rdgen-rollback:20260806-114847-11bd5bd3f877` for the current rollback. The backup includes online and final SQLite snapshots, the prior environment and Nginx configuration, the exact source archive, build/test logs, and image metadata. Retain `20260806-112556-c304e1573be8` and earlier rollback sets as fallbacks.
-- No live generator form was submitted and no client workflow was dispatched during deployment or verification.
+- `.env`, `data`, `exe`, `png`, and `temp_zips` were preserved. `migrate --check` and SQLite `quick_check` pass. The deployment retained 4 users and 39 task rows; the authorized relay test build then added successful row 40. No active client build remains.
+- Keep `/opt/rdgen-backups/20260810-103245-d4ec7e498a60`, `/opt/rdgen-previous-20260810-103245-d4ec7e498a60`, and image tag `rdgen-rollback:20260810-103245-d4ec7e498a60` for the current rollback. The backup includes online and final SQLite snapshots, the prior environment and Nginx configuration, the exact source archive, build/test logs, and image metadata. Retain the earlier rollback sets as fallbacks.
+- Deployment checks did not submit the live form. After cutover, the user-authorized `RelayPoolTest` Windows x64 build was dispatched specifically to verify the new relay configuration path; it completed successfully and is recorded below.
 - The temporary OSS multi-relay test uses official server `1.1.16`: hbbs `120.55.0.199:22116`, relay A `:22117`, and relay B `:23117`, with `ALWAYS_USE_RELAY=Y`. Each transient service is capped at 128 MB and 25% CPU. Real clients verified B/A round-robin and, after A was stopped, automatic reconnection to B in about eight seconds; A was restored and both relays are healthy. This same-host test proves basic list/health/round-robin/failover behavior, not geographic redundancy or independent-host resilience. Preserve the test directory and private key; never copy the private key into Git or chat.
 
 ## Historical Verified Outputs
@@ -118,6 +118,14 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
     - `D:\rustdesk-生成器\sign-test-output\SignTest.exe`
     - `D:\rustdesk-生成器\sign-test-output\SignTest.msi`
   - Both were signed by `CN=RDGen Self-Signed Code Signing`.
+- Windows server-managed relay build:
+  - filename: `RelayPoolTest`
+  - UUID: `42bd21b0-77d2-4182-9ac9-db6758388754`
+  - GitHub Actions run: `31350450912`
+  - local outputs: `D:\rustdesk-生成器\rdgen\output\relay-client-42bd21b0\RelayPoolTest.exe` and `RelayPoolTest.msi`
+  - SHA-256: EXE `eafc6f3d4913a50a8f36c32bc26c066fdbe2df237034859dd1cdf17ebccfc1ea`; MSI `f1d6d6a545f6b59f70e703a2b650ba1c6af9b57a9b557d8cd8657679e3b90480`
+  - extracted MSI `custom_.txt` confirms ID server `120.55.0.199:22116`, no top-level relay field, and an empty `override-settings.relay-server`; real runtime testing of this exact generated client is still pending
+  - both artifacts are timestamped and self-signed by `CN=RDGen Self-Signed Code Signing`; Windows reports an untrusted root unless the public root certificate is explicitly trusted in the appropriate certificate store, so do not describe these signatures as publicly trusted and never distribute the PFX/private key
 - Android universal output test:
   - filename: `WuYouDesk`
   - UUID: `9de4743a-ec38-4266-b155-cd383ae64685`

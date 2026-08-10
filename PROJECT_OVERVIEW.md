@@ -145,7 +145,7 @@ Important implemented changes compared with the upstream author's baseline:
 
 ## External Systems
 
-- Live generator URL: `http://120.55.0.199:8000/`
+- Live generator URL: `https://120.55.0.199/`
 - Live generator host directory: `/opt/rdgen`
 - Live generator Docker service: `rdgen-rdgen-1`
 - Current project repo/fork: `https://github.com/zhenzhenwq/rdgen.git`
@@ -157,7 +157,10 @@ Secrets are intentionally not stored here. Ask the user or use already configure
 
 ## Current Test Links
 
+- Server-managed relay Windows verification:
+  `https://120.55.0.199/check_for_file?filename=RelayPoolTest&uuid=42bd21b0-77d2-4182-9ac9-db6758388754&platform=windows`
+
 - Android universal verification:
-  `http://120.55.0.199:8000/check_for_file?filename=WuYouDesk&uuid=9de4743a-ec38-4266-b155-cd383ae64685&platform=android`
+  `https://120.55.0.199/check_for_file?filename=WuYouDesk&uuid=9de4743a-ec38-4266-b155-cd383ae64685&platform=android`
 - Old Android report that only has pre-fix split APKs:
-  `http://120.55.0.199:8000/check_for_file?filename=WuYouDesk&uuid=dcaa5218-3b21-4883-a4e9-d28a96c467eb&platform=android`
+  `https://120.55.0.199/check_for_file?filename=WuYouDesk&uuid=dcaa5218-3b21-4883-a4e9-d28a96c467eb&platform=android`
