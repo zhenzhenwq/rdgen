@@ -9,7 +9,7 @@ This is the current durable handoff for the RustDesk generator work.
 - User fork/build repository: `https://github.com/zhenzhenwq/rdgen.git`
 - Upstream: `https://github.com/bryangerlach/rdgen.git`
 - Deployed generator: `https://120.55.0.199/`
-- Host-purpose boundary: `120.55.0.199` is for the generator deployment only. A root audit on 2026-08-10 found no installed or running RustDesk OSS/Pro `hbbs` or `hbbr` service and no 21114-21119 listener. Do not install one there without explicit user approval.
+- Host-purpose boundary: `120.55.0.199` remains the generator production host. A root audit on 2026-08-10 found no pre-existing RustDesk server; afterward, the user explicitly approved one isolated temporary multi-relay test. Its exact footprint is `/opt/rdgen-relay-test`, user `rdgen-relay-test`, and the three `rdgen-relay-test-*` transient systemd units. Do not expand it into a production server without fresh approval.
 - Old reference project: `D:\rustdesk_web客户端\rdgen-repo`
 
 The old reference project is strictly read-only. Do not edit, format, move, delete, clean, or generate files inside it.
@@ -135,7 +135,7 @@ Important Linux/Flatpak boundaries:
 - Root-only rollback material is under `/opt/rdgen-backups/20260806-114847-11bd5bd3f877`, `/opt/rdgen-previous-20260806-114847-11bd5bd3f877`, and `rdgen-rollback:20260806-114847-11bd5bd3f877`. The backup contains online/final SQLite snapshots plus the prior environment, Nginx configuration, source, build/test logs, and image metadata. The immediately preceding `20260806-112556-c304e1573be8` and earlier rollback sets remain present.
 - The hourly cleanup converted the former cancelled legacy `in_progress` row to `timed_out`. Current database and GitHub gates report zero active client workflows.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
-- The generator-only host audit checked Docker containers/images/volumes/networks, systemd, processes, installed packages, commands, cron, Nginx, firewall rules, exact filesystem names, and ports 21114-21119. No RustDesk server deletion was performed because no target existed. Files containing `rustdesk` under `/opt/rdgen*` belong to generator source/rollback material and remain preserved.
+- The pre-test host audit checked Docker, systemd, processes, packages, cron, Nginx, firewall, filesystem, and ports 21114-21119; no pre-existing RustDesk server target existed, so nothing was deleted. The later user-authorized test runs official OSS server `1.1.16` with hbbs on `120.55.0.199:22116`, relay A on `:22117`, relay B on `:23117`, and forced relay enabled. Real clients verified B/A round-robin plus automatic reconnection to B roughly eight seconds after A was stopped. A was restored; all three test units are active, both relays are healthy, and the generator remains healthy with zero restarts. The same-host topology is only a functional proof, not geographic or host-level redundancy.
 
 ## Not Yet Verified
 
