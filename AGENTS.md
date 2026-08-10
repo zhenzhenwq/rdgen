@@ -124,7 +124,8 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
   - GitHub Actions run: `31350450912`
   - local outputs: `D:\rustdesk-生成器\rdgen\output\relay-client-42bd21b0\RelayPoolTest.exe` and `RelayPoolTest.msi`
   - SHA-256: EXE `eafc6f3d4913a50a8f36c32bc26c066fdbe2df237034859dd1cdf17ebccfc1ea`; MSI `f1d6d6a545f6b59f70e703a2b650ba1c6af9b57a9b557d8cd8657679e3b90480`
-  - extracted MSI `custom_.txt` confirms ID server `120.55.0.199:22116`, no top-level relay field, and an empty `override-settings.relay-server`; real runtime testing of this exact generated client is still pending
+  - extracted MSI `custom_.txt` confirms ID server `120.55.0.199:22116`, no top-level relay field, and an empty `override-settings.relay-server`; two real Windows devices then used both relays, and a controlled stop of active relay A caused automatic re-pairing through B in about 18 seconds
+  - relay A was restored immediately after the failover test; hbbs, both hbbr units, and the generator finished healthy, with the active session remaining on B
   - both artifacts are timestamped and self-signed by `CN=RDGen Self-Signed Code Signing`; Windows reports an untrusted root unless the public root certificate is explicitly trusted in the appropriate certificate store, so do not describe these signatures as publicly trusted and never distribute the PFX/private key
 - Android universal output test:
   - filename: `WuYouDesk`
