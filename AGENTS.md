@@ -73,6 +73,17 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - If deploying source changes to `120.55.0.199`, do not assume `git pull` works there. Either install git deliberately, upload a controlled source snapshot, or rebuild/recreate the Docker service from a known copied tree.
 - The old project `D:\rustdesk_web客户端\rdgen-repo` remains read-only even if it contains useful reference fixes.
 
+## Phase-Two Smart Multi-relay Design State
+
+- Product discovery and the first-release engineering contract are frozen in `MULTI_RELAY_PHASE2_DECISIONS.md` and `MULTI_RELAY_PHASE2_SPEC.md`. Decisions 0-44 are locked; there is no pending product question.
+- The implementation baseline is RustDesk client `1.4.9` at `6c578292e8ebbbec708b76986ba8c4bc7c509747` / `hbb_common` `7e1c392c62d39c364127307cd408421dd5f8cfb0`, plus rustdesk-server `1.1.16` at `73523b31cfd25d77dee862e6fc9f5e1fb5e485ef` / `hbb_common` `83419b6549636ee39dacef7776c473f5802e08d6`.
+- Planned architecture is one custom hbbs/controller, unchanged official hbbr `1.1.16` nodes, one outbound-HTTPS agent per relay host, and smart RustDesk `1.4.9` clients on Windows x64/x86, Linux, and Android. macOS is excluded from the smart build.
+- Selection optimizes two-peer RTT sum with a per-leg guardrail, then considers configured Mbps, metered/unmetered traffic policy, current utilization, quota, maintenance, and host protection. At most 50 relay nodes are supported; clients probe at most 6 IPv4 candidates.
+- Smart `RequestRelay` preserves RustDesk's safe retry pattern: each retry uses a new UUID, but every retry must reuse the same server-signed relay selection and endpoint. Do not reintroduce same-UUID UDP retransmission to old clients.
+- Decision 44 keeps upstream rustdesk-server PeerMap IP persistence unchanged for registration security. New smart measurement, scheduling, aggregation, logs, CLI, events, and backups must not persist complete peer IPs or raw per-session measurements.
+- The frozen specification passed independent protocol, scheduler/accounting, and operations/security review with no remaining P0/P1 conflicts. This is documentation only: no phase-two client/server/agent production code exists, no new artifact has been built, and no production deployment is authorized.
+- When implementation starts, create separate writable worktrees/forks from the exact stable commits. Keep the clean upstream reference directories unchanged, keep official hbbr unmodified, and begin with the specification's enrollment/telemetry vertical slice and tests before generator or production integration.
+
 ## Current Release State
 
 - The development baseline for the RustDesk `1.4.9` batch was `8ff0593`, matching `origin/master` when work resumed on 2026-07-13.

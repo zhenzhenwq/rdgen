@@ -143,6 +143,21 @@ Important implemented changes compared with the upstream author's baseline:
     - `${filename}-armv7.apk`
     - `${filename}-x86_64.apk`
 
+## Frozen Phase-two Smart Multi-relay Plan
+
+Phase one is implemented and verified: generated clients leave relay choice to hbbs, official OSS hbbs accepts multiple hbbr addresses, and real Windows clients used both test relays and reconnected after the active relay stopped.
+
+Phase two is fully specified but not implemented. The authoritative records are:
+
+- `MULTI_RELAY_PHASE2_DECISIONS.md`: product decisions 0–44 with no pending question.
+- `MULTI_RELAY_PHASE2_SPEC.md`: frozen protocol, scheduler, accounting, agent, security, installer, generator, release, and validation contract.
+
+The planned first release uses a custom RustDesk server `1.1.16` hbbs/controller, unchanged official hbbr nodes, a lightweight outbound-HTTPS agent on each relay host, and modified RustDesk `1.4.9` clients for Windows x64/x86, Linux, and Android. It selects one relay per connection from at most six candidates using the two peers' combined RTT, a per-peer latency guardrail, configured bandwidth, live utilization, metered/unmetered traffic policy, quota, maintenance, and host protection. Missing monitoring data falls back to the official TCP-healthy pool without overriding explicit disable/maintenance or confirmed quota exhaustion.
+
+This design supports at most 50 IPv4 relay nodes, keeps client retries on the same signed relay while using a new UUID per attempt, and leaves the official hbbr data path unchanged. New smart data does not persist complete peer IPs or raw per-session measurements; upstream PeerMap registration-security behavior remains unchanged. The first release is CLI/config driven; customer API, web administration, notifications, runtime licensing, automatic upgrades, IPv6, macOS smart builds, and hbbs HA remain deferred.
+
+No phase-two production source, build, or deployment exists yet. Implementation must begin in separate writable worktrees from the exact frozen client/server stable commits and must not expand the temporary test footprint on the generator host without fresh authorization.
+
 ## External Systems
 
 - Live generator URL: `https://120.55.0.199/`

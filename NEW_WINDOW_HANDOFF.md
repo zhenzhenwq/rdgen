@@ -40,6 +40,17 @@ The full generator path requires public GitHub Actions callbacks. Local Docker c
 - `libs/hbb_common` is initialized at `69cea8dafee147848ae88702029f4bf7df7224c3`. The shallow/partial clone has a complete and clean current worktree containing the `hbbs`, `hbbr`, Docker, systemd, Debian, and Kubernetes sources.
 - Use this directory for later questions about the official OSS rendezvous/relay server. Read its repository-local `AGENTS.md` before editing and keep it unchanged unless the user requests a source modification.
 
+## Frozen Phase-two Smart Multi-relay Design
+
+- `MULTI_RELAY_PHASE2_DECISIONS.md` contains decisions 0-44. Product discovery is complete and there is no pending first-release question.
+- `MULTI_RELAY_PHASE2_SPEC.md` is the frozen first-release engineering contract. Protocol, scheduler/accounting, and operations/security terminal reviews found no remaining P0/P1 conflict.
+- Exact implementation baselines are client `1.4.9` (`6c578292...`, hbb `7e1c392c...`) and server `1.1.16` (`73523b31...`, hbb `83419b65...`). The clean source-reference directories remain read-only; implementation requires separate writable worktrees.
+- Planned components are custom hbbs/controller, unchanged official hbbr, one outbound-HTTPS relay agent, local CLI, and smart client patches for Windows x64/x86, Linux, and Android. The first release is IPv4-only, one controller, and at most 50 relays; macOS/API/Web UI/notifications/upgrades/runtime licensing/HA are deferred.
+- Scheduling uses two-peer RTT sum with a per-leg guardrail plus bandwidth, utilization, metered quota, maintenance, and host-safety policy. Client probing is bounded to six candidates. Missing monitoring falls back to compatible official TCP-health selection while explicit admin policy and confirmed quota exhaustion remain authoritative.
+- Every smart `RequestRelay` retry generates a new UUID as upstream does, but reuses one server-signed selection and endpoint. This is the frozen compatibility rule for both smart and old target clients.
+- Decision 44 preserves upstream PeerMap's existing registration-security IP storage; all newly added smart measurement/session data obeys the stricter non-persistence boundary.
+- No phase-two source code, artifact, server mutation, or production deployment has been performed. The temporary same-host phase-one services are not a phase-two environment and must not be expanded without new approval.
+
 ## Current Release Batch
 
 The active batch adapts the generator to RustDesk `1.4.9` while retaining `1.4.7` and `1.4.8` compatibility for strict optional patches.
@@ -85,6 +96,7 @@ Runtime patch helpers are downloaded from the current `${{ github.sha }}`; the s
 - Current deployed application release: `d4ec7e498a60f0996b9b10372b8ac0d1b365d10c` (`Support server-managed relay selection`, tree `eba9444758cb4b1bc82fc5aef29c269633a4497e`). It retains the full-width management workspace and adds an advanced fixed-relay field while making hbbs-selected relay the default.
 - The live application is built from `d4ec7e4`. Documentation-only commits after that application commit do not change the server image. Push-triggered Docker run `31349924535` stopped at the known Docker Hub login step and did not dispatch a RustDesk client workflow.
 - Treat the latest `master` commit containing this handoff as the authoritative batch state.
+- The latest documentation state also includes the frozen phase-two decision/specification files; it does not change the live `d4ec7e4` application image.
 
 ## Verified State
 
@@ -146,6 +158,7 @@ Important Linux/Flatpak boundaries:
 - Docker image runs, including application push run `31349924535` and subsequent documentation-only pushes, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS ad-hoc signing is verified on real runners. Production P12 signing with configured secrets, Apple notarization, and stapling remain unverified.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
+- Phase two remains design-only: no custom hbbs/controller, agent, client protocol patch, installer, artifact, three-region test, 50-node load test, or generator integration has been implemented or verified.
 
 ## Resume Checklist
 
@@ -154,6 +167,7 @@ Important Linux/Flatpak boundaries:
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
 5. The relay-aware generator release, real Windows build, and controlled failover validation are complete. Treat additional builds, independent-host relay testing, local Docker setup, and Docker credential repair as separate follow-up work.
+6. For phase two, read both frozen design documents first, create writable worktrees at the exact locked stable commits, and begin with the enrollment/telemetry vertical slice. Do not edit clean upstream references or deploy to `120.55.0.199` without a new explicit authorization.
 
 ## Deployment Notes
 
