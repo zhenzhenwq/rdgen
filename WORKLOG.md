@@ -911,3 +911,12 @@ User constraint recorded:
 - Fetched and recorded latest stable tag `1.1.16` at `73523b31cfd25d77dee862e6fc9f5e1fb5e485ef`; current master declares development version `1.1.17` in `Cargo.toml`.
 - Initialized `libs/hbb_common` at `69cea8dafee147848ae88702029f4bf7df7224c3`. The main repository plus submodule contain 144 tracked entries, including the `hbbs` default binary source in `src/main.rs`, `hbbr` in `src/hbbr.rs`, and Docker/systemd/Debian/Kubernetes deployment material.
 - Recorded this directory as the clean, read-only-by-default OSS server reference. Its repository-local `AGENTS.md` must be read before future edits and requires semantic-only diffs plus explicit error handling in production Rust code.
+
+## 2026-08-10
+
+### Generator Host RustDesk Server Audit
+
+- At the user's request, performed a root-level, read-only audit of `120.55.0.199` before any destructive action. The host's only running Docker workload is the healthy `rdgen-rdgen-1` generator under compose project `/opt/rdgen`; its restart count is `0` and public `/healthz` returns `200`.
+- Found no RustDesk `hbbs`/`hbbr` containers, images, processes, systemd services, commands, installed packages, Docker volumes/networks, cron entries, Nginx references, firewall rules, exact-named deployment files/directories, or TCP/UDP listeners on ports 21114-21119.
+- Matches containing `rustdesk` in the first broad filesystem scan were generator patch/workflow files inside `/opt/rdgen` and preserved generator rollback trees. They are not RustDesk server installations and were deliberately preserved.
+- Because the user's deletion condition was “delete it if present” and no RustDesk server target existed, no service, container, file, data, firewall rule, or image was deleted. The host boundary is now explicitly generator-only unless the user later authorizes a RustDesk server installation.

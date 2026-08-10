@@ -65,6 +65,8 @@ The user wants to optimize this RustDesk custom client generator. Keep changes s
 - Credentials were provided in chat during previous work, but repository memory files intentionally omit the secret values.
 - Code signing certificate material is outside the repo at `D:\rustdesk-生成器\codesign\`; treat the PFX and password file as sensitive.
 - Generator server is reachable at `https://120.55.0.199/`; HTTP port 80 redirects to HTTPS.
+- Treat `120.55.0.199` as a generator-only host. A two-pass root audit on 2026-08-10 found no RustDesk `hbbs`/`hbbr` container, process, systemd unit, executable, package, Docker volume/network, cron/Nginx/firewall reference, filesystem deployment, or listener on ports 21114-21119. Do not install a RustDesk server there unless the user explicitly changes this boundary.
+- RustDesk-named files under `/opt/rdgen*` are generator source patches and rollback snapshots, not deployed RustDesk services; preserve them with the generator deployment and never delete them as false positives.
 - The deployed generator directory on `120.55.0.199` is `/opt/rdgen`, but that server currently does not have `git` installed.
 - The live Docker service is `rdgen-rdgen-1`. Container port `8000` is bound only to `127.0.0.1`; Nginx owns public ports 80/443 and applies login rate limiting.
 - Let's Encrypt issues the trusted IP certificate. `rdgen-certbot-renew.timer` checks renewal twice daily and reloads Nginx after successful renewal.

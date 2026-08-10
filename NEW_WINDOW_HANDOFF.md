@@ -9,6 +9,7 @@ This is the current durable handoff for the RustDesk generator work.
 - User fork/build repository: `https://github.com/zhenzhenwq/rdgen.git`
 - Upstream: `https://github.com/bryangerlach/rdgen.git`
 - Deployed generator: `https://120.55.0.199/`
+- Host-purpose boundary: `120.55.0.199` is for the generator deployment only. A root audit on 2026-08-10 found no installed or running RustDesk OSS/Pro `hbbs` or `hbbr` service and no 21114-21119 listener. Do not install one there without explicit user approval.
 - Old reference project: `D:\rustdesk_web客户端\rdgen-repo`
 
 The old reference project is strictly read-only. Do not edit, format, move, delete, clean, or generate files inside it.
@@ -134,6 +135,7 @@ Important Linux/Flatpak boundaries:
 - Root-only rollback material is under `/opt/rdgen-backups/20260806-114847-11bd5bd3f877`, `/opt/rdgen-previous-20260806-114847-11bd5bd3f877`, and `rdgen-rollback:20260806-114847-11bd5bd3f877`. The backup contains online/final SQLite snapshots plus the prior environment, Nginx configuration, source, build/test logs, and image metadata. The immediately preceding `20260806-112556-c304e1573be8` and earlier rollback sets remain present.
 - The hourly cleanup converted the former cancelled legacy `in_progress` row to `timed_out`. Current database and GitHub gates report zero active client workflows.
 - No live generator form was submitted and no client workflow was dispatched during deployment.
+- The generator-only host audit checked Docker containers/images/volumes/networks, systemd, processes, installed packages, commands, cron, Nginx, firewall rules, exact filesystem names, and ports 21114-21119. No RustDesk server deletion was performed because no target existed. Files containing `rustdesk` under `/opt/rdgen*` belong to generator source/rollback material and remain preserved.
 
 ## Not Yet Verified
 
