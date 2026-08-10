@@ -419,6 +419,10 @@ SAFE_SCRIPT_VALUE = RegexValidator(
     regex=r"""^[^\x00-\x1f\x7f"'`;&|$<>\\]+$""",
     message="内容包含构建脚本不支持的字符。",
 )
+SINGLE_RELAY_SERVER = RegexValidator(
+    regex=r"^[^,]+$",
+    message="固定中继服务器只能填写一个地址；多中继列表应配置在 hbbs。",
+)
 SAFE_COMPANY_VALUE = RegexValidator(
     regex=r"""^[^\x00-\x1f\x7f"'`;|$<>\\]+$""",
     message="公司名称包含构建脚本不支持的字符。",
@@ -589,7 +593,12 @@ class GenerateForm(forms.Form):
     )
 
     #Custom Server
-    serverIP = forms.CharField(label="服务器地址", required=False, validators=[SAFE_SCRIPT_VALUE])
+    serverIP = forms.CharField(label="ID 服务器", required=False, validators=[SAFE_SCRIPT_VALUE])
+    relayServer = forms.CharField(
+        label="固定中继服务器",
+        required=False,
+        validators=[SAFE_SCRIPT_VALUE, SINGLE_RELAY_SERVER],
+    )
     apiServer = forms.CharField(
         label="API 服务", required=False, validators=[SAFE_SCRIPT_VALUE, HTTP_URL]
     )
@@ -712,6 +721,38 @@ class GenerateForm(forms.Form):
             cleaned['hideTray'] = (
                 manual_hide_tray_values[manual_hide_tray_source] == 'Y'
             )
+
+        # Preserve fixed relays stored by older exported configurations in the
+        # free-form advanced settings. The dedicated field is authoritative for
+        # new submissions, while a valid legacy value is promoted when that
+        # field is empty. Override settings take precedence over defaults.
+        manual_relay_values = {}
+        normalized_relay_settings = {}
+        manual_relay_invalid = False
+        for field in ('defaultManual', 'overrideManual'):
+            value, normalized = extract_manual_setting(
+                cleaned.get(field),
+                'relay-server',
+            )
+            normalized_relay_settings[field] = normalized
+            if value is None:
+                continue
+            try:
+                manual_relay_values[field] = self.fields['relayServer'].clean(value)
+            except forms.ValidationError as errors:
+                self.add_error(field, errors)
+                manual_relay_invalid = True
+        if manual_relay_values and not manual_relay_invalid:
+            for field, normalized in normalized_relay_settings.items():
+                cleaned[field] = normalized
+            source = (
+                'overrideManual'
+                if 'overrideManual' in manual_relay_values
+                else 'defaultManual'
+            )
+            if not cleaned.get('relayServer'):
+                cleaned['relayServer'] = manual_relay_values[source]
+
         legacy_hidecm_submission = (
             cleaned.get('hidecm')
             and 'hidecmDefaultEnabled' not in self.data

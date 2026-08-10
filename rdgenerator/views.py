@@ -5,6 +5,7 @@ import math
 import mimetypes
 import tempfile
 from datetime import timedelta
+from ipaddress import ip_address
 from pathlib import Path
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
@@ -25,7 +26,7 @@ import base64
 import json
 import uuid
 import pyzipper
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from django.conf import settings as _settings
 from .forms import GenerateForm
 from .models import (
@@ -71,6 +72,36 @@ VALID_ARTIFACT_SUFFIXES = (
     ".dmg",
     ".pkg.tar.zst",
 )
+
+
+def _default_api_server(server):
+    value = (server or "").strip()
+    authority = value.split("://", 1)[-1].split("/", 1)[0]
+    host = None
+    if not authority.startswith("[") and authority.count(":") > 1:
+        try:
+            address = ip_address(authority)
+        except ValueError:
+            pass
+        else:
+            if address.version == 6:
+                host = str(address)
+    try:
+        if not host:
+            parsed = urlsplit(value if "://" in value else f"//{value}")
+            host = parsed.hostname
+    except ValueError:
+        pass
+    if not host:
+        if authority.startswith("[") and "]" in authority:
+            host = authority[1 : authority.index("]")]
+        elif authority.count(":") == 1:
+            host = authority.rsplit(":", 1)[0]
+        else:
+            host = authority
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:21114"
 
 
 def _canonical_run_uuid(value):
@@ -444,6 +475,7 @@ def generator_view(request):
             hideSettingsMenu = form.cleaned_data['hideSettingsMenu'] and platform in desktop_platforms and linuxCustomAllowed
             removeRecentSessions = form.cleaned_data['removeRecentSessions'] and platform in desktop_platforms and linuxCustomAllowed
             server = form.cleaned_data['serverIP']
+            relayServer = form.cleaned_data['relayServer']
             key = form.cleaned_data['key']
             apiServer = form.cleaned_data['apiServer']
             urlLink = form.cleaned_data['urlLink']
@@ -453,8 +485,7 @@ def generator_view(request):
             if not key:
                 key = default_key
             if not apiServer:
-                api_host = server.removeprefix("https://").removeprefix("http://").rstrip("/")
-                apiServer = f"http://{api_host}:21114"
+                apiServer = _default_api_server(server)
             if not urlLink:
                 urlLink = default_url_link
             if not downloadLink:
@@ -525,8 +556,9 @@ def generator_view(request):
                 filename = "rustdesk"
             if not linuxCustomAllowed:
                 server = default_server
+                relayServer = ""
                 key = default_key
-                apiServer = f"http://{default_server}:21114"
+                apiServer = _default_api_server(default_server)
                 urlLink = default_url_link
                 downloadLink = default_download_link
                 direction = "both"
@@ -593,7 +625,6 @@ def generator_view(request):
             if appname.upper() != "RUSTDESK":
                 decodedCustom['app-name'] = appname
             decodedCustom['custom-rendezvous-server'] = server
-            decodedCustom['relay-server'] = server
             decodedCustom['api-server'] = apiServer
             decodedCustom['key'] = key
             decodedCustom['override-settings'] = {}
@@ -694,6 +725,11 @@ def generator_view(request):
                     ),
                     'allow-hide-cm': 'Y' if hidecmDefaultEnabled else 'N',
                 })
+
+            # Keep relay selection authoritative for generated clients. An empty
+            # override makes RustDesk use the relay returned by hbbs even when a
+            # previous installation left a local fixed relay in CONFIG2.
+            decodedCustom['override-settings']['relay-server'] = relayServer
 
             if not linuxCustomAllowed:
                 decodedCustom = {}

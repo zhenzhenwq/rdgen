@@ -757,6 +757,14 @@
         .workspace-page .field-block > input,
         .workspace-page .field-block > select,
         .workspace-page .field-block > textarea { margin-bottom: 0; }
+        .workspace-page .advanced-server-options { padding-top: 2px; }
+        .workspace-page .advanced-server-options summary { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 42px; padding: 6px 2px; border-radius: 6px; color: #4e5865; font-size: 12px; font-weight: 700; cursor: pointer; outline: none; }
+        .workspace-page .advanced-server-options summary::before { color: var(--ui-accent); content: '+'; font-family: 'DM Mono', monospace; font-size: 15px; line-height: 1; }
+        .workspace-page .advanced-server-options[open] summary::before { content: '−'; }
+        .workspace-page .advanced-server-options summary:focus-visible { box-shadow: 0 0 0 3px rgba(47,99,204,.14); }
+        .workspace-page .advanced-server-options__content { margin-top: 12px; padding: 13px; border: 1px solid var(--ui-line); border-radius: 7px; background: #fafbfc; }
+        .workspace-page .advanced-server-options__content label { margin-bottom: 7px; }
+        .workspace-page .advanced-server-options__content input { margin-bottom: 0; }
         .workspace-page #basicCustomFields > .field-grid:has(#androidAppIdField[hidden]) > .field-block:first-child { grid-column: 1 / -1; }
         .workspace-page #build-basic .container.form-grid:has(> .section:nth-child(2)[hidden]) > .section:first-child { grid-column: 1 / -1; }
         .workspace-page .toggle-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 8px; }
@@ -1041,8 +1049,9 @@
                                 <h3 class="section-subtitle"><i class="fas fa-server" aria-hidden="true"></i> 自定义服务器</h3>
                                 <div class="field-grid">
                                     <div class="field-block">
-                                        <label for="{{ form.serverIP.id_for_label }}">服务器地址</label>
+                                        <label for="{{ form.serverIP.id_for_label }}">ID 服务器</label>
                                         {{ form.serverIP }}
+                                        <span class="help-text">填写 hbbs 地址，可包含端口。</span>
                                     </div>
                                     <div class="field-block">
                                         <label for="{{ form.key.id_for_label }}">服务器密钥</label>
@@ -1051,7 +1060,16 @@
                                     <div class="field-block field-block--full">
                                         <label for="{{ form.apiServer.id_for_label }}">API 地址</label>
                                         {{ form.apiServer }}
+                                        <span class="help-text">留空时按 ID 服务器的主机名自动使用 21114 端口。</span>
                                     </div>
+                                    <details id="relayServerOptions" class="advanced-server-options field-block field-block--full"{% if form.relayServer.value or form.relayServer.errors %} open{% endif %}>
+                                        <summary>高级：固定中继服务器</summary>
+                                        <div class="advanced-server-options__content">
+                                            <label for="{{ form.relayServer.id_for_label }}">固定中继服务器</label>
+                                            {{ form.relayServer }}
+                                            <span class="help-text">通常留空，由 ID 服务器选择健康中继；填写后将强制使用单个 hbbr，不能填写逗号分隔的列表。</span>
+                                        </div>
+                                    </details>
                                     <div class="field-block field-block--full">
                                         <label for="{{ form.urlLink.id_for_label }}">站内链接地址</label>
                                         {{ form.urlLink }}
@@ -1352,6 +1370,8 @@
         const hideTrayToggle = document.getElementById("{{ form.hideTray.id_for_label }}");
         const defaultManualInput = document.getElementById("{{ form.defaultManual.id_for_label }}");
         const overrideManualInput = document.getElementById("{{ form.overrideManual.id_for_label }}");
+        const relayServerInput = document.getElementById("{{ form.relayServer.id_for_label }}");
+        const relayServerOptions = document.getElementById('relayServerOptions');
         const passwordRequirement = document.getElementById('passwordRequirement');
         const permanentPasswordInput = document.getElementById("{{ form.permanentPassword.id_for_label }}");
         const passApproveModeSelect = document.getElementById("{{ form.passApproveMode.id_for_label }}");
@@ -1372,23 +1392,31 @@
         const deliveryAccessInputs = Array.from(document.querySelectorAll('input[name="download_access"]'));
         const deliveryTtlSelect = document.getElementById("{{ form.download_ttl_hours.id_for_label }}");
 
-        function readManualHideTraySetting(input) {
+        function readManualSetting(input, targetKey) {
             let manualValue = null;
             const lines = input.value.split(/\r?\n/);
             lines.forEach(line => {
                 const separator = line.indexOf('=');
                 const key = line.slice(0, separator).trim().replace(/_/g, '-');
-                if (separator >= 0 && key === 'hide-tray') {
+                if (separator >= 0 && key === targetKey) {
                     manualValue = line.slice(separator + 1).trim();
                 }
             });
             return {input, lines, value: manualValue};
         }
 
+        function removeManualSetting(setting, targetKey) {
+            setting.input.value = setting.lines.filter(line => {
+                const separator = line.indexOf('=');
+                const key = line.slice(0, separator).trim().replace(/_/g, '-');
+                return separator < 0 || key !== targetKey;
+            }).join('\n');
+        }
+
         function migrateManualHideTraySetting() {
             const settings = [
-                readManualHideTraySetting(defaultManualInput),
-                readManualHideTraySetting(overrideManualInput),
+                readManualSetting(defaultManualInput, 'hide-tray'),
+                readManualSetting(overrideManualInput, 'hide-tray'),
             ];
             const foundSettings = settings.filter(setting => setting.value !== null);
             if (!foundSettings.length || foundSettings.some(setting => !['Y', 'N'].includes(setting.value))) {
@@ -1403,16 +1431,34 @@
             const overrideSetting = foundSettings.find(setting => setting.input === overrideManualInput);
             const selectedSetting = overrideSetting || foundSettings[0];
             hideTrayToggle.checked = selectedSetting.value === 'Y';
-            settings.forEach(setting => {
-                setting.input.value = setting.lines.filter(line => {
-                    const separator = line.indexOf('=');
-                    const key = line.slice(0, separator).trim().replace(/_/g, '-');
-                    return separator < 0 || key !== 'hide-tray';
-                }).join('\n');
-            });
+            settings.forEach(setting => removeManualSetting(setting, 'hide-tray'));
         }
 
-        generatorForm.addEventListener('submit', migrateManualHideTraySetting);
+        function migrateManualRelaySetting() {
+            const settings = [
+                readManualSetting(defaultManualInput, 'relay-server'),
+                readManualSetting(overrideManualInput, 'relay-server'),
+            ];
+            const foundSettings = settings.filter(setting => setting.value !== null);
+            if (foundSettings.length) {
+                const overrideSetting = foundSettings.find(
+                    setting => setting.input === overrideManualInput
+                );
+                const selectedSetting = overrideSetting || foundSettings[0];
+                if (!relayServerInput.value.trim()) {
+                    relayServerInput.value = selectedSetting.value;
+                }
+                settings.forEach(setting => removeManualSetting(setting, 'relay-server'));
+            }
+            relayServerOptions.open = Boolean(relayServerInput.value.trim());
+        }
+
+        function migrateLegacyManualSettings() {
+            migrateManualHideTraySetting();
+            migrateManualRelaySetting();
+        }
+
+        generatorForm.addEventListener('submit', migrateLegacyManualSettings);
 
         function syncSectionNavigation() {
             sectionLinks.forEach(link => {
@@ -1465,6 +1511,7 @@
                     firstField ||= field;
                 }
             });
+            firstField?.closest('details')?.setAttribute('open', '');
             if (firstField && !firstField.disabled && !firstField.closest('[hidden]')) {
                 firstField.closest('.builder-section')?.scrollIntoView({block: 'start'});
                 firstField.focus({preventScroll: true});
@@ -1686,7 +1733,7 @@
         hideCmDefaultEnabledToggle.addEventListener('change', function() {
             updateHideCmDefaultVisibility(this.checked);
         });
-        migrateManualHideTraySetting();
+        migrateLegacyManualSettings();
         syncPlatformIconState();
         updateBuildSummary();
         updateDesktopBehaviorVisibility();
@@ -1816,7 +1863,7 @@
                 exenameInput.removeAttribute('aria-invalid');
             }
 
-            migrateManualHideTraySetting();
+            migrateLegacyManualSettings();
 
             const formData = {};
             const form = document.getElementById("myForm"); // Get the form element
@@ -1921,6 +1968,15 @@
                             forcedApproveModeInput.disabled = true;
                             hideCmPreviousApproveMode = null;
                             form.reset();
+                            if (!Object.prototype.hasOwnProperty.call(formData, 'relayServer')) {
+                                relayServerInput.value = '';
+                            }
+                            if (!Object.prototype.hasOwnProperty.call(formData, 'defaultManual')) {
+                                defaultManualInput.value = '';
+                            }
+                            if (!Object.prototype.hasOwnProperty.call(formData, 'overrideManual')) {
+                                overrideManualInput.value = '';
+                            }
                             ['id_iconbase64', 'id_logobase64', 'id_privacybase64'].forEach(id => {
                                 document.getElementById(id).value = '';
                             });
@@ -1973,7 +2029,7 @@
                                     });
                                 }
                             }
-                            migrateManualHideTraySetting();
+                            migrateLegacyManualSettings();
                             syncPlatformIconState();
                             updateDesktopBehaviorVisibility();
                             updateBuildSummary();

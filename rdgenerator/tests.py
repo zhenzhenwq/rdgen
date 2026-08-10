@@ -13,6 +13,7 @@ from django.test import TestCase, override_settings
 
 from .forms import GenerateForm
 from .models import GithubRun, UserEntitlement
+from .views import _default_api_server
 
 
 @override_settings(
@@ -44,6 +45,46 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertContains(response, "renderImportedPngPreview")
         self.assertContains(response, "replaceChildren(image)")
         self.assertNotContains(response, 'innerHTML = `<img src="${formData[key]}">`')
+
+    def test_generator_exposes_server_managed_relay_as_the_default(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ID 服务器")
+        self.assertContains(response, 'name="relayServer"')
+        self.assertContains(response, "通常留空，由 ID 服务器选择健康中继")
+        self.assertContains(response, "填写后将强制使用单个 hbbr")
+        self.assertContains(response, "不能填写逗号分隔的列表")
+        self.assertNotContains(
+            response,
+            'id="relayServerOptions" class="advanced-server-options field-block field-block--full" open',
+        )
+
+    def test_generator_migrates_legacy_manual_relay_in_the_browser(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "function migrateManualRelaySetting()")
+        self.assertContains(
+            response,
+            "readManualSetting(overrideManualInput, 'relay-server')",
+        )
+        self.assertContains(
+            response,
+            "relayServerInput.value = selectedSetting.value",
+        )
+        self.assertContains(
+            response,
+            "removeManualSetting(setting, 'relay-server')",
+        )
+        self.assertContains(
+            response,
+            "defaultManualInput.value = ''",
+        )
+        self.assertContains(
+            response,
+            "overrideManualInput.value = ''",
+        )
 
     def test_ambiguous_dispatch_error_keeps_windows_run_receivable(self):
         with (
@@ -162,6 +203,7 @@ class GeneratorFeaturePayloadTests(TestCase):
             "incomingContentHeight": "360",
             "androidappid": "com.example.wuyoudesk",
             "serverIP": "10.0.0.1",
+            "relayServer": "",
             "apiServer": "",
             "key": "test-server-key",
             "urlLink": "https://example.com",
@@ -277,12 +319,13 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertNotIn("disable-settings", custom_config)
         self.assertEqual(custom_config["hide-network-setting"], "Y")
         self.assertEqual(custom_config["custom-rendezvous-server"], "10.0.0.1")
-        self.assertEqual(custom_config["relay-server"], "10.0.0.1")
+        self.assertNotIn("relay-server", custom_config)
         self.assertEqual(custom_config["api-server"], "http://10.0.0.1:21114")
         self.assertEqual(custom_config["key"], "test-server-key")
         self.assertEqual(custom_config["password"], "fixed-password")
 
         default_settings = custom_config["default-settings"]
+        self.assertNotIn("relay-server", default_settings)
         self.assertEqual(default_settings["view-style"], "adaptive")
         self.assertEqual(default_settings["enable-file-copy-paste"], "Y")
         self.assertEqual(default_settings["enable-file-transfer"], "N")
@@ -294,11 +337,111 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(default_settings["direct-server"], "Y")
         self.assertEqual(default_settings["custom-option"], "Y")
         override_settings = custom_config["override-settings"]
+        self.assertEqual(override_settings["relay-server"], "")
         self.assertNotIn("approve-mode", override_settings)
         self.assertNotIn("verification-method", override_settings)
         self.assertNotIn("allow-hide-cm", override_settings)
         self.assertEqual(override_settings["hide-tray"], "Y")
         self.assertEqual(override_settings["override-option"], "N")
+
+    def test_fixed_relay_server_replaces_server_managed_empty_override(self):
+        data = self._feature_payload(platform="windows")
+        data["relayServer"] = "relay.example.com:21117"
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(
+            custom_config["custom-rendezvous-server"],
+            "10.0.0.1",
+        )
+        self.assertEqual(
+            custom_config["override-settings"]["relay-server"],
+            "relay.example.com:21117",
+        )
+        self.assertNotIn("relay-server", custom_config["default-settings"])
+        self.assertNotIn("relay-server", custom_config)
+
+    def test_id_server_port_is_not_reused_as_the_api_port(self):
+        data = self._feature_payload(platform="windows")
+        data["serverIP"] = "10.0.0.1:22116"
+
+        _, inputs_raw, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(inputs_raw["server"], "10.0.0.1:22116")
+        self.assertEqual(inputs_raw["apiServer"], "http://10.0.0.1:21114")
+        self.assertEqual(
+            custom_config["custom-rendezvous-server"],
+            "10.0.0.1:22116",
+        )
+        self.assertEqual(custom_config["api-server"], "http://10.0.0.1:21114")
+        self.assertNotIn("relay-server", custom_config)
+
+    def test_explicit_api_server_is_preserved(self):
+        data = self._feature_payload(platform="windows")
+        data["serverIP"] = "10.0.0.1:22116"
+        data["apiServer"] = "https://api.example.com:9443"
+
+        _, inputs_raw, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(inputs_raw["apiServer"], "https://api.example.com:9443")
+        self.assertEqual(custom_config["api-server"], "https://api.example.com:9443")
+
+    def test_default_api_server_supports_ipv6(self):
+        self.assertEqual(
+            _default_api_server("2001:db8::1"),
+            "http://[2001:db8::1]:21114",
+        )
+        self.assertEqual(
+            _default_api_server("[2001:db8::1]:22116"),
+            "http://[2001:db8::1]:21114",
+        )
+
+    def test_legacy_payload_without_relay_field_uses_server_selection(self):
+        data = self._feature_payload(platform="windows")
+        data.pop("relayServer")
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(custom_config["custom-rendezvous-server"], "10.0.0.1")
+        self.assertNotIn("relay-server", custom_config)
+        self.assertNotIn("relay-server", custom_config["default-settings"])
+        self.assertEqual(custom_config["override-settings"]["relay-server"], "")
+
+    def test_legacy_manual_relay_is_promoted_to_the_dedicated_field(self):
+        data = self._feature_payload(platform="windows")
+        data["relayServer"] = ""
+        data["defaultManual"] = "relay-server=relay-default.example.com:21117"
+        data["overrideManual"] = "relay-server=relay-override.example.com:21117"
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(
+            custom_config["override-settings"]["relay-server"],
+            "relay-override.example.com:21117",
+        )
+        self.assertNotIn("relay-server", custom_config["default-settings"])
+
+    def test_dedicated_relay_wins_over_legacy_manual_relay(self):
+        data = self._feature_payload(platform="windows")
+        data["relayServer"] = "relay-new.example.com:21117"
+        data["overrideManual"] = "relay-server=relay-old.example.com:21117"
+
+        _, _, custom_config = self._post_and_read_inputs(data)
+
+        self.assertEqual(
+            custom_config["override-settings"]["relay-server"],
+            "relay-new.example.com:21117",
+        )
+
+    def test_rejects_legacy_manual_relay_lists(self):
+        data = self._feature_payload(platform="windows")
+        data["relayServer"] = ""
+        data["overrideManual"] = "relay-server=relay-a.example.com,relay-b.example.com"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("overrideManual", form.errors)
+        self.assertIn("多中继列表应配置在 hbbs", form.errors["overrideManual"][0])
 
     def test_other_settings_start_disabled_and_serialize_as_opt_in(self):
         form = GenerateForm()
@@ -738,10 +881,33 @@ class GeneratorFeaturePayloadTests(TestCase):
         data = self._feature_payload()
         data["exename"] = "client;touch-pwned"
         data["serverIP"] = "server.example.com'"
+        data["relayServer"] = "relay.example.com'"
         form = GenerateForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("exename", form.errors)
         self.assertIn("serverIP", form.errors)
+        self.assertIn("relayServer", form.errors)
+
+    def test_rejects_relay_server_lists(self):
+        data = self._feature_payload()
+        data["relayServer"] = "relay-a.example.com,relay-b.example.com"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("relayServer", form.errors)
+        self.assertIn("多中继列表应配置在 hbbs", form.errors["relayServer"][0])
+
+    def test_relay_validation_error_opens_advanced_server_options(self):
+        data = self._feature_payload()
+        data["relayServer"] = "relay-a.example.com,relay-b.example.com"
+
+        response = self.client.post("/generator", data=data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'id="relayServerOptions" class="advanced-server-options field-block field-block--full" open',
+        )
 
     def test_rejects_nonportable_build_names(self):
         invalid_names = (

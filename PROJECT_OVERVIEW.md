@@ -122,8 +122,14 @@ Important implemented changes compared with the upstream author's baseline:
   - `settingsN` writes `disable-settings = Y`.
   - Windows workflows can apply `hide_settings_menu.diff`.
 - Built-in server settings:
-  - `rdgenerator/views.py` writes `custom-rendezvous-server` and `relay-server` into the generated config.
-  - This fixed earlier cases where generated clients did not actually embed the desired server.
+  - `rdgenerator/views.py` embeds the ID server, API server, and server key used by the build workflow.
+  - Relay selection is server-managed by default: an empty `override-settings.relay-server`
+    makes the client use the healthy relay returned by hbbs, including when an older local
+    RustDesk configuration still contains a fixed relay.
+  - The optional fixed-relay field writes one explicit address to
+    `override-settings.relay-server`; comma-separated relay pools belong in hbbs, not the client.
+  - Legacy exported configs that stored `relay-server` in the manual default/override text
+    are promoted into the dedicated field (manual override wins) instead of being silently lost.
 - Windows self-signed code signing:
   - GitHub Actions can sign generated Windows EXE, DLL, and MSI outputs using `CODE_SIGN_PFX_BASE64` and `CODE_SIGN_PFX_PASSWORD`.
   - External signing service behavior remains available if configured.
