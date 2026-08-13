@@ -976,3 +976,11 @@ User constraint recorded:
 - Attempt UUID `91a64b5d-dec0-4d90-9782-2e0d2a2b883d` completed in 8.3 seconds. Selected relay R2 recorded exactly one new request and one successful pair, while non-selected R1 recorded zero new requests and zero pairs (`R2 1/1`, `R1 0/0`).
 - The local LAN endpoint allowance, rendezvous key-exchange helper, and metrics-availability bridge are feature-gated fixture support only. They do not change the production contract and do not prove a production raw-TCP smart rendezvous closed loop; production validation should prefer strict WSS.
 - No change from this milestone was pushed or deployed, and no production system was accessed. The next bounded implementation and verification target is S2: duplicate requests using the same UUID.
+
+### Phase-two S2 Same-UUID Local Integration Milestone
+
+- Completed the bounded S2 duplicate-request integration with server `fa464c262fd3401a6db87dcbe74e7fe3991e0c1b` (tree `0bbf9db7ea43aa1be4986f3963bcc743ec18499b`), client parent `0b997fea0caa69cd4f69d3cfcd6a681d3b7e8992`, and client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`.
+- The three request lanes shared UUID `0737e04a-77f4-4a84-8bfc-8f0019492b9f`. Their decrypted protobuf frames all had SHA-256 `b362d0f9fe11d8a84fe96243e80ab130d1b81b3b92a0214c35b53d987689e3aa`, demonstrating identical successful final frames for the same request context.
+- hbbs recorded exactly one owner, one enqueue, one join, and one replay. Target B recorded one create and one pairing request; requester A recorded one hbbr owner/pairing request. Selected relay R2 recorded one new request and one completed pair, while non-selected R1 remained at zero (`R2 1/1`, `R1 0/0`).
+- The run completed in about 9.18 seconds, below the 30-second limit. S1/S2 contract, dry-run, and offline checks passed, and test worktrees/processes were cleaned after verification.
+- Nothing was pushed or deployed. The next bounded implementation and verification target is S3: immediate recovery using a different UUID.
