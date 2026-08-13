@@ -147,7 +147,7 @@ Important implemented changes compared with the upstream author's baseline:
 
 Phase one is implemented and verified: generated clients leave relay choice to hbbs, official OSS hbbs accepts multiple hbbr addresses, and real Windows clients used both test relays and reconnected after the active relay stopped.
 
-Phase two is fully specified but not implemented. The authoritative records are:
+Phase two is fully specified and implementation has started in isolated writable worktrees. The authoritative design records are:
 
 - `MULTI_RELAY_PHASE2_DECISIONS.md`: product decisions 0–44 with no pending question.
 - `MULTI_RELAY_PHASE2_SPEC.md`: frozen protocol, scheduler, accounting, agent, security, installer, generator, release, and validation contract.
@@ -156,7 +156,9 @@ The planned first release uses a custom RustDesk server `1.1.16` hbbs/controller
 
 This design supports at most 50 IPv4 relay nodes, keeps a signed smart requester's retries on the same signed relay while using a new UUID per attempt, and leaves the official hbbr data path unchanged. The frozen compatibility correction makes smart admission directional: an offer-absent official/old requester always stays on the complete OSS path, with no probe wait, selection, smart owner, or anonymous IP/NAT index, even when the target is smart. A signed smart requester can still interoperate with an official/old target through a verifiable unique legacy owner. New smart data does not persist complete peer IPs or raw per-session measurements; upstream PeerMap registration-security behavior remains unchanged. The first release is CLI/config driven; customer API, web administration, notifications, runtime licensing, automatic upgrades, IPv6, macOS smart builds, and hbbs HA remain deferred.
 
-No phase-two production source, build, or deployment exists yet. Implementation must begin in separate writable worktrees from the exact frozen client/server stable commits and must not expand the temporary test footprint on the generator host without fresh authorization.
+On 2026-08-13, the first real local-process S1 integration passed with server commit `f8d1766a9b4393cf179dda976103cde8f26799a7` (tree `493565835e617b2353441e3ce9f8c6ec0d02d6c4`), client commit `2441b53d5667050cc6fe80c1428f18e178311346`, and client `hbb_common` commit `b3183ee848c1566e59737e878a418bbb177dc2bc`. Attempt UUID `91a64b5d-dec0-4d90-9782-2e0d2a2b883d` completed in 8.3 seconds: selected relay R2 recorded one new request and one completed pair, while non-selected R1 recorded neither (`R2 1/1`, `R1 0/0`). This verifies the bounded S1 fixture across real local hbbs, two hbbr processes, target B, and requester A.
+
+The S1-only LAN endpoint allowance, rendezvous key-exchange helper, and metrics-availability bridge are feature-gated test support. They are not production configuration and do not prove a production raw-TCP smart rendezvous closed loop; production validation should prefer strict WSS. Nothing from this milestone was pushed or deployed, and no production system was accessed. The immediate next implementation target is S2: duplicate requests using the same UUID.
 
 ## External Systems
 

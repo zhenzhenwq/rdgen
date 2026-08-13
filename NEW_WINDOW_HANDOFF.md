@@ -49,7 +49,10 @@ The full generator path requires public GitHub Actions callbacks. Local Docker c
 - Scheduling uses two-peer RTT sum with a per-leg guardrail plus bandwidth, utilization, metered quota, maintenance, and host-safety policy. Client probing is bounded to six candidates. Missing monitoring falls back to compatible official TCP-health selection while explicit admin policy and confirmed quota exhaustion remain authoritative.
 - Every smart `RequestRelay` retry generates a new UUID as upstream does, but reuses one server-signed selection and endpoint. This is the frozen compatibility rule for both smart and old target clients.
 - Decision 44 preserves upstream PeerMap's existing registration-security IP storage; all newly added smart measurement/session data obeys the stricter non-persistence boundary.
-- No phase-two source code, artifact, server mutation, or production deployment has been performed. The temporary same-host phase-one services are not a phase-two environment and must not be expanded without new approval.
+- Phase-two implementation now exists only in isolated writable worktrees. The first real local-process S1 integration passed on 2026-08-13 with server `f8d1766a9b4393cf179dda976103cde8f26799a7` (tree `493565835e617b2353441e3ce9f8c6ec0d02d6c4`), client `2441b53d5667050cc6fe80c1428f18e178311346`, and client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`.
+- S1 attempt UUID `91a64b5d-dec0-4d90-9782-2e0d2a2b883d` completed in 8.3 seconds. Selected R2 recorded one new request and one pair; non-selected R1 recorded neither (`R2 1/1`, `R1 0/0`). The fixture crossed real local hbbs, two hbbr processes, target B, and requester A.
+- The LAN endpoint allowance, rendezvous key-exchange helper, and metrics-availability bridge are feature-only S1 test support. They are not production behavior and do not establish a production raw-TCP smart closed loop; production validation should prefer strict WSS.
+- No phase-two change was pushed or deployed, and no production system was accessed. The next bounded target is S2: duplicate requests with the same UUID. The temporary same-host phase-one services remain separate and must not be expanded without new approval.
 
 ## Current Release Batch
 
@@ -158,7 +161,7 @@ Important Linux/Flatpak boundaries:
 - Docker image runs, including application push run `31349924535` and subsequent documentation-only pushes, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS ad-hoc signing is verified on real runners. Production P12 signing with configured secrets, Apple notarization, and stapling remain unverified.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
-- Phase two remains design-only: no custom hbbs/controller, agent, client protocol patch, installer, artifact, three-region test, 50-node load test, or generator integration has been implemented or verified.
+- Phase two is no longer design-only: the feature-gated local S1 process integration is verified. Production strict-WSS smart rendezvous, agent, installer, artifact, three-region test, 50-node load test, generator integration, push, and deployment remain unverified or undone.
 
 ## Resume Checklist
 
@@ -167,7 +170,7 @@ Important Linux/Flatpak boundaries:
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
 5. The relay-aware generator release, real Windows build, and controlled failover validation are complete. Treat additional builds, independent-host relay testing, local Docker setup, and Docker credential repair as separate follow-up work.
-6. For phase two, read both frozen design documents first, create writable worktrees at the exact locked stable commits, and begin with the enrollment/telemetry vertical slice. Do not edit clean upstream references or deploy to `120.55.0.199` without a new explicit authorization.
+6. For phase two, preserve the verified S1 versions above and implement only the next bounded S2 case: duplicate requests with the same UUID. Keep test-only feature bridges out of production claims, prefer strict WSS for production validation, do not edit clean upstream references, and do not deploy without new explicit authorization.
 
 ## Deployment Notes
 

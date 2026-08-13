@@ -969,3 +969,10 @@ User constraint recorded:
 - Offer-absent requester attempts now explicitly remain on the complete upstream OSS path with no smart probe wait, selection, owner/replay state, or source-IP/NAT alias. The smart-A/old-B direction remains supported through a verifiable unique legacy owner because A supplies the signed admission context.
 - Expanded the documented server 1.1.16 additive proto backport to the exact existing client 1.4.9 field numbers needed across initial punch, intranet, response, and relay envelopes. The contract continues to forbid replacing either baseline's complete `hbb_common` submodule.
 - This was a specification and project-memory correction only. No client/server/agent/generator source was changed, no build or test workflow was launched, and nothing was deployed or published.
+
+### Phase-two S1 Real Local Integration Milestone
+
+- Completed the first real local-process S1 integration across hbbs, two hbbr processes, target B, and requester A. The verified server version is `f8d1766a9b4393cf179dda976103cde8f26799a7` with tree `493565835e617b2353441e3ce9f8c6ec0d02d6c4`; the verified client version is `2441b53d5667050cc6fe80c1428f18e178311346` with client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`.
+- Attempt UUID `91a64b5d-dec0-4d90-9782-2e0d2a2b883d` completed in 8.3 seconds. Selected relay R2 recorded exactly one new request and one successful pair, while non-selected R1 recorded zero new requests and zero pairs (`R2 1/1`, `R1 0/0`).
+- The local LAN endpoint allowance, rendezvous key-exchange helper, and metrics-availability bridge are feature-gated fixture support only. They do not change the production contract and do not prove a production raw-TCP smart rendezvous closed loop; production validation should prefer strict WSS.
+- No change from this milestone was pushed or deployed, and no production system was accessed. The next bounded implementation and verification target is S2: duplicate requests using the same UUID.
