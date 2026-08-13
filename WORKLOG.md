@@ -984,3 +984,12 @@ User constraint recorded:
 - hbbs recorded exactly one owner, one enqueue, one join, and one replay. Target B recorded one create and one pairing request; requester A recorded one hbbr owner/pairing request. Selected relay R2 recorded one new request and one completed pair, while non-selected R1 remained at zero (`R2 1/1`, `R1 0/0`).
 - The run completed in about 9.18 seconds, below the 30-second limit. S1/S2 contract, dry-run, and offline checks passed, and test worktrees/processes were cleaned after verification.
 - Nothing was pushed or deployed. The next bounded implementation and verification target is S3: immediate recovery using a different UUID.
+
+### Phase-two S3 Different-UUID Local Integration Milestone
+
+- Completed the final bounded S3 local integration with server HEAD `d34bcaec3b86d89614037df03dffcff43d01ee4f` (tree `a2173c417b968a7dda45e8c1ba2dd230d16d36e7`), client `051a54c23a55c5c76272a09c3b9de0557088a80a`, and client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`.
+- UUID1 `68c25b4d-f9de-4a4b-a66d-2098b924ec5f` produced response SHA-256 `fbb650ead7c078533bbc1ad7c5e0a6197512d6ff684c6d7cc772413326e0790`; UUID2 `25075eb6-fefd-447c-8bfd-507ec3ad2c37` produced response SHA-256 `12dd0e3fea68f17a045fe97dc12d4fdcab3cc927f819ecdadd8ac5dbc8e34ef1`. The recovery interval was 5 ms, and total run duration was 7,563 ms.
+- For each UUID, hbbs owner/enqueue/join/replay was `1/1/0/0`, and target B create/pairing was `1/1`. Requester A was `0/0` for UUID1 and `1/1` for UUID2.
+- R1 recorded `0/0` for both UUIDs. R2 recorded `1/0` for UUID1 and `1/1` for UUID2, confirming immediate recovery on the second request identity.
+- S1/S2/S3 contract checks and locked server/client offline checks passed. The database was restored after verification, and remaining processes and owned run roots were both zero.
+- Nothing was pushed or deployed, and no production system was accessed. The next phase is total integration closeout: merge modules not yet present in integration, resolve the uncommitted handler work, run the full regression suite, and then produce a runnable vertical slice.

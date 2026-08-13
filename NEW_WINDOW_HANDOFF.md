@@ -54,7 +54,10 @@ The full generator path requires public GitHub Actions callbacks. Local Docker c
 - The LAN endpoint allowance, rendezvous key-exchange helper, and metrics-availability bridge are feature-only S1 test support. They are not production behavior and do not establish a production raw-TCP smart closed loop; production validation should prefer strict WSS.
 - The same-UUID S2 local milestone passed with server `fa464c262fd3401a6db87dcbe74e7fe3991e0c1b` (tree `0bbf9db7ea43aa1be4986f3963bcc743ec18499b`), client parent `0b997fea0caa69cd4f69d3cfcd6a681d3b7e8992`, and client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`. UUID `0737e04a-77f4-4a84-8bfc-8f0019492b9f` completed in about 9.18 seconds, below the 30-second limit.
 - All three same-UUID lanes produced decrypted protobuf frames with SHA-256 `b362d0f9fe11d8a84fe96243e80ab130d1b81b3b92a0214c35b53d987689e3aa`. hbbs recorded owner/enqueue/join/replay once each; B create/pairing and A hbbr owner/pairing each occurred once; selected R2 was `1/1`, and R1 was `0/0`.
-- S1/S2 contract, dry-run, and offline checks passed, and test worktrees/processes were cleaned. No phase-two change was pushed or deployed, and no production system was accessed. The next bounded target is S3: immediate recovery using a different UUID. The temporary same-host phase-one services remain separate and must not be expanded without new approval.
+- S1/S2 contract, dry-run, and offline checks passed, and test worktrees/processes were cleaned.
+- The different-UUID S3 final local milestone passed with server HEAD `d34bcaec3b86d89614037df03dffcff43d01ee4f` (tree `a2173c417b968a7dda45e8c1ba2dd230d16d36e7`), client `051a54c23a55c5c76272a09c3b9de0557088a80a`, and client `hbb_common` `b3183ee848c1566e59737e878a418bbb177dc2bc`. UUID1 `68c25b4d-f9de-4a4b-a66d-2098b924ec5f` and UUID2 `25075eb6-fefd-447c-8bfd-507ec3ad2c37` produced response SHA-256 values `fbb650ead7c078533bbc1ad7c5e0a6197512d6ff684c6d7cc772413326e0790` and `12dd0e3fea68f17a045fe97dc12d4fdcab3cc927f819ecdadd8ac5dbc8e34ef1`, respectively. The recovery interval was 5 ms and total duration was 7,563 ms.
+- For each S3 UUID, hbbs owner/enqueue/join/replay was `1/1/0/0`, and B create/pairing was `1/1`. A was `0/0` for UUID1 and `1/1` for UUID2; R1 stayed `0/0` for both UUIDs, while R2 was `1/0` for UUID1 and `1/1` for UUID2.
+- S1/S2/S3 contract checks and locked server/client offline checks passed. The database was restored, and remaining processes and owned run roots were both zero. No phase-two change was pushed or deployed, and no production system was accessed. The next phase is total integration closeout: merge modules not yet present in integration, resolve the uncommitted handler work, run the full regression suite, and then produce a runnable vertical slice. The temporary same-host phase-one services remain separate and must not be expanded without new approval.
 
 ## Current Release Batch
 
@@ -163,7 +166,7 @@ Important Linux/Flatpak boundaries:
 - Docker image runs, including application push run `31349924535` and subsequent documentation-only pushes, fail at `Login to Docker Hub` because repository Docker Hub credentials are unavailable. The production image was built and tested directly on the server; repair `vars.DOCKERHUB_USERNAME` and `secrets.DOCKERHUB_TOKEN` separately.
 - macOS ad-hoc signing is verified on real runners. Production P12 signing with configured secrets, Apple notarization, and stapling remain unverified.
 - No real Flatpak bundle installation/runtime smoke test has been run for this batch.
-- Phase two is no longer design-only: the feature-gated local S1 process integration and same-UUID S2 owner/join/replay path are verified. Production strict-WSS smart rendezvous, agent, installer, artifact, three-region test, 50-node load test, generator integration, push, and deployment remain unverified or undone.
+- Phase two is no longer design-only: the feature-gated local S1 process integration, same-UUID S2 owner/join/replay path, and different-UUID S3 immediate recovery are verified. Production strict-WSS smart rendezvous, agent, installer, artifact, three-region test, 50-node load test, generator integration, push, and deployment remain unverified or undone.
 
 ## Resume Checklist
 
@@ -172,7 +175,7 @@ Important Linux/Flatpak boundaries:
 3. Re-run Django tests, `actionlint`, patch-reference checks, YAML/Python parsing, and `git diff --check` after any edit.
 4. Verify remote state before pushing; the machine's global Git proxy may point at unavailable `127.0.0.1:7892`.
 5. The relay-aware generator release, real Windows build, and controlled failover validation are complete. Treat additional builds, independent-host relay testing, local Docker setup, and Docker credential repair as separate follow-up work.
-6. For phase two, preserve the verified S1/S2 versions above and implement only the next bounded S3 case: immediate recovery with a different UUID. Keep test-only feature bridges out of production claims, prefer strict WSS for production validation, do not edit clean upstream references, and do not deploy without new explicit authorization.
+6. For phase two, preserve the verified S1/S2/S3 versions above and complete total integration closeout: merge modules not yet present in integration, resolve the uncommitted handler work, run the full regression suite, and then produce a runnable vertical slice. Keep test-only feature bridges out of production claims, prefer strict WSS for production validation, do not edit clean upstream references, and do not deploy without new explicit authorization.
 
 ## Deployment Notes
 
