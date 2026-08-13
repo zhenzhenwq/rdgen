@@ -182,10 +182,12 @@
 - Status: locked by the user.
 - Relay-measurement support is an optional negotiated capability, not a requirement for registering with hbbs or establishing a session.
 - When both peers support measurement, the scheduler uses both real result sets.
-- When only one peer supports measurement, hbbs combines that peer's real results with a conservative server-side estimate or historical aggregate for the other peer.
-- When neither peer supports measurement, hbbs falls back to compatible server-side estimation and ultimately the existing TCP-healthy OSS relay pool.
+- Direction matters because only requester A can supply the signed admission context. When smart A supplies a valid signed offer and B is official/old, hbbs may combine A's real results with a conservative estimate for B; it may send B additive fields that B ignores and may inject the cached signed selection back to A only through a verifiable unique legacy owner.
+- When requester A is official/old, its offer is absent. Even if B advertises smart capability, hbbs immediately uses the complete upstream OSS flow: no smart probe wait, no selection, no smart owner/replay state, no guaranteed intelligent placement, and the later unsigned relay remains unbound to a selection.
+- When neither peer supports measurement, hbbs likewise retains the complete OSS flow without added intelligent delay or state.
 - Missing capability or measurement data never becomes a zero-latency score and never causes an otherwise compatible official client to be rejected.
 - Protocol changes must remain additive and versioned so older protobuf implementations safely ignore unknown fields.
+- Security rationale: the official 1.4.9 requester wire has no requester identity or initial origin nonce, and its later unsigned `RequestRelay` uses a new TCP connection. hbbs therefore cannot safely associate that request with an anonymous selection; source-IP/NAT-route, target-only, or endpoint-only indexes are forbidden because they collide for shared NAT/proxy users and do not prove requester identity.
 
 ### 17. Client Measurement Timing
 
@@ -451,4 +453,4 @@
 
 ## Discovery Result
 
-There are no pending first-release product questions. Exact source review found one privacy-boundary conflict, and decision 44 now resolves it without changing the selected intelligent-relay behavior.
+There are no pending first-release product questions. Exact source review resolved the PeerMap privacy boundary in decision 44 and later corrected the directional compatibility contract in decision 16: unsigned official/old requesters remain fully OSS, while signed smart requesters retain the smart-to-old target compatibility owner.

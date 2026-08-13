@@ -960,3 +960,12 @@ User constraint recorded:
 - Decision 44 resolves the only product-level conflict found during source review: rustdesk-server's pre-existing PeerMap IP persistence remains for registration security, while all newly added smart measurement, scheduling, aggregation, logs, CLI, events, and backups may not persist complete peer IPs or raw per-session measurements.
 - Independent protocol, scheduler/accounting, and operations/security reviews iterated until no P0/P1 conflict remained. Important corrections included RequestRelay secure/conn-type binding, old/new-client fallback, new UUID per retry with one signed selection, monitoring-vs-data-plane fallback, bps/Bps consistency, bounded/idempotent accounting, crash-consistent gap markers, WAL limits, endpoint uniqueness, administrator-authorized key rotation, complete trust material, and anti-rollback backup restore.
 - This work changed documentation and durable project memory only. No RustDesk client/server/agent production code was written, no artifact or generator workflow was launched, no clean upstream reference was modified, and nothing was deployed or expanded on `120.55.0.199`.
+
+## 2026-08-13
+
+### Phase-two Official-requester Compatibility Specification Correction
+
+- Corrected the frozen compatibility contract after read-only tracing of RustDesk client 1.4.9 and rustdesk-server 1.1.16 wire behavior. An official/old requester has no signed requester identity or initial nonce, and its later unsigned `RequestRelay` arrives on a new TCP connection, so it cannot be safely bound to an anonymous selection.
+- Offer-absent requester attempts now explicitly remain on the complete upstream OSS path with no smart probe wait, selection, owner/replay state, or source-IP/NAT alias. The smart-A/old-B direction remains supported through a verifiable unique legacy owner because A supplies the signed admission context.
+- Expanded the documented server 1.1.16 additive proto backport to the exact existing client 1.4.9 field numbers needed across initial punch, intranet, response, and relay envelopes. The contract continues to forbid replacing either baseline's complete `hbb_common` submodule.
+- This was a specification and project-memory correction only. No client/server/agent/generator source was changed, no build or test workflow was launched, and nothing was deployed or published.

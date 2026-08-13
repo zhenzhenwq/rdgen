@@ -2,7 +2,7 @@
 
 ## 0. 文档状态
 
-- 状态：首版规格已冻结（2026-08-10）；协议、调度/账本、运维/安全终检均无剩余 P0/P1 冲突。
+- 状态：首版规格已冻结（2026-08-10），并于 2026-08-13 根据锁定上游 wire 证据纠正 official/old requester 兼容合同；纠正后协议、调度/账本、运维/安全合同无已知剩余 P0/P1 冲突。
 - 产品决定来源：`MULTI_RELAY_PHASE2_DECISIONS.md` 中的 0–44 项决定。
 - 本文只把已锁定的产品决定转成可开发、可测试的工程合同，不授权修改生产环境或开始生产代码。
 - 本文中的“必须 / MUST”是首版验收条件；“应该 / SHOULD”是默认实现，若实现时偏离必须记录原因和测试证据；“可以 / MAY”是兼容扩展点。
@@ -187,19 +187,21 @@ agent 在本地持久化逻辑单调累计值。内核计数器重置、重启�
 
 只要发起端 A 携带可验签的 smart connect offer，hbbs 必须在把初始 `PunchHole` 转发给 B 之前完成一次有界智能协商。原因是 B 可能因自身 symmetric NAT、proxy 或 WebSocket 在收到 `PunchHole` 后立即连接 relay；若等 A 直连失败后才选点，两端可能进入不同 hbbr。
 
-典型 warm cache 只增加一次短消息往返；cold cache 的 server 截止为 2 秒。智能开关是显式 opt-in，因此首版接受这个有界延迟。A 为旧客户端时没有 signed requester identity，不等待 A probe；若 B 可投递且为智能端，使用 requester empty、target=B ID 和 server-generated 16-byte origin nonce，最多等待 B 900 ms，否则立即估算。该 selection 只供 B 验证，A 继续 unsigned OSS relay 路径；两端都旧时完全不增加等待。
+典型 warm cache 只增加一次短消息往返；cold cache 的 server 截止为 2 秒。智能开关是显式 opt-in，因此首版只对携带可验签 PUNCH offer 的 smart requester 接受这个有界延迟。A 为 official/old 客户端时没有 signed requester identity 或 origin nonce；无论 B 是否广告 smart capability，hbbs 都必须立即走完整 upstream OSS 路径，不等待任何智能 probe，不生成 selection，不创建 smart owner/replay state，也不建立任何基于源 IP/NAT route 的匿名 requester 索引。
 
 智能选择流程：
 
 1. 用两端当前地址只在内存中派生粗粒度 region/ASN；不持久化完整 peer IP。
 2. 应用管理员与 TCP 可达性硬门槛，再应用 fresh-telemetry 容量门槛。
-3. 从最多 50 个节点预筛一个默认 4 个、最大 6 个的共同候选集，为 A/B 分别生成 nonce，并用 hbbs server key 签署 probe request。
+3. 对已验证 signed smart requester 的会话，从最多 50 个节点预筛一个默认 4 个、最大 6 个的共同候选集，为 A/B 分别生成 nonce，并用 hbbs server key 签署 probe request。
 4. A probe 经本次 PunchHole TCP/WS connection 发送；B probe 优先经其已登记 UDP 地址发送。客户端若有同 network epoch、同 candidate-set hash 的新鲜缓存就直接签名返回，否则在 deadline 内短测后返回。无法投递或旧端直接进入估算分支。
 5. 客户端测量预算最多 1.5 秒，hbbs 收集截止最多 2 秒且不得越过现有连接重试窗口；到期立即使用一侧真实值加另一侧估算、两侧估算，最后才使用官方轮询回退。
 6. 对有数据的候选按第 9 节算法排序，选择一个 node ID。
-7. 在本次连接尝试中锁定选择，通过现有 singular `relay_server` 将同一地址送给 A/B，并给 A 返回 server-signed `SmartRelaySelection`。相同 request nonce 的 PunchHole retry 必须幂等复用选择，不能重复 probe。
-8. 后续 `RequestRelay` 必须携带并验签同一 selection，复用原 endpoint，不允许无条件重新调度。selection 默认 120 秒有效；失效/篡改时明确要求客户端重新开始完整 rendezvous attempt，避免 B 已在旧 hbbr 等待而 A 改连新节点。
-9. 原始调度上下文和测速集合正常在完成后立即删除，pending 5 秒过期；异常清理最迟 60 秒硬删除。另保留一个不含 IP/RTT 的 bounded selection replay cache：key 为 `(requester,target,origin_request_nonce)`，value 为 signed selection、initial PUNCH canonical request digest 和 final decision metadata，TTL 与 selection 同为 120 秒、默认最多 4096 项。entry 在首次向 B 转发前写入 crash-consistent 的短期 runtime journal，journal 不含 peer IP/RTT、排除于 backup/普通 CLI/日志并按 TTL 清除，使 hbbs 进程/主机重启后的同 nonce retry 仍复用原 relay。相同 key 但 force-relay/conn type/issued time/其他 signed context digest 不同则返回 `CONNECT_REPLAY_CONTEXT_MISMATCH`。未过期 entry 绝不因容量压力淘汰；cache 满时必须在向 B 转发任何消息前以 retryable `SMART_COORDINATOR_BUSY` 拒绝新的 smart 协商，客户端随后另起一个不带智能扩展的兼容 attempt。entry 到期后同 nonce/旧 issued time 返回 `SELECTION_REPLAY_MISS`，要求客户端用新 nonce 重新开始完整 rendezvous attempt，绝不能悄悄重新选一个节点。
+7. 在本次 signed smart requester 连接尝试中锁定选择，通过现有 singular `relay_server` 将同一地址送给 A/B，并给 A 返回 server-signed `SmartRelaySelection`。相同 request nonce 的 PunchHole retry 必须幂等复用选择，不能重复 probe。
+8. **仅对已声明并验证 signed smart requester 的会话**，后续 `RequestRelay` 必须携带并验签同一 selection，复用原 endpoint，不允许无条件重新调度。selection 默认 120 秒有效；失效/篡改时明确要求客户端重新开始完整 rendezvous attempt，避免 B 已在旧 hbbr 等待而 A 改连新节点。official/old requester 的 `RequestRelay` 不受本条约束，必须保持 unsigned OSS 语义。
+9. signed smart requester 会话的原始调度上下文和测速集合正常在完成后立即删除，pending 5 秒过期；异常清理最迟 60 秒硬删除。另保留一个不含 IP/RTT 的 bounded selection replay cache：key 为 `(requester,target,origin_request_nonce)`，value 为 signed selection、initial PUNCH canonical request digest 和 final decision metadata，TTL 与 selection 同为 120 秒、默认最多 4096 项。entry 在首次向 B 转发前写入 crash-consistent 的短期 runtime journal，journal 不含 peer IP/RTT、排除于 backup/普通 CLI/日志并按 TTL 清除，使 hbbs 进程/主机重启后的同 nonce retry 仍复用原 relay。相同 key 但 force-relay/conn type/issued time/其他 signed context digest 不同则返回 `CONNECT_REPLAY_CONTEXT_MISMATCH`。未过期 entry 绝不因容量压力淘汰；cache 满时必须在向 B 转发任何消息前以 retryable `SMART_COORDINATOR_BUSY` 拒绝新的 smart 协商，客户端随后另起一个不带智能扩展的兼容 attempt。entry 到期后同 nonce/旧 issued time 返回 `SELECTION_REPLAY_MISS`，要求客户端用新 nonce 重新开始完整 rendezvous attempt，绝不能悄悄重新选一个节点。
+
+smart A + official/old B 的方向仍在智能会话内：A 的 signed offer 是 admission 根，hbbs 可向 B 发送带 additive selection 的官方 envelope，B 安全忽略未知字段。B 返回不含 echo 的官方 `PunchHoleSent`/`LocalAddr` 或后续 `RelayResponse` 时，hbbs 只能在 target ID、response variant、endpoint、target response source 与 requester writer 组成的上下文可验且唯一时，从已持久的 smart owner 注入原 signed selection 后回给 A；不唯一或不匹配必须 fail closed，不得以 NAT/IP 推测身份。smart `RequestRelay` 对 old B 的无 echo 响应同样只能使用每 UUID 的可验唯一 owner 注入 cached selection。
 
 ## 7. Rendezvous 协议扩展
 
@@ -211,7 +213,19 @@ agent 在本地持久化逻辑单调累计值。内核计数器重置、重启�
 - 一个未知 oneof、未知字段、未知 capability bit 或高版本请求都必须安全忽略/降级，不能 panic。
 - 最终 relay 仍用官方字段；扩展消息永远不直接建立数据通道。
 - server/client 使用相同 `.proto` 设计，但分别固定到各自上游 `hbb_common` commit 生成，不能把不匹配的整个子模块粗暴替换。
-- 两个固定基线并非同一 superset。server 1.1.16 的 proto 增量必须先按 client 1.4.9 的既有号码 additive 回补 `ConnType.TERMINAL=5` 以及 `PunchHoleRequest.udp_port=7`、`force_relay=8`、`upnp_port=9`、`socket_addr_v6=10`，再添加智能字段；否则 server 无法构造相同的 PUNCH canonical transcript。禁止给这些上游既有号码另换含义。
+- 两个固定基线并非同一 superset。server 1.1.16 的 proto 必须先按 client 1.4.9 的既有号码 additive 回补以下完整差异，再添加智能字段；禁止给这些上游既有号码另换含义，也禁止用 client 的整个 `hbb_common` 替换 server 子模块：
+
+  | 1.4.9 既有定义 | server 1.1.16 additive backport |
+  | --- | --- |
+  | `ConnType` | `TERMINAL=5` |
+  | `PunchHoleRequest` | `udp_port=7`、`force_relay=8`、`upnp_port=9`、`socket_addr_v6=10` |
+  | `PunchHole` | `udp_port=4`、`force_relay=5`、`upnp_port=6`、`socket_addr_v6=7`、`control_permissions=8`、`controlled_context=9` |
+  | `FetchLocalAddr` | `socket_addr_v6=3`、`control_permissions=4`、`controlled_context=5` |
+  | `PunchHoleSent` | `upnp_port=6`、`socket_addr_v6=7` |
+  | `PunchHoleResponse` | `is_udp=9`、`upnp_port=10`、`socket_addr_v6=11`（`feedback=8` 在 server 1.1.16 已存在） |
+  | `RequestRelay` | `control_permissions=9`、`controlled_context=10` |
+  | `LocalAddr` | `socket_addr_v6=6` |
+  | `RelayResponse` | `socket_addr_v6=10`、`upnp_port=11`（`feedback=9` 在 server 1.1.16 已存在） |
 
 ### 7.2 v1 消息模型
 
@@ -294,7 +308,7 @@ message SmartRelayCandidate {
 
 message SmartRelaySelection {
   uint32 protocol_version = 1;  // exactly 1
-  string requester_id = 2;      // max 64; empty only for legacy requester mode
+  string requester_id = 2;      // smart session: nonempty; max 64
   string target_id = 3;         // max 64 bytes
   bytes node_id = 4;            // exactly 16 bytes
   string relay_server = 5;      // normalized IPv4:port; max 64 bytes
@@ -326,7 +340,7 @@ message SmartRelayProbeRequest {
   uint64 issued_at_ms = 7;
   uint32 deadline_ms = 8;
   repeated SmartRelayCandidate candidates = 9; // hard max 6
-  string requester_id = 10;     // smart requester: max 64; legacy requester/warmup: empty
+  string requester_id = 10;     // smart session: nonempty; warmup: empty
   string target_id = 11;        // session: max 64; warmup: empty
   ConnType conn_type = 12;      // session: outer value; warmup: DEFAULT_CONN
   bytes server_signature = 13;
@@ -392,7 +406,7 @@ hbbs probe/selection/capability response 使用现有 server Ed25519 private key
 | `RDSMART/CAPABILITY/V1` | hbbs key fingerprint、outer peer ID、outer RegisterPk public key 的 presence byte 与存在时的 bytes、capability fields 1–6 |
 | `RDSMART/CONNECT/PUNCH/V1` | hbbs fingerprint、requester ID、outer target ID、outer conn type、outer force-relay bool、request nonce、issued time、selection presence=`0x00` |
 | `RDSMART/CONNECT/RELAY/V1` | hbbs fingerprint、requester ID、outer target ID、outer conn type、outer secure bool、outer UUID、outer relay string、request nonce、issued time、selection presence=`0x01`、`signed_selection_blob`；此 domain 没有 force-relay 字段 |
-| `RDSMART/PROBE-REQUEST/V1` | probe request fields 1–12（不含 signature field 13），candidate list canonical order；smart-requester session 绑定 requester/target/conn type；legacy-requester 的 TARGET probe 固定 requester empty、target=B ID、outer conn type；warmup 固定 empty/empty/DEFAULT_CONN |
+| `RDSMART/PROBE-REQUEST/V1` | probe request fields 1–12（不含 signature field 13），candidate list canonical order；smart session 的 REQUESTER/TARGET probe 均绑定同一非空 requester/target/conn type；warmup 固定 empty/empty/DEFAULT_CONN |
 | `RDSMART/PROBE-REPORT/V1` | report fields 1–9，results 按 node ID，RTT 升序 |
 | `RDSMART/SELECTION/V1` | selection fields 1–9（含 protocol version、requester、target、initial request nonce 与原 outer conn type） |
 | `RDSMART/CAPABILITY-RESPONSE/V1` | response fields 1–5 |
@@ -407,7 +421,7 @@ Ed25519 直接签 canonical transcript；验签前先做长度、上限、enum�
 - 不超过候选上限的唯一结果。
 - RTT 在 1–3000 ms 范围内的值。
 - 能通过对应设备公钥验签，并与 probe ID、role nonce、candidate-set hash 和 deadline 匹配的响应。`network_epoch` 是客户端随机值，服务端只校验长度、签名和单份报告一致性，不预先猜测其值。
-- session `SMART_REQUESTER` probe 必须有与 signed connect offer 相同的非空 requester/target；`SMART_TARGET` 在 smart requester 时同样绑定两者，在 official/old requester 时只允许 requester empty 且 target 必须等于报告 B 自身 ID。服务端不得从 NAT source address 猜 requester ID。
+- session `SMART_REQUESTER` 和 `SMART_TARGET` probe 必须有与 signed connect offer 相同的非空 requester/target/conn type。offer absent 不得生成 session probe，服务端不得从 NAT source address 猜 requester ID 或建立匿名 requester 索引。
 - 每个 peer/IP 限速内的响应。
 
 客户端 RTT 仍属于不完全可信输入。它只影响报告者参与的当前会话，不得直接写成全局节点健康，也不得让一个 peer 影响其他客户的硬门槛。进入历史聚合前必须去极值、按粗粒度桶累计并达到最小样本量。
@@ -420,8 +434,8 @@ Ed25519 直接签 canonical transcript；验签前先做长度、上限、enum�
 | --- | --- | --- | --- |
 | smart | smart | smart | delivery 均可用时两端真实 RTT；不可投递的一端自动估算 |
 | smart | official/old | smart | A 真实 RTT + B 历史/Geo 估算；仍连接 |
-| official/old | smart | smart | requester ID 留空；B 可投递时最多等 900 ms 实测、A 只估算；B 收到 server selection，A 的后续 relay 保持 unsigned OSS 兼容路径；仍连接 |
-| official/old | official/old | smart | 双端估算；无可靠估算则官方 TCP 健康池轮询 |
+| official/old | smart | smart | offer absent；立即走完整 OSS，不等待智能 probe，不生成/下发 selection，不保证智能选点；后续 relay 保持 unsigned OSS，无 selection 安全绑定；仍连接 |
+| official/old | official/old | smart | offer absent；完整 OSS，零额外智能等待与状态；仍连接 |
 | smart | 任意 | official 1.1.16 | 没有 server capability，立即使用当前 OSS 流程 |
 | official/old | official/old | official 1.1.16 | 完全不变 |
 
@@ -439,11 +453,11 @@ RustDesk client 1.4.9：
 
 rustdesk-server 1.1.16：
 
-- `libs/hbb_common/protos/rendezvous.proto`：先回补上述 client 1.4.9 已有的 fields 7–10/enum 5，再共享同一智能增量定义；始终建立在 server 自己固定的 submodule commit 上。
+- `libs/hbb_common/protos/rendezvous.proto`：先按第 7.1 节表格回补 client 1.4.9 的全部已有 additive 字段/enum，再共享同一智能增量定义；始终建立在 server 自己固定的 submodule commit 上，不替换整个 `hbb_common`。
 - `libs/hbb_common/src/smart_relay.rs`：与客户端增量保持同一 wire validation/canonical/golden-vector 实现。
 - 新建 `src/smart_relay/{session,probe,selector,registry,metrics,store}.rs`。
 - `src/peer.rs`：在线内存保存已验签 capability/epoch，不把 probe cache 写入上游 peer DB。任何不带 capability、验签失败、public key 改变或 process epoch 改变的重新注册都必须清除/替换旧 capability。
-- `src/rendezvous_server.rs`：注册处理、TCP/UDP probe report、`handle_punch_hole_request()`、`handle_hole_sent()`、`handle_local_addr()`、`RequestRelay`/`RelayResponse` 与 `get_relay_server(pa,pb)` 接入同一调度接口；中间转换必须注入/校验同一 cached selection，保留原 selector 作为异常回退。
+- `src/rendezvous_server.rs`：注册处理、TCP/UDP probe report、`handle_punch_hole_request()`、`handle_hole_sent()`、`handle_local_addr()`、`RequestRelay`/`RelayResponse` 与 `get_relay_server(pa,pb)` 接入同一调度接口。只有可验签 signed PUNCH offer 可启动 smart admission；offer absent 必须立即走 upstream OSS handler，零 smart probe/selection/owner/replay state、零额外等待，且不建立基于 IP/NAT route 的匿名索引。smart A + old B 的中间转换仍必须在可验且唯一的 legacy owner 上下文中注入/校验同一 cached selection；保留原 selector 作为兼容回退。
 - smart `RequestRelay` 对每个 `(requester,target,origin_nonce,relay_attempt_uuid)` 建立 bounded single-flight。每个新 UUID owner 只向 B 投递一次，不做相同 UUID 的 timer 重投；首包/response 丢失由 A 的下一次新 UUID retry 恢复，三个 owner 始终使用同一 selection/endpoint。相同 UUID/context 的意外 duplicate 只 join 当前 owner；context 不同返回 `RELAY_ATTEMPT_CONTEXT_MISMATCH`。
 - 完成后 hbbs 在内存缓存该 UUID 的 final `RelayResponse` 30 秒并可原样重放，再保留不含 response/socket payload 的 context tombstone 到 60 秒；tombstone duplicate 返回 `RELAY_ATTEMPT_REPLAY_MISS`，绝不能再次转发 B。in-flight/未过期 response/tombstone entry 不因容量压力淘汰；默认上限 4096，满时在转发 B 前返回 `SMART_COORDINATOR_BUSY`。offer/selection/attempt issued time 超过 60 秒同样返回 replay miss；普通“没有 entry”的新 UUID 是首次 attempt，不能误报 miss。server process 丢失缓存后，客户端下一次 retry 仍必须生成新 UUID，而不是重发可能已到达 B 的旧 UUID。
 - 现有 `tcp_punch` sink 是一次性且 `send_to_tcp*()` 会 remove。智能 fork 必须把 value 重构为可共享的单连接 writer（如 `Arc<Mutex<Sink>>`），增加 `send_to_tcp_keep()`：先 clone writer、释放 map lock 后 await write；只有最终 `PunchHoleResponse`/`RelayResponse` 或连接清理才 remove。禁止持有全局 map mutex 做网络 IO。
@@ -451,13 +465,13 @@ rustdesk-server 1.1.16：
 - `src/main.rs`：新增独立 `--smart-relay-config`，不重载 legacy `--relay-servers`。
 - `src/relay_server.rs` 与官方 hbbr：不修改。
 
-对 official/old client，`RequestRelay` 继续兼容其现有字段；只有声明 smart protocol 的会话才强制验证 signed selection/offer。任何实现都不能为了智能路径破坏旧 client 固定 relay 的现有兼容行为。
+对 official/old requester，`RequestRelay` 继续兼容其现有字段并原样传播 `relay_server`/UUID/其他上游字段；它不携带 requester identity、initial origin nonce 或 selection token，且使用新 TCP connection，因此不能安全关联到任何匿名 selection。只有声明并已验证 signed smart requester 的会话才强制验证 signed selection/offer。禁止用源 IP、NAT route、target ID 或 endpoint-only match 伪造该绑定；任何实现都不能为了智能路径破坏旧 client 固定 relay 的现有兼容行为。
 
 target-side delivery 使用明确的 `PeerDelivery` abstraction：
 
 - 默认 UDP 注册客户端：probe request 发往 PeerMap 当前 UDP address；B 经一个到 hbbs 的短 secure TCP connection 发送 signed report。connect/send 失败可在 deadline 内用完全相同报告重试一次，不能生成第二套结果。
 - 若以后确认现有 TCP/WS 注册 connection 可安全持有 writer，可实现 `tcp_registered`/`ws_registered` delivery；必须有独立生命周期和背压测试，不能借用一次性 punch sink 假装持久。
-- UDP-disabled、outgoing-only、TCP/WS 无可寻址 writer 或地址已变化时标记 `TARGET_PROBE_UNDELIVERABLE`，不等待无效 channel，按一端实测/估算继续。兼容矩阵中的 “smart B” 只有 delivery 可用时才代表真实 B RTT。
+- 本 delivery 抽象只用于 signed smart requester 已启动的会话。UDP-disabled、outgoing-only、TCP/WS 无可寻址 writer 或地址已变化时标记 `TARGET_PROBE_UNDELIVERABLE`，不等待无效 channel，按一端实测/估算继续。official/old requester 不进入该分支。
 
 ## 8. 客户端测量规范
 
@@ -1143,15 +1157,17 @@ server/agent Linux artifact 必须在 glibc 2.34 或更低兼容基线上构建�
 ### 18.2 兼容测试
 
 - smart + smart + smart hbbs。
-- smart + official/old + smart hbbs，两种方向。
+- smart A + official/old B + smart hbbs：signed offer 启动智能选择，old B 忽略扩展，hbbs 仅在可验且唯一的 legacy owner 上下文中向 A 注入 cached signed selection；direct 与后续 smart `RequestRelay` 无 echo 路径均覆盖。
+- official/old A + smart B + smart hbbs：offer absent 必须立即完成 OSS 路径，不等待 probe，不生成 selection/owner/replay state，不保证智能选点，但仍必须连接。
 - official/old + official/old + smart hbbs。
 - smart client + official 1.1.16 hbbs。
-- official client + smart hbbs。
+- official client + smart hbbs：即使 target 广告 smart capability，offer absent 也必须零额外延迟地使用 upstream OSS handler。
 - smart field false 的四平台回归必须与当前 OSS server-managed relay 行为一致。
 - fixed relay 与 smart 同时提交必须前后端拒绝。
 - 高版本/未知 proto、畸形集合、oversize、重复字段和 fuzz input 不得 crash。
 - client 1.4.9/server 1.1.16 两套固定 proto 基线必须共享 canonical golden vectors；覆盖回补 fields 7–10、`force_relay`/`secure` 两值、`TERMINAL=5`、warmup/session probe context、selection presence 和所有签名 domain。
-- smart client 对 official hbbs 的初始 PUNCH offer 可被忽略，但随后 OSS `RequestRelay` field 1001 必须 absent；old requester + smart B 必须使用 requester empty/target self，不能从 NAT address 猜 ID。
+- smart client 对 official hbbs 的初始 PUNCH offer 可被忽略，但随后 OSS `RequestRelay` field 1001 必须 absent。old requester + smart B 不得生成 requester-empty session；必须全程 OSS，不能从 NAT address 猜 ID。
+- old A + smart B 的 OSS 验收必须覆盖：无智能等待；`PunchHole`/`FetchLocalAddr` 的 1.4.9 既有字段逐字段保留；direct 失败后 unsigned `RequestRelay` 将先前官方响应的 endpoint 和每次新 UUID 原样转发；两个共享同一 NAT/IP 的 old A 并发时零串话。测试还必须断言零 smart probe、selection、owner、replay entry 和匿名 IP 索引。
 - 丢失首次 selection response 后相同 nonce 必须复用原 endpoint；同 nonce 改 signed context 必须拒绝；replay cache 满时在消息到达 B 前返回 `SMART_COORDINATOR_BUSY`，客户端另起无智能扩展的兼容 attempt；过期/mismatch `RequestRelay` 不得重新选点。
 - smart `RequestRelay` 的三次 A retry 必须使用三个不同 UUID/分别签名，但复用同一 selection/endpoint；每个 server owner 只通知 B 一次。分别丢弃第 1/2 个 hbbs→B UDP request 与 final response，验证下一 UUID 可恢复且不会出现相同 UUID 的 B↔B 错误配对；同时覆盖 in-flight duplicate、30/60 秒过期和 cache-full。
 
