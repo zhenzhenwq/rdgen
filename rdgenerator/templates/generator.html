@@ -988,12 +988,17 @@
                                     <div class="toggle-grid target-toggle-grid">
                                         <label id="delayFixOption" class="option-toggle" for="{{ form.delayFix.id_for_label }}">{{ form.delayFix }} 修复第三方 API 连接延迟</label>
                                         <label id="beijingCustomOption" class="option-toggle" for="{{ form.beijingCustom.id_for_label }}" hidden>{{ form.beijingCustom }} 北京 Linux 定制</label>
+                                        <label id="smartMultiRelayOption" class="option-toggle" for="{{ form.smartMultiRelay.id_for_label }}">{{ form.smartMultiRelay }} 智能多中继（严格 WSS）</label>
                                     </div>
                                 </div>
                             </div>
                             <div id="linuxCapabilityNotice" class="capability-note" hidden>
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 <span>标准 Linux 构建仅使用配置名称；需要服务器、品牌和权限定制时，请开启“北京 Linux 定制”。</span>
+                            </div>
+                            <div id="smartMultiRelayNotice" class="capability-note" hidden>
+                                <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                                <span>要求 RustDesk 1.4.9、域名形式的 hbbs、受信任证书和 HTTPS API；构建会强制 WSS 并禁用不安全 TLS 回退。</span>
                             </div>
                         </div>
                     </div>
@@ -1336,6 +1341,8 @@
         const beijingLinuxVersions = new Set(['1.4.7', '1.4.8', '1.4.9']);
         const beijingCustomOption = document.getElementById('beijingCustomOption');
         const beijingCustomToggle = document.getElementById("{{ form.beijingCustom.id_for_label }}");
+        const smartMultiRelayOption = document.getElementById('smartMultiRelayOption');
+        const smartMultiRelayNotice = document.getElementById('smartMultiRelayNotice');
         const delayFixOption = document.getElementById('delayFixOption');
         const linuxCapabilityNotice = document.getElementById('linuxCapabilityNotice');
         const linuxCustomContent = document.querySelectorAll('.linux-custom-content');
@@ -1371,6 +1378,7 @@
         const defaultManualInput = document.getElementById("{{ form.defaultManual.id_for_label }}");
         const overrideManualInput = document.getElementById("{{ form.overrideManual.id_for_label }}");
         const relayServerInput = document.getElementById("{{ form.relayServer.id_for_label }}");
+        const smartMultiRelayInput = document.getElementById("{{ form.smartMultiRelay.id_for_label }}");
         const relayServerOptions = document.getElementById('relayServerOptions');
         const passwordRequirement = document.getElementById('passwordRequirement');
         const permanentPasswordInput = document.getElementById("{{ form.permanentPassword.id_for_label }}");
@@ -1479,6 +1487,9 @@
             }
             if (exenameInput?.value.trim()) {
                 parts.push(exenameInput.value.trim());
+            }
+            if (smartMultiRelayInput?.checked) {
+                parts.push('智能多中继');
             }
             const access = deliveryAccessInputs.find(input => input.checked)?.value;
             if (access) {
@@ -1652,16 +1663,30 @@
             const supportsBeijingCustom = platformSelect.value === 'linux' &&
                 beijingLinuxVersions.has(versionSelect.value);
             const beijingCustomEnabled = supportsBeijingCustom && beijingCustomToggle.checked;
-            const linuxCustomAllowed = platformSelect.value !== 'linux' || beijingCustomEnabled;
+            const supportsSmartMultiRelay = versionSelect.value === '1.4.9' &&
+                new Set(['windows', 'windows-x86', 'linux', 'android']).has(platformSelect.value);
+            setOptionAvailability(smartMultiRelayOption, supportsSmartMultiRelay);
+            if (!supportsSmartMultiRelay) {
+                smartMultiRelayInput.checked = false;
+            }
+            const smartMultiRelayEnabled = supportsSmartMultiRelay && smartMultiRelayInput.checked;
+            const linuxCustomAllowed = platformSelect.value !== 'linux' ||
+                beijingCustomEnabled || smartMultiRelayEnabled;
             const supportsLogo = platformSelect.value !== 'windows-x86' && platformSelect.value !== 'android';
             const supportsPrivacy = platformSelect.value === 'windows';
             linuxCustomContent.forEach(element => {
                 setSectionAvailability(element, linuxCustomAllowed);
             });
             linuxCapabilityNotice.hidden = linuxCustomAllowed;
+            smartMultiRelayNotice.hidden = !smartMultiRelayEnabled;
             setOptionAvailability(androidAppIdField, linuxCustomAllowed && platformSelect.value === 'android');
             setOptionAvailability(logoOption, supportsLogo);
             setOptionAvailability(privacyOption, supportsPrivacy);
+            if (smartMultiRelayEnabled) {
+                relayServerInput.value = '';
+                relayServerOptions.open = false;
+            }
+            setOptionAvailability(relayServerOptions, linuxCustomAllowed && !smartMultiRelayEnabled);
             logoBase64Input.disabled = !supportsLogo;
             privacyBase64Input.disabled = !supportsPrivacy;
             beijingCustomOption.hidden = !supportsBeijingCustom;
@@ -1723,6 +1748,7 @@
             input.addEventListener('change', updateDesktopBehaviorVisibility);
         });
         beijingCustomToggle.addEventListener('change', updateDesktopBehaviorVisibility);
+        smartMultiRelayInput.addEventListener('change', updateDesktopBehaviorVisibility);
         incomingCompactToggle.addEventListener('change', updateDesktopBehaviorVisibility);
         hideCmToggle.addEventListener('change', function() {
             if (!this.checked) {
@@ -1968,6 +1994,9 @@
                             forcedApproveModeInput.disabled = true;
                             hideCmPreviousApproveMode = null;
                             form.reset();
+                            if (!Object.prototype.hasOwnProperty.call(formData, 'smartMultiRelay')) {
+                                smartMultiRelayInput.checked = false;
+                            }
                             if (!Object.prototype.hasOwnProperty.call(formData, 'relayServer')) {
                                 relayServerInput.value = '';
                             }

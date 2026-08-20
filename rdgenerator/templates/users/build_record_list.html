@@ -22,6 +22,7 @@
     .build-owner strong { display: block; color: var(--ink); font-size: 12px; }
     .build-owner small, .build-delivery small { display: block; color: var(--muted); font-size: 10px; }
     .build-platform { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .build-relay-mode { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; white-space: nowrap; }
     .build-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
     .build-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ''; }
     .build-status--success { background: var(--success-soft); color: var(--success); }
@@ -127,7 +128,7 @@
                         {% endif %}
                     </td>
                     {% endif %}
-                    <td data-label="平台"><span class="build-platform">{{ build_run.platform_label }}</span></td>
+                    <td data-label="平台"><span class="build-platform">{{ build_run.platform_label }}</span><span class="build-relay-mode">{% if build_run.smart_multi_relay %}智能多中继{% else %}标准中继{% endif %}</span></td>
                     <td data-label="状态"><span class="build-status build-status--{{ build_run.status_tone }}">{{ build_run.status_label }}</span>{% if request.user.is_staff and build_run.github_run_id %}<span class="build-id">Run #{{ build_run.github_run_id }}</span>{% endif %}</td>
                     <td data-label="提交时间">{{ build_run.created_at|date:"Y-m-d H:i" }}</td>
                     <td data-label="交付">

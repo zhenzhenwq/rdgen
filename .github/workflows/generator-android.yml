@@ -194,6 +194,16 @@ jobs:
           repository: rustdesk/rustdesk
           submodules: recursive
 
+      - name: Apply locked smart multi-relay patch
+        if: env.smartMultiRelay == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/rdgen-patches/apply_smart_multi_relay_149.py" \
+            --enabled true \
+            --source . \
+            --patches "$RUNNER_TEMP/rdgen-patches"
+
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:

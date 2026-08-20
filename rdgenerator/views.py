@@ -456,8 +456,9 @@ def generator_view(request):
             flutter_desktop_platforms = {'windows', 'linux', 'macos'}
             windows_platforms = {'windows', 'windows-x86'}
             version = form.cleaned_data['version']
+            smartMultiRelay = form.cleaned_data['smartMultiRelay']
             beijingCustom = form.cleaned_data['beijingCustom'] and platform == 'linux'
-            linuxCustomAllowed = platform != 'linux' or beijingCustom
+            linuxCustomAllowed = platform != 'linux' or beijingCustom or smartMultiRelay
             default_server = 'rs-ny.rustdesk.com'
             default_key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw='
             default_url_link = "https://rustdesk.com"
@@ -730,6 +731,11 @@ def generator_view(request):
             # override makes RustDesk use the relay returned by hbbs even when a
             # previous installation left a local fixed relay in CONFIG2.
             decodedCustom['override-settings']['relay-server'] = relayServer
+            if smartMultiRelay:
+                # Production smart relay negotiation is accepted only over a
+                # certificate-verified WSS rendezvous stream.
+                decodedCustom['override-settings']['allow-websocket'] = 'Y'
+                decodedCustom['override-settings']['allow-insecure-tls-fallback'] = 'N'
 
             if not linuxCustomAllowed:
                 decodedCustom = {}
@@ -795,6 +801,7 @@ def generator_view(request):
                 "urlLink":urlLink,
                 "downloadLink":downloadLink,
                 "delayFix": 'true' if delayFix else 'false',
+                "smartMultiRelay": 'true' if smartMultiRelay else 'false',
                 "beijingCustom": 'true' if beijingCustom else 'false',
                 "rdgen":'true',
                 "direction": direction,
@@ -889,6 +896,7 @@ def generator_view(request):
                     status=initial_status,
                     platform=platform,
                     artifact_stem=filename,
+                    smart_multi_relay=smartMultiRelay,
                     callback_token_hash=_callback_token_hash(callback_token),
                     download_access=download_access,
                     download_ttl_hours=download_ttl_hours,

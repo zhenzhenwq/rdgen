@@ -84,6 +84,20 @@ jobs:
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
 
+      - name: Stage smart multi-relay patch bundle
+        if: env.smartMultiRelay == 'true'
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP 'rdgen-smart-multi-relay'
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+          foreach ($name in @(
+            'apply_smart_multi_relay_149.py',
+            'smart_multi_relay_149_root.diff',
+            'smart_multi_relay_149_hbb_common.diff'
+          )) {
+            Copy-Item -LiteralPath (Join-Path '.github\patches' $name) -Destination $bundle -Force
+          }
+
       - name: Finalize and Cleanup zip/json
         if: always() # Run even if previous steps fail
         continue-on-error: true
@@ -125,6 +139,13 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           submodules: recursive
+
+      - name: Apply locked smart multi-relay patch
+        if: env.smartMultiRelay == 'true'
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP 'rdgen-smart-multi-relay'
+          python (Join-Path $bundle 'apply_smart_multi_relay_149.py') --enabled true --source . --patches $bundle
 
       - name: Install ImageMagick on Windows
         run: |

@@ -1,4 +1,6 @@
+import ipaddress
 import re
+from urllib.parse import urlsplit
 
 from django import forms
 from django.conf import settings
@@ -443,6 +445,11 @@ WINDOWS_RESERVED_NAME = re.compile(
 MAX_BUILD_NAME_UTF8_BYTES = 200
 BEIJING_LINUX_VERSIONS = {"1.4.7", "1.4.8", "1.4.9"}
 FORM_SCHEMA_VERSION = "2"
+SMART_MULTI_RELAY_PLATFORMS = {'windows', 'windows-x86', 'linux', 'android'}
+SMART_RENDEZVOUS_DOMAIN = re.compile(
+    r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\Z"
+)
 
 
 def validate_portable_name(value):
@@ -494,12 +501,44 @@ def version_at_least(value, minimum):
     return current >= minimum
 
 
+def is_smart_rendezvous_domain(value):
+    value = (value or '').strip()
+    if not value or '://' in value or any(character.isspace() for character in value):
+        return False
+    try:
+        parsed = urlsplit(f'//{value}')
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return False
+    if not hostname or (port is not None and not 1 <= port <= 65535):
+        return False
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        return SMART_RENDEZVOUS_DOMAIN.fullmatch(hostname) is not None
+    return False
+
+
+def is_https_api_server(value):
+    try:
+        parsed = urlsplit((value or '').strip())
+    except ValueError:
+        return False
+    return parsed.scheme.lower() == 'https' and bool(parsed.hostname)
+
+
 class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     formSchemaVersion = forms.CharField(
         initial=FORM_SCHEMA_VERSION,
         required=False,
         widget=forms.HiddenInput(),
+    )
+    smartMultiRelay = forms.BooleanField(
+        label="智能多中继",
+        initial=False,
+        required=False,
     )
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64 位'),('windows-x86','Windows 32 位'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
@@ -752,6 +791,38 @@ class GenerateForm(forms.Form):
             )
             if not cleaned.get('relayServer'):
                 cleaned['relayServer'] = manual_relay_values[source]
+
+        smart_multi_relay = bool(cleaned.get('smartMultiRelay'))
+        if smart_multi_relay:
+            if version != '1.4.9':
+                self.add_error(
+                    'smartMultiRelay',
+                    '智能多中继仅支持 RustDesk 1.4.9；nightly 和其他版本暂不支持。',
+                )
+            if platform not in SMART_MULTI_RELAY_PLATFORMS:
+                self.add_error(
+                    'smartMultiRelay',
+                    '智能多中继仅支持 Windows 64 位、Windows 32 位、Linux 和 Android；macOS 暂不支持。',
+                )
+            if cleaned.get('relayServer'):
+                conflict_message = '智能多中继不能与固定中继服务器同时启用。'
+                self.add_error('smartMultiRelay', conflict_message)
+                self.add_error('relayServer', conflict_message)
+            if not is_smart_rendezvous_domain(cleaned.get('serverIP')):
+                self.add_error(
+                    'serverIP',
+                    '智能多中继要求使用可由受信任证书覆盖的 hbbs 域名，可附带端口；不能使用 IP 地址。',
+                )
+            if not is_https_api_server(cleaned.get('apiServer')):
+                self.add_error(
+                    'apiServer',
+                    '智能多中继要求显式填写以 https:// 开头的 API 地址，以启用严格 WSS。',
+                )
+            if not cleaned.get('key'):
+                self.add_error(
+                    'key',
+                    '智能多中继要求填写服务器公钥，用于验证服务器签名的中继选择。',
+                )
 
         legacy_hidecm_submission = (
             cleaned.get('hidecm')

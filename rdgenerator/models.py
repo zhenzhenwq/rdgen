@@ -344,6 +344,7 @@ class GithubRun(models.Model):
     artifact_file_count = models.PositiveIntegerField(default=0)
     platform = models.CharField(max_length=20, blank=True, default="")
     artifact_stem = models.CharField(max_length=255, blank=True, default="")
+    smart_multi_relay = models.BooleanField(default=False)
     quota_chargeable = models.BooleanField(default=False)
     quota_reserved = models.BooleanField(default=False)
     quota_counted = models.BooleanField(default=False)

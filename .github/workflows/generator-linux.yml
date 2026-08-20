@@ -94,6 +94,20 @@ jobs:
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
 
+      - name: Stage smart multi-relay patch bundle
+        if: env.smartMultiRelay == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/rdgen-smart-multi-relay"
+          rm -rf "$bundle"
+          install -d "$bundle"
+          cp \
+            .github/patches/apply_smart_multi_relay_149.py \
+            .github/patches/smart_multi_relay_149_root.diff \
+            .github/patches/smart_multi_relay_149_hbb_common.diff \
+            "$bundle/"
+
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v7
         with:
@@ -141,6 +155,17 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           submodules: recursive
+
+      - name: Apply locked smart multi-relay patch
+        if: env.smartMultiRelay == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/rdgen-smart-multi-relay"
+          python3 "$bundle/apply_smart_multi_relay_149.py" \
+            --enabled true \
+            --source . \
+            --patches "$bundle"
 
       - name: Set Swap Space
         if: ${{ matrix.job.arch == 'x86_64' }}

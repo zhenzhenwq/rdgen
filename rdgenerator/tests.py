@@ -86,6 +86,18 @@ class GeneratorFeaturePayloadTests(TestCase):
             "overrideManualInput.value = ''",
         )
 
+    def test_smart_multi_relay_data_field_is_staged_for_import_export(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'type="checkbox" name="smartMultiRelay"')
+        self.assertContains(response, '智能多中继（严格 WSS）')
+        self.assertContains(
+            response,
+            "hasOwnProperty.call(formData, 'smartMultiRelay')",
+        )
+        self.assertContains(response, "smartMultiRelayInput.checked = false")
+
     def test_ambiguous_dispatch_error_keeps_windows_run_receivable(self):
         with (
             patch("rdgenerator.views.requests.post", side_effect=TimeoutError("lost response")),
@@ -245,6 +257,26 @@ class GeneratorFeaturePayloadTests(TestCase):
         }
         return data
 
+    def _smart_multi_relay_payload(self, platform="windows", version="1.4.9"):
+        data = self._feature_payload(platform=platform)
+        data["smartMultiRelay"] = "on"
+        data["version"] = version
+        data["serverIP"] = "hbbs.example.com:21116"
+        data["apiServer"] = "https://api.example.com"
+        if platform == "windows-x86":
+            for field in (
+                "cycleMonitor",
+                "xOffline",
+                "copyIdPasswordButton",
+                "manualTemporaryPassword",
+                "showStartOnBootCheckbox",
+                "incomingCompactMode",
+            ):
+                data[field] = ""
+        if platform == "android":
+            data["hideSettingsMenu"] = ""
+        return data
+
     def _post_and_read_inputs(self, data):
         counter = iter(range(1, 20))
 
@@ -262,6 +294,7 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(GithubRun.objects.get().owner, self.user)
         post_payload = post_mock.call_args.kwargs["json"]
+        self.last_dispatch_payload = post_payload
         zip_url = json.loads(post_payload["inputs"]["zip_url"])
         self.last_dispatch_metadata = zip_url
         zip_path = Path("temp_zips") / zip_url["file"]
@@ -735,6 +768,115 @@ class GeneratorFeaturePayloadTests(TestCase):
 
     def test_default_version_is_1_4_9(self):
         self.assertEqual(GenerateForm().fields["version"].initial, "1.4.9")
+
+    def test_smart_multi_relay_missing_input_defaults_false_and_is_serialized(self):
+        data = self._feature_payload()
+        form = GenerateForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["smartMultiRelay"])
+
+        _, inputs_raw, custom_config = self._post_and_read_inputs(data)
+        run = GithubRun.objects.get()
+        self.assertFalse(run.smart_multi_relay)
+        self.assertEqual(inputs_raw["smartMultiRelay"], "false")
+        self.assertEqual(custom_config["override-settings"]["relay-server"], "")
+
+    def test_smart_multi_relay_accepts_only_locked_platform_matrix(self):
+        for platform in ("windows", "windows-x86", "linux", "android"):
+            with self.subTest(platform=platform):
+                form = GenerateForm(data=self._smart_multi_relay_payload(platform))
+                self.assertTrue(form.is_valid(), form.errors)
+                self.assertTrue(form.cleaned_data["smartMultiRelay"])
+
+    def test_smart_multi_relay_rejects_nightly_and_other_versions(self):
+        for version in ("master", "1.4.8"):
+            with self.subTest(version=version):
+                form = GenerateForm(
+                    data=self._smart_multi_relay_payload(version=version)
+                )
+                self.assertFalse(form.is_valid())
+                self.assertIn("smartMultiRelay", form.errors)
+                self.assertIn("仅支持 RustDesk 1.4.9", form.errors["smartMultiRelay"][0])
+
+    def test_smart_multi_relay_rejects_macos(self):
+        form = GenerateForm(data=self._smart_multi_relay_payload("macos"))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("smartMultiRelay", form.errors)
+        self.assertIn("macOS 暂不支持", form.errors["smartMultiRelay"][0])
+
+    def test_smart_multi_relay_rejects_explicit_fixed_relay(self):
+        data = self._smart_multi_relay_payload()
+        data["relayServer"] = "relay.example.com:21117"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("smartMultiRelay", form.errors)
+        self.assertIn("relayServer", form.errors)
+        self.assertIn("不能与固定中继服务器同时启用", form.errors["relayServer"][0])
+
+    def test_smart_multi_relay_requires_strict_wss_deployment_inputs(self):
+        cases = (
+            ("serverIP", "192.0.2.10:21116", "不能使用 IP 地址"),
+            ("serverIP", "hbbs", "不能使用 IP 地址"),
+            ("apiServer", "http://api.example.com", "https://"),
+            ("apiServer", "", "https://"),
+            ("key", "", "服务器公钥"),
+        )
+        for field, value, message in cases:
+            with self.subTest(field=field, value=value):
+                data = self._smart_multi_relay_payload()
+                data[field] = value
+                form = GenerateForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+                self.assertIn(message, form.errors[field][0])
+
+    def test_smart_multi_relay_rejects_manual_fixed_relay(self):
+        data = self._smart_multi_relay_payload()
+        data["relayServer"] = ""
+        data["overrideManual"] = "relay-server=relay.example.com:21117"
+        form = GenerateForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("smartMultiRelay", form.errors)
+        self.assertIn("relayServer", form.errors)
+
+    def test_smart_multi_relay_is_persisted_and_encrypted_for_generation(self):
+        _, inputs_raw, custom_config = self._post_and_read_inputs(
+            self._smart_multi_relay_payload()
+        )
+        run = GithubRun.objects.get()
+
+        self.assertTrue(run.smart_multi_relay)
+        self.assertEqual(inputs_raw["smartMultiRelay"], "true")
+        self.assertEqual(custom_config["override-settings"]["relay-server"], "")
+        self.assertEqual(
+            custom_config["override-settings"]["allow-websocket"],
+            "Y",
+        )
+        self.assertEqual(
+            custom_config["override-settings"]["allow-insecure-tls-fallback"],
+            "N",
+        )
+        self.assertNotIn("smartMultiRelay", self.last_dispatch_payload["inputs"])
+
+    def test_smart_multi_relay_linux_keeps_wss_server_configuration(self):
+        _, inputs_raw, custom_config = self._post_and_read_inputs(
+            self._smart_multi_relay_payload("linux")
+        )
+
+        self.assertEqual(inputs_raw["smartMultiRelay"], "true")
+        self.assertEqual(
+            custom_config["custom-rendezvous-server"],
+            "hbbs.example.com:21116",
+        )
+        self.assertEqual(custom_config["api-server"], "https://api.example.com")
+        self.assertEqual(
+            custom_config["override-settings"]["allow-websocket"],
+            "Y",
+        )
 
     def test_hide_connection_window_capability_allows_empty_permanent_password(self):
         data = self._feature_payload()

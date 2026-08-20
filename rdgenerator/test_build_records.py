@@ -26,6 +26,7 @@ class BuildRecordListTests(TestCase):
             owner=self.owner,
             platform="windows",
             artifact_stem="OwnerClient",
+            smart_multi_relay=True,
             github_run_id=101,
             artifact_file_count=2,
             download_expires_at=timezone.now() + timedelta(days=1),
@@ -66,7 +67,16 @@ class BuildRecordListTests(TestCase):
         self.assertNotContains(response, "OtherClient")
         self.assertNotContains(response, "LegacyClient")
         self.assertContains(response, "查看结果")
+        self.assertContains(response, "智能多中继")
         self.assertNotContains(response, "全部用户")
+
+    def test_build_history_distinguishes_smart_and_standard_relay_modes(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("users:build_records"))
+
+        self.assertContains(response, "智能多中继", count=1)
+        self.assertContains(response, "标准中继", count=2)
 
     def test_staff_sees_all_records_including_deleted_owner(self):
         self.client.force_login(self.staff)
