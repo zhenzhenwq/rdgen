@@ -112,7 +112,7 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         self.assertIn('"allow-websocket": "Y"', release)
         self.assertIn('"allow-insecure-tls-fallback": "N"', release)
         self.assertIn('"smartMultiRelay": "true"', release)
-        self.assertIn('"beijingCustom": true', release)
+        self.assertIn('"beijingCustom": "true"', release)
         self.assertIn('"rdgen": "validation"', release)
         self.assertIn('"source": "actions-artifact"', release)
         for workflow_name in SMART_WORKFLOWS:
