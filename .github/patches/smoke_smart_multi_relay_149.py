@@ -216,11 +216,11 @@ def exercise_disabled_and_enabled(
     )
     assert_contains(
         source / "src/flutter_ffi.rs",
-        "pub fn main_notify_network_changed()",
+        "failed to invalidate smart relay network state: {error}",
     )
     assert_contains(
         source / "flutter/lib/main.dart",
-        "unawaited(bind.mainNotifyNetworkChanged());",
+        "unawaited(bind.mainCheckConnectStatus());",
     )
     assert_contains(
         source / "src/smart_relay.rs",

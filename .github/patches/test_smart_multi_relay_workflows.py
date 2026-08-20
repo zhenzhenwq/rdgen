@@ -32,6 +32,17 @@ def named_step(workflow: str, name: str) -> str:
 
 
 class SmartMultiRelayWorkflowTests(unittest.TestCase):
+    def test_lifecycle_invalidation_reuses_the_generated_bridge_contract(self):
+        root_patch = (
+            Path(__file__).resolve().parent / "smart_multi_relay_149_root.diff"
+        ).read_text(encoding="utf-8")
+        self.assertIn("unawaited(bind.mainCheckConnectStatus());", root_patch)
+        self.assertIn(
+            "failed to invalidate smart relay network state: {error}",
+            root_patch,
+        )
+        self.assertNotIn("mainNotifyNetworkChanged", root_patch)
+
     def test_supported_workflows_apply_only_the_locked_true_path(self):
         for workflow_name, (stage_name, first_following_step) in SMART_WORKFLOWS.items():
             with self.subTest(workflow=workflow_name):
