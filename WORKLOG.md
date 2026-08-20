@@ -993,3 +993,19 @@ User constraint recorded:
 - R1 recorded `0/0` for both UUIDs. R2 recorded `1/0` for UUID1 and `1/1` for UUID2, confirming immediate recovery on the second request identity.
 - S1/S2/S3 contract checks and locked server/client offline checks passed. The database was restored after verification, and remaining processes and owned run roots were both zero.
 - Nothing was pushed or deployed, and no production system was accessed. The next phase is total integration closeout: merge modules not yet present in integration, resolve the uncommitted handler work, run the full regression suite, and then produce a runnable vertical slice.
+
+## 2026-08-20
+
+### Phase-two Production Integration Closeout
+
+- Consolidated the server production path on `rdsmart/phase2-integration-116`. The current local HEAD is `9ddf237`; important closeout commits include `248cacb` for the separate relay-supervisor UID/IPC composition, `a4e2f0c` for audited drain/force-offline/resume operations and evidence-based convergence, and `9ddf237` for the bounded, sorted, strict read-only node inventory.
+- Verified `node list` on Windows and Rocky 8: four focused tests pass on both platforms, local-admin is 27/27, `rdsmartctl` is 16/16, local-admin protocol is 14/14, the Linux `rdsmartctl` binary builds, and packaging shell/static gates pass. The earlier full Linux library run remains 649/684 with 35 environment/security-fixture failures unrelated to the affected paths, so the complete suite is not claimed green.
+- The VM already has a valid generation-1 credential and enrolled node. Its controller database is the only authoritative state; the earlier local SQLite copy predates node creation and must never be restored. No agent/hbbr process or local relay listener currently runs. Re-enrollment is both unsafe and rejected while the active credential exists.
+- The planned VM run cannot use `1.1.1.1`: that address is not assigned locally, and public reachability caused a false-positive health result. Before an authorized slice, use an actually owned endpoint and remediate controller logging/rotation plus the observed permissive private-key and database modes. No VM deployment, process restart, state deletion, or credential mutation was performed.
+
+### Locked Generator Integration And Verification
+
+- Commit `fd13daf` added the off-by-default `smartMultiRelay` field, migration/history display, exact RustDesk 1.4.9 and supported-platform validation, strict-WSS hostname/API requirements, fixed-relay conflicts, encrypted workflow input staging, true-only Windows x64/x86/Linux/Android workflow steps, and locked production root plus `hbb_common` patches. macOS remains excluded.
+- Follow-up `c99801e` added the missing network/lifecycle invalidation bridge and tightened apply/smoke markers. The patch helper pins root `6c578292e8ebbbec708b76986ba8c4bc7c509747` and `hbb_common` `7e1c392c62d39c364127307cd408421dd5f8cfb0`, validates exact patch digests and path sets, rejects partial/repeated/wrong-baseline application, and excludes fixture-only paths and markers.
+- Reverification passed all 200 Django tests, Django system checks, migration-drift checks, two workflow contract tests, and the complete offline enabled/disabled/repeated/wrong-root/wrong-hbb patch smoke. No live form was submitted, no GitHub Actions workflow was dispatched, and nothing was pushed or deployed.
+- Cleaned large build artifacts after verification: the server default target had already freed about 28.9 GiB, and the final mixed-platform `target-rocky8` cache removed another 20.0 GiB (27,752 files). The temporary 5.4 GiB Rocky 8 target lived only in Docker overlay and was also removed. User data and the pre-existing `db_v2.sqlite3` working-tree change were preserved.
