@@ -467,7 +467,8 @@ class LinuxPackagingCustomizationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "apt-get install -y git flatpak flatpak-builder python3", workflow
+            "apt-get install -y git flatpak flatpak-builder appstream-compose python3",
+            workflow,
         )
         self.assertIn(
             'if [[ "${{ env.filename }}" != "rustdesk" ]]; then', workflow

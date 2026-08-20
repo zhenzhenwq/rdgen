@@ -158,6 +158,10 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         self.assertIn("env.beijingCustom == 'true'", beijing_base)
         self.assertNotIn("env.smartMultiRelay", beijing_base)
         self.assertGreaterEqual(workflow.count("--without-beijing-runtime"), 3)
+        self.assertIn(
+            "apt-get install -y git flatpak flatpak-builder appstream-compose python3",
+            workflow,
+        )
 
 
 if __name__ == "__main__":
