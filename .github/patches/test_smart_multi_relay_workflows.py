@@ -43,6 +43,12 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         )
         self.assertNotIn("mainNotifyNetworkChanged", root_patch)
 
+        hbb_patch = (
+            Path(__file__).resolve().parent / "smart_multi_relay_149_hbb_common.diff"
+        ).read_text(encoding="utf-8")
+        self.assertIn("configured_api_server_for_websocket", hbb_patch)
+        self.assertIn("hard_api_server_is_used_when_config_api_is_empty", hbb_patch)
+
     def test_supported_workflows_apply_only_the_locked_true_path(self):
         for workflow_name, (stage_name, first_following_step) in SMART_WORKFLOWS.items():
             with self.subTest(workflow=workflow_name):
@@ -109,6 +115,7 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("actions: write", release)
+        self.assertIn('"api-server": api_server', release)
         self.assertIn('"allow-websocket": "Y"', release)
         self.assertIn('"allow-insecure-tls-fallback": "N"', release)
         self.assertIn('"smartMultiRelay": "true"', release)

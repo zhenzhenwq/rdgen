@@ -24,7 +24,7 @@ ROOT_PATCH_PATHS = (
 )
 
 HBB_COMMON_PATCH_NAME = "smart_multi_relay_149_hbb_common.diff"
-HBB_COMMON_PATCH_SHA256 = "ef120097e6c03cad19d7e5e1e6fd44a22d01bdb3e9487edf4f9164701925c1da"
+HBB_COMMON_PATCH_SHA256 = "f8b07957bb5187959a42ab06a51b749c3235f9593e8d28ab12bea176e1f5910b"
 HBB_COMMON_PATCH_PATHS = (
     "Cargo.toml",
     "protos/rendezvous.proto",
@@ -83,6 +83,7 @@ HBB_COMMON_POST_MARKERS = (
     ("src/smart_relay.rs", "pub const SMART_RELAY_PROTOCOL_V1: u32 = 1;"),
     ("src/stream.rs", "pub fn has_strict_websocket_tls_handshake(&self) -> bool"),
     ("src/websocket.rs", "pub fn has_strict_tls_handshake(&self) -> bool"),
+    ("src/websocket.rs", "fn configured_api_server_for_websocket() -> String"),
 )
 
 FORBIDDEN_PATCH_TOKENS = (

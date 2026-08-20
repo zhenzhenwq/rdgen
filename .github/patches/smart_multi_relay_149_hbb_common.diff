@@ -1931,10 +1931,19 @@ index a8e6b6c2d1b4dc73175ec573649277af3d3227e4..2d41d857a83b47785c18ed7289eac18d
      pub async fn next_timeout(
          &mut self,
 diff --git a/src/websocket.rs b/src/websocket.rs
-index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde7f254d42 100644
+index 7bf21084090c0e85a6bfa950260c1955a56e324d..5f0a21246cbb8c18bfeaf6671883208678e33846 100644
 --- a/src/websocket.rs
 +++ b/src/websocket.rs
-@@ -33,9 +33,40 @@ pub struct WsFramedStream {
+@@ -1,6 +1,7 @@
+ use crate::{
+     config::{
+-        keys::OPTION_RELAY_SERVER, use_ws, Config, Socks5Server, RELAY_PORT, RENDEZVOUS_PORT,
++        keys::{OPTION_API_SERVER, OPTION_RELAY_SERVER},
++        use_ws, Config, Socks5Server, HARD_SETTINGS, RELAY_PORT, RENDEZVOUS_PORT,
+     },
+     protobuf::Message,
+     socket_client::split_host_port,
+@@ -33,9 +34,40 @@ pub struct WsFramedStream {
      addr: SocketAddr,
      encrypt: Option<Encrypt>,
      send_timeout: u64,
@@ -1975,7 +1984,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
      #[inline]
      fn get_connector(
          tls_type: &TlsType,
-@@ -68,7 +99,7 @@ impl WsFramedStream {
+@@ -68,7 +100,7 @@ impl WsFramedStream {
      async fn connect(
          url: &str,
          ms_timeout: u64,
@@ -1984,7 +1993,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
          // to-do: websocket proxy.
 
          let tls_type = get_cached_tls_type(url);
-@@ -94,7 +125,7 @@ impl WsFramedStream {
+@@ -94,7 +126,7 @@ impl WsFramedStream {
          is_tls_type_cached: bool,
          danger_accept_invalid_cert: Option<bool>,
          original_danger_accept_invalid_certs: Option<bool>,
@@ -1993,7 +2002,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
          let ws_config = None;
          let disable_nagle = false;
          let request = url
-@@ -109,8 +140,20 @@ impl WsFramedStream {
+@@ -109,8 +141,20 @@ impl WsFramedStream {
          .await?
          {
              Ok((ws_stream, _)) => {
@@ -2016,7 +2025,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
              }
              Err(e) => match (tls_type, is_tls_type_cached, danger_accept_invalid_cert) {
                  (TlsType::Rustls, _, None) => {
-@@ -188,22 +231,39 @@ impl WsFramedStream {
+@@ -188,22 +232,39 @@ impl WsFramedStream {
          _proxy_conf: Option<&Socks5Server>,
          ms_timeout: u64,
      ) -> ResultType<Self> {
@@ -2071,7 +2080,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
      }
 
      #[inline]
-@@ -222,6 +282,7 @@ impl WsFramedStream {
+@@ -222,6 +283,7 @@ impl WsFramedStream {
              addr,
              encrypt: None,
              send_timeout: 0,
@@ -2079,7 +2088,7 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
          })
      }
 
-@@ -245,6 +306,11 @@ impl WsFramedStream {
+@@ -245,6 +307,11 @@ impl WsFramedStream {
          self.encrypt.is_some()
      }
 
@@ -2091,10 +2100,97 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
      #[inline]
      pub async fn send(&mut self, msg: &impl Message) -> ResultType<()> {
          self.send_raw(msg.write_to_bytes()?).await
-@@ -405,6 +471,50 @@ mod tests {
-     use super::*;
-     use crate::config::{keys, Config};
+@@ -326,6 +393,19 @@ pub fn is_ws_endpoint(endpoint: &str) -> bool {
+     endpoint.starts_with("ws://") || endpoint.starts_with("wss://")
+ }
 
++fn configured_api_server_for_websocket() -> String {
++    let configured = Config::get_option(OPTION_API_SERVER);
++    if !configured.is_empty() {
++        return configured;
++    }
++    HARD_SETTINGS
++        .read()
++        .unwrap()
++        .get(OPTION_API_SERVER)
++        .cloned()
++        .unwrap_or_default()
++}
++
+ /**
+  * Core function to convert an endpoint to WebSocket format
+  *
+@@ -388,7 +468,7 @@ pub fn check_ws(endpoint: &str) -> String {
+         (format!("{}{}", endpoint_host, domain_path), true)
+     };
+     let protocol = if is_domain {
+-        let api_server = Config::get_option("api-server");
++        let api_server = configured_api_server_for_websocket();
+         if api_server.starts_with("https") {
+             "wss"
+         } else {
+@@ -403,7 +483,106 @@ pub fn check_ws(endpoint: &str) -> String {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+-    use crate::config::{keys, Config};
++    use crate::config::{keys, Config, OVERWRITE_SETTINGS};
++
++    struct HardApiServerGuard(Option<String>);
++    struct OverrideApiServerGuard(Option<String>);
++
++    impl HardApiServerGuard {
++        fn replace(value: &str) -> Self {
++            let original = HARD_SETTINGS
++                .write()
++                .unwrap()
++                .insert(OPTION_API_SERVER.to_string(), value.to_string());
++            Self(original)
++        }
++    }
++
++    impl Drop for HardApiServerGuard {
++        fn drop(&mut self) {
++            let mut hard_settings = HARD_SETTINGS.write().unwrap();
++            if let Some(original) = self.0.take() {
++                hard_settings.insert(OPTION_API_SERVER.to_string(), original);
++            } else {
++                hard_settings.remove(OPTION_API_SERVER);
++            }
++        }
++    }
++
++    impl OverrideApiServerGuard {
++        fn force_empty() -> Self {
++            let original = OVERWRITE_SETTINGS
++                .write()
++                .unwrap()
++                .insert(OPTION_API_SERVER.to_string(), String::new());
++            Self(original)
++        }
++    }
++
++    impl Drop for OverrideApiServerGuard {
++        fn drop(&mut self) {
++            let mut overwrite_settings = OVERWRITE_SETTINGS.write().unwrap();
++            if let Some(original) = self.0.take() {
++                overwrite_settings.insert(OPTION_API_SERVER.to_string(), original);
++            } else {
++                overwrite_settings.remove(OPTION_API_SERVER);
++            }
++        }
++    }
++
++    #[test]
++    fn hard_api_server_is_used_when_config_api_is_empty() {
++        let _configured_api_server = OverrideApiServerGuard::force_empty();
++        let _hard_api_server = HardApiServerGuard::replace("https://api.rustdesk.com");
++        assert_eq!(
++            configured_api_server_for_websocket(),
++            "https://api.rustdesk.com"
++        );
++    }
++
 +    #[test]
 +    fn strict_tls_verdict_rejects_plain_and_accept_invalid_handshakes() {
 +        assert!(WsFramedStream::strict_tls_handshake_verdict(
@@ -2138,7 +2234,6 @@ index 7bf21084090c0e85a6bfa950260c1955a56e324d..c79b9ab5efee91a58223938b6e9eafde
 +            .unwrap();
 +        assert!(!stream.has_strict_tls_handshake());
 +    }
-+
+
      #[test]
      fn test_check_ws() {
-         // enable websocket

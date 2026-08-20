@@ -853,6 +853,10 @@ class GeneratorFeaturePayloadTests(TestCase):
         self.assertEqual(inputs_raw["smartMultiRelay"], "true")
         self.assertEqual(custom_config["override-settings"]["relay-server"], "")
         self.assertEqual(
+            custom_config["override-settings"]["api-server"],
+            "https://api.example.com",
+        )
+        self.assertEqual(
             custom_config["override-settings"]["allow-websocket"],
             "Y",
         )
@@ -873,6 +877,10 @@ class GeneratorFeaturePayloadTests(TestCase):
             "hbbs.example.com:21116",
         )
         self.assertEqual(custom_config["api-server"], "https://api.example.com")
+        self.assertEqual(
+            custom_config["override-settings"]["api-server"],
+            "https://api.example.com",
+        )
         self.assertEqual(
             custom_config["override-settings"]["allow-websocket"],
             "Y",

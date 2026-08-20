@@ -76,6 +76,7 @@ jobs:
               "api-server": api_server,
               "key": server_key,
               "override-settings": {
+                  "api-server": api_server,
                   "relay-server": "",
                   "allow-websocket": "Y",
                   "allow-insecure-tls-fallback": "N",

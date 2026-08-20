@@ -733,7 +733,11 @@ def generator_view(request):
             decodedCustom['override-settings']['relay-server'] = relayServer
             if smartMultiRelay:
                 # Production smart relay negotiation is accepted only over a
-                # certificate-verified WSS rendezvous stream.
+                # certificate-verified WSS rendezvous stream. Keep api-server
+                # in the ordinary override map as well as the top-level hard
+                # setting because hbb_common's transport selector reads the
+                # ordinary Config option.
+                decodedCustom['override-settings']['api-server'] = apiServer
                 decodedCustom['override-settings']['allow-websocket'] = 'Y'
                 decodedCustom['override-settings']['allow-insecure-tls-fallback'] = 'N'
 
