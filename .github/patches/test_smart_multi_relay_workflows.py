@@ -95,6 +95,39 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         self.assertNotIn("smartMultiRelay", macos)
         self.assertNotIn("apply_smart_multi_relay_149.py", macos)
 
+    def test_release_validation_uses_private_actions_artifacts(self):
+        fetch = (WORKFLOW_DIR / "fetch-encrypted-secrets.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Download prepared release inputs", fetch)
+        self.assertIn("source == 'actions-artifact'", fetch)
+        self.assertIn("run-id: ${{ fromJSON(inputs.zip_url_json).run_id }}", fetch)
+        self.assertIn("github-token: ${{ github.token }}", fetch)
+        self.assertIn("source != 'actions-artifact'", fetch)
+
+        release = (WORKFLOW_DIR / "smart-release-validation.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("actions: write", release)
+        self.assertIn('"allow-websocket": "Y"', release)
+        self.assertIn('"allow-insecure-tls-fallback": "N"', release)
+        self.assertIn('"smartMultiRelay": "true"', release)
+        self.assertIn('"rdgen": "validation"', release)
+        self.assertIn('"source": "actions-artifact"', release)
+        for workflow_name in SMART_WORKFLOWS:
+            self.assertIn(f'"{workflow_name}"', release)
+
+    def test_release_validation_never_calls_generator_cleanup(self):
+        for workflow_name in SMART_WORKFLOWS:
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                cleanup_count = workflow.count("Finalize and Cleanup zip/json")
+                self.assertGreaterEqual(cleanup_count, 1)
+                self.assertEqual(
+                    workflow.count("always() && env.rdgen != 'validation'"),
+                    cleanup_count,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

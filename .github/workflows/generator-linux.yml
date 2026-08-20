@@ -1051,7 +1051,7 @@ jobs:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
+        if: ${{ always() && env.rdgen != 'validation' }}
         continue-on-error: true
         uses: fjogeleit/http-request-action@v1
         with:
