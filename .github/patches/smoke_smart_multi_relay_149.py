@@ -215,6 +215,18 @@ def exercise_disabled_and_enabled(
         "struct SmartRendezvousRestart {",
     )
     assert_contains(
+        source / "src/flutter_ffi.rs",
+        "pub fn main_notify_network_changed()",
+    )
+    assert_contains(
+        source / "flutter/lib/main.dart",
+        "unawaited(bind.mainNotifyNetworkChanged());",
+    )
+    assert_contains(
+        source / "src/smart_relay.rs",
+        "pub(crate) fn invalidate_configured_smart_relay_network()",
+    )
+    assert_contains(
         source / "libs/hbb_common/protos/rendezvous.proto",
         "message SmartRelayCapability {",
     )

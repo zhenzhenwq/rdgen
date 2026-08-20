@@ -11,11 +11,14 @@ ROOT_BASELINE = "6c578292e8ebbbec708b76986ba8c4bc7c509747"
 HBB_COMMON_BASELINE = "7e1c392c62d39c364127307cd408421dd5f8cfb0"
 
 ROOT_PATCH_NAME = "smart_multi_relay_149_root.diff"
-ROOT_PATCH_SHA256 = "bc6d852b629f9f5074eb713e4e38afbfe0f7f74dbaaf62f6452aef45e04aa792"
+ROOT_PATCH_SHA256 = "dcc3becab4c68cf71f27ab706d66d9287e80b519eb95ed5f1b710bfe13c57d3d"
 ROOT_PATCH_PATHS = (
     "Cargo.lock",
     "Cargo.toml",
+    "flutter/lib/main.dart",
+    "flutter/lib/web/bridge.dart",
     "src/client.rs",
+    "src/flutter_ffi.rs",
     "src/lib.rs",
     "src/rendezvous_mediator.rs",
     "src/smart_relay.rs",
@@ -55,6 +58,16 @@ ROOT_POST_MARKERS = (
     ("src/client.rs", "fn strict_wss_probe_trust_for_connected_stream("),
     ("src/client.rs", "enum RelayRefusalDisposition {"),
     ("src/client.rs", "struct SmartRendezvousRestart {"),
+    ("src/flutter_ffi.rs", "pub fn main_notify_network_changed()"),
+    ("flutter/lib/main.dart", "unawaited(bind.mainNotifyNetworkChanged());"),
+    (
+        "flutter/lib/web/bridge.dart",
+        "Future<void> mainNotifyNetworkChanged({dynamic hint})",
+    ),
+    (
+        "src/smart_relay.rs",
+        "pub(crate) fn invalidate_configured_smart_relay_network()",
+    ),
     ("src/rendezvous_mediator.rs", "fn rendezvous_stream_origin("),
     (
         "src/rendezvous_mediator.rs",
