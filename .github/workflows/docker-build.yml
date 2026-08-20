@@ -49,3 +49,23 @@ jobs:
         with:
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ env.IMAGE_TAG }}
+
+      - name: Export deployable image
+        if: env.CREATE_IMAGE == 'true'
+        shell: bash
+        run: |
+          image="ghcr.io/${{ github.repository }}:${IMAGE_TAG}"
+          docker pull "$image"
+          docker save "$image" | gzip -9 > rdgen-image.tar.gz
+          sha256sum rdgen-image.tar.gz > rdgen-image.tar.gz.sha256
+
+      - name: Upload deployable image
+        if: env.CREATE_IMAGE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdgen-container-${{ env.IMAGE_TAG }}
+          path: |
+            rdgen-image.tar.gz
+            rdgen-image.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
