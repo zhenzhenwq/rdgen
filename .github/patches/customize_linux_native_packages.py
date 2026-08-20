@@ -15,6 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app-name", required=True)
     parser.add_argument("--company", required=True)
     parser.add_argument("--url-link", required=True)
+    parser.add_argument("--without-beijing-runtime", action="store_true")
     return parser.parse_args()
 
 
@@ -299,7 +300,12 @@ def patch_build_script(path: Path, filename: str, app_name: str) -> None:
 
 
 def patch_rpm(
-    path: Path, filename: str, app_name: str, company: str, url_link: str
+    path: Path,
+    filename: str,
+    app_name: str,
+    company: str,
+    url_link: str,
+    include_beijing_runtime: bool = True,
 ) -> None:
     validate_value(app_name, "RPM summary")
     validate_value(company, "RPM vendor")
@@ -338,13 +344,15 @@ def patch_rpm(
         )
         if copy_bundle not in text:
             raise SystemExit(f"Unable to identify customized bundle copy in {path}")
-        install_compat = "\n".join(
-            [
-                f'install -Dm 755 ${{HBB}}/.rdgen-beijing/usr/lib/{filename}/librustdesk_no_sysvipc.so "%{{buildroot}}/usr/lib/{filename}/librustdesk_no_sysvipc.so"',
-                f'install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/systemd/system/{filename}.service.d/beijing-custom.conf "%{{buildroot}}/etc/systemd/system/{filename}.service.d/beijing-custom.conf"',
-                f'install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/udev/rules.d/99-{filename}-uinput.rules "%{{buildroot}}/etc/udev/rules.d/99-{filename}-uinput.rules"',
-            ]
-        )
+        install_compat = ""
+        if include_beijing_runtime:
+            install_compat = "\n" + "\n".join(
+                [
+                    f'install -Dm 755 ${{HBB}}/.rdgen-beijing/usr/lib/{filename}/librustdesk_no_sysvipc.so "%{{buildroot}}/usr/lib/{filename}/librustdesk_no_sysvipc.so"',
+                    f'install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/systemd/system/{filename}.service.d/beijing-custom.conf "%{{buildroot}}/etc/systemd/system/{filename}.service.d/beijing-custom.conf"',
+                    f'install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/udev/rules.d/99-{filename}-uinput.rules "%{{buildroot}}/etc/udev/rules.d/99-{filename}-uinput.rules"',
+                ]
+            )
         text = text.replace(
             copy_bundle,
             copy_bundle
@@ -357,48 +365,59 @@ def patch_rpm(
         files_marker = f"/usr/share/{filename}/*\n"
         if text.count(files_marker) != 1:
             raise SystemExit(f"Unable to identify RPM files section in {path}")
-        compat_files = "\n".join(
-            [
-                f"/usr/lib/{filename}/librustdesk_no_sysvipc.so",
-                f"/etc/systemd/system/{filename}.service.d/beijing-custom.conf",
-                f"/etc/udev/rules.d/99-{filename}-uinput.rules",
-            ]
-        )
-        text = text.replace(files_marker, files_marker + compat_files + "\n", 1)
+        compat_files = ""
+        if include_beijing_runtime:
+            compat_files = "\n".join(
+                [
+                    f"/usr/lib/{filename}/librustdesk_no_sysvipc.so",
+                    f"/etc/systemd/system/{filename}.service.d/beijing-custom.conf",
+                    f"/etc/udev/rules.d/99-{filename}-uinput.rules",
+                ]
+            )
+            text = text.replace(files_marker, files_marker + compat_files + "\n", 1)
 
     text = remove_legacy_sudoers_references(text, filename)
     text = set_line(text, r"^Name:\s+.*$", f"Name:       {package_name(filename)}", path, "RPM name")
     text = set_line(text, r"^Summary:\s+.*$", f"Summary:    {app_name}", path, "RPM summary")
     text = set_line(text, r"^URL:\s+.*$", f"URL:        {url_link}", path, "RPM URL")
     text = set_line(text, r"^Vendor:\s+.*$", f"Vendor:     {company}", path, "RPM vendor")
-    text = add_udev_refresh(
-        text,
-        f"systemctl daemon-reload\nsystemctl enable {filename}",
-        path,
-        expected_count=1,
-    )
-    require_all(
-        path,
-        text,
-        (
-            f"Name:       {package_name(filename)}",
-            f"Summary:    {app_name}",
-            f"URL:        {url_link}",
-            f"Vendor:     {company}",
-            f"/usr/share/{filename}/*",
-            f"/usr/lib/{filename}/librustdesk_no_sysvipc.so",
-            f'"%{{buildroot}}/usr/share/{filename}/files/{filename}.service"',
-            UDEV_REFRESH_MARKER,
-            "udevadm control --reload-rules || true",
-            "udevadm trigger --name-match=uinput || true",
-        ),
-    )
+    if include_beijing_runtime:
+        text = add_udev_refresh(
+            text,
+            f"systemctl daemon-reload\nsystemctl enable {filename}",
+            path,
+            expected_count=1,
+        )
+    expected = [
+        f"Name:       {package_name(filename)}",
+        f"Summary:    {app_name}",
+        f"URL:        {url_link}",
+        f"Vendor:     {company}",
+        f"/usr/share/{filename}/*",
+        f'"%{{buildroot}}/usr/share/{filename}/files/{filename}.service"',
+    ]
+    if include_beijing_runtime:
+        expected.extend(
+            (
+                f"/usr/lib/{filename}/librustdesk_no_sysvipc.so",
+                UDEV_REFRESH_MARKER,
+                "udevadm control --reload-rules || true",
+                "udevadm trigger --name-match=uinput || true",
+            )
+        )
+    require_all(path, text, tuple(expected))
     if "sudoers.d" in text:
         raise SystemExit(f"Unsafe sudoers packaging remains in {path}")
     path.write_text(text, encoding="utf-8")
 
 
-def patch_pkgbuild(path: Path, filename: str, app_name: str, url_link: str) -> None:
+def patch_pkgbuild(
+    path: Path,
+    filename: str,
+    app_name: str,
+    url_link: str,
+    include_beijing_runtime: bool = True,
+) -> None:
     text = path.read_text(encoding="utf-8")
     custom_marker = f'"${{pkgdir}}/usr/share/{filename}/custom_.txt"'
     if custom_marker not in text:
@@ -431,13 +450,15 @@ def patch_pkgbuild(path: Path, filename: str, app_name: str, url_link: str) -> N
         )
         if copy_bundle not in text:
             raise SystemExit("Unable to identify customized Arch bundle copy")
-        install_compat = "\n".join(
-            [
-                f'\t  install -Dm 755 ${{HBB}}/.rdgen-beijing/usr/lib/{filename}/librustdesk_no_sysvipc.so "${{pkgdir}}/usr/lib/{filename}/librustdesk_no_sysvipc.so"',
-                f'\t  install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/systemd/system/{filename}.service.d/beijing-custom.conf "${{pkgdir}}/etc/systemd/system/{filename}.service.d/beijing-custom.conf"',
-                f'\t  install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/udev/rules.d/99-{filename}-uinput.rules "${{pkgdir}}/etc/udev/rules.d/99-{filename}-uinput.rules"',
-            ]
-        )
+        install_compat = ""
+        if include_beijing_runtime:
+            install_compat = "\n" + "\n".join(
+                [
+                    f'\t  install -Dm 755 ${{HBB}}/.rdgen-beijing/usr/lib/{filename}/librustdesk_no_sysvipc.so "${{pkgdir}}/usr/lib/{filename}/librustdesk_no_sysvipc.so"',
+                    f'\t  install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/systemd/system/{filename}.service.d/beijing-custom.conf "${{pkgdir}}/etc/systemd/system/{filename}.service.d/beijing-custom.conf"',
+                    f'\t  install -Dm 644 ${{HBB}}/.rdgen-beijing/etc/udev/rules.d/99-{filename}-uinput.rules "${{pkgdir}}/etc/udev/rules.d/99-{filename}-uinput.rules"',
+                ]
+            )
         text = text.replace(
             copy_bundle,
             copy_bundle
@@ -453,53 +474,56 @@ def patch_pkgbuild(path: Path, filename: str, app_name: str, url_link: str) -> N
     url_value = quote_shell_double(url_link, "Arch URL")
     text = set_line(text, r"^pkgdesc=.*$", f"pkgdesc={description_value}", path, "Arch description")
     text = set_line(text, r"^url=.*$", f"url={url_value}", path, "Arch URL")
-    require_all(
-        path,
-        text,
-        (
-            f"pkgname={package_name(filename)}",
-            f"pkgdesc={description_value}",
-            f"url={url_value}",
-            f"/usr/share/{filename}/{filename}",
-            f"/usr/lib/{filename}/librustdesk_no_sysvipc.so",
-            f'"${{pkgdir}}/usr/share/{filename}/files/{filename}.service"',
-        ),
-    )
+    expected = [
+        f"pkgname={package_name(filename)}",
+        f"pkgdesc={description_value}",
+        f"url={url_value}",
+        f"/usr/share/{filename}/{filename}",
+        f'"${{pkgdir}}/usr/share/{filename}/files/{filename}.service"',
+    ]
+    if include_beijing_runtime:
+        expected.append(f"/usr/lib/{filename}/librustdesk_no_sysvipc.so")
+    require_all(path, text, tuple(expected))
     if "sudoers.d" in text:
         raise SystemExit(f"Unsafe sudoers packaging remains in {path}")
     path.write_text(text, encoding="utf-8")
 
 
-def patch_pacman_install(path: Path, filename: str) -> None:
+def patch_pacman_install(
+    path: Path, filename: str, include_beijing_runtime: bool = True
+) -> None:
     text = path.read_text(encoding="utf-8")
     custom_marker = f"/usr/share/{filename}/files/{filename}.service"
     if custom_marker not in text:
         if "/usr/share/rustdesk/files/rustdesk.service" not in text:
             raise SystemExit(f"Unable to customize pacman install hook in {path}")
         text = text.replace("rustdesk", filename)
-    text = add_udev_refresh(
-        text,
-        "\tsystemctl daemon-reload",
-        path,
-        expected_count=2,
-        indent="\t",
-    )
-    require_all(
-        path,
-        text,
-        (
-            f"/usr/share/{filename}/files/{filename}.service",
-            f"/etc/systemd/system/{filename}.service",
-            f"systemctl enable {filename}",
-            f"systemctl start {filename}",
-            f"systemctl stop {filename}",
-            f"/usr/share/applications/{filename}.desktop",
-            f"/usr/share/applications/{filename}-link.desktop",
-            UDEV_REFRESH_MARKER,
-            "udevadm control --reload-rules || true",
-            "udevadm trigger --name-match=uinput || true",
-        ),
-    )
+    if include_beijing_runtime:
+        text = add_udev_refresh(
+            text,
+            "\tsystemctl daemon-reload",
+            path,
+            expected_count=2,
+            indent="\t",
+        )
+    expected = [
+        f"/usr/share/{filename}/files/{filename}.service",
+        f"/etc/systemd/system/{filename}.service",
+        f"systemctl enable {filename}",
+        f"systemctl start {filename}",
+        f"systemctl stop {filename}",
+        f"/usr/share/applications/{filename}.desktop",
+        f"/usr/share/applications/{filename}-link.desktop",
+    ]
+    if include_beijing_runtime:
+        expected.extend(
+            (
+                UDEV_REFRESH_MARKER,
+                "udevadm control --reload-rules || true",
+                "udevadm trigger --name-match=uinput || true",
+            )
+        )
+    require_all(path, text, tuple(expected))
     path.write_text(text, encoding="utf-8")
 
 
@@ -608,6 +632,7 @@ def main() -> None:
     validate_value(app_name, "application name")
     validate_value(company, "company")
     validate_value(args.url_link, "URL")
+    include_beijing_runtime = not args.without_beijing_runtime
 
     patch_build_script(ROOT / "build.py", args.filename, app_name)
     for relative_path in ("res/rpm-flutter.spec", "res/rpm-flutter-suse.spec"):
@@ -617,9 +642,18 @@ def main() -> None:
             app_name,
             company,
             args.url_link,
+            include_beijing_runtime,
         )
-    patch_pkgbuild(ROOT / "res/PKGBUILD", args.filename, app_name, args.url_link)
-    patch_pacman_install(ROOT / "res/pacman_install", args.filename)
+    patch_pkgbuild(
+        ROOT / "res/PKGBUILD",
+        args.filename,
+        app_name,
+        args.url_link,
+        include_beijing_runtime,
+    )
+    patch_pacman_install(
+        ROOT / "res/pacman_install", args.filename, include_beijing_runtime
+    )
     patch_desktop(ROOT / "res/rustdesk.desktop", args.filename, app_name)
     patch_desktop(ROOT / "res/rustdesk-link.desktop", args.filename, app_name)
     patch_service(ROOT / "res/rustdesk.service", args.filename, app_name)

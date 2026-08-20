@@ -15,6 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app-name", required=True)
     parser.add_argument("--company", required=True)
     parser.add_argument("--url-link", required=True)
+    parser.add_argument("--without-beijing-runtime", action="store_true")
     return parser.parse_args()
 
 
@@ -88,7 +89,12 @@ def patch_metainfo(
 
 
 def customize(
-    path: Path, filename: str, app_name: str, company: str, url_link: str
+    path: Path,
+    filename: str,
+    app_name: str,
+    company: str,
+    url_link: str,
+    include_beijing_runtime: bool = True,
 ) -> None:
     validate_filename(filename)
     validate_url(url_link)
@@ -102,25 +108,26 @@ def customize(
     finish_args = manifest.get("finish-args")
     if not isinstance(finish_args, list):
         raise SystemExit("Flatpak finish-args are missing")
-    preload_arg = f"--env=LD_PRELOAD=/app/lib/{filename}/librustdesk_no_sysvipc.so"
-    if preload_arg not in finish_args:
-        finish_args.append(preload_arg)
-    for key, value in {
-        "RUSTDESK_NO_SYSVIPC_SHIM_LOG": "0",
-        "RUSTDESK_UINPUT_INPUT_FALLBACK": "0",
-        "RUSTDESK_UINPUT_INPUT_LOG": "1",
-        "RUSTDESK_XCB_MOUSE_FALLBACK": "1",
-        "RUSTDESK_UINPUT_MOUSE_MODE": "anchor",
-        "RUSTDESK_UINPUT_MOUSE_REL_SCALE": "2",
-        "RUSTDESK_UINPUT_WIDTH": "1024",
-        "RUSTDESK_UINPUT_HEIGHT": "600",
-        "RUSTDESK_FORCE_CM_NO_UI": "1",
-        "RUSTDESK_DISABLE_TRAY": "1",
-        "RUSTDESK_PREWARM_CM_NO_UI": "1",
-    }.items():
-        env_arg = f"--env={key}={value}"
-        if env_arg not in finish_args:
-            finish_args.append(env_arg)
+    if include_beijing_runtime:
+        preload_arg = f"--env=LD_PRELOAD=/app/lib/{filename}/librustdesk_no_sysvipc.so"
+        if preload_arg not in finish_args:
+            finish_args.append(preload_arg)
+        for key, value in {
+            "RUSTDESK_NO_SYSVIPC_SHIM_LOG": "0",
+            "RUSTDESK_UINPUT_INPUT_FALLBACK": "0",
+            "RUSTDESK_UINPUT_INPUT_LOG": "1",
+            "RUSTDESK_XCB_MOUSE_FALLBACK": "1",
+            "RUSTDESK_UINPUT_MOUSE_MODE": "anchor",
+            "RUSTDESK_UINPUT_MOUSE_REL_SCALE": "2",
+            "RUSTDESK_UINPUT_WIDTH": "1024",
+            "RUSTDESK_UINPUT_HEIGHT": "600",
+            "RUSTDESK_FORCE_CM_NO_UI": "1",
+            "RUSTDESK_DISABLE_TRAY": "1",
+            "RUSTDESK_PREWARM_CM_NO_UI": "1",
+        }.items():
+            env_arg = f"--env={key}={value}"
+            if env_arg not in finish_args:
+                finish_args.append(env_arg)
     while "--device=all" in finish_args:
         finish_args.remove("--device=all")
 
@@ -204,6 +211,7 @@ def main() -> None:
         args.app_name,
         args.company,
         args.url_link,
+        not args.without_beijing_runtime,
     )
 
 

@@ -112,7 +112,7 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         self.assertIn('"allow-websocket": "Y"', release)
         self.assertIn('"allow-insecure-tls-fallback": "N"', release)
         self.assertIn('"smartMultiRelay": "true"', release)
-        self.assertIn('"beijingCustom": "true"', release)
+        self.assertIn('"beijingCustom": false', release)
         self.assertIn('"rdgen": "validation"', release)
         self.assertIn('"source": "actions-artifact"', release)
         for workflow_name in SMART_WORKFLOWS:
@@ -144,6 +144,20 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
                 self.assertIn("actions/upload-artifact@v4", step)
                 self.assertIn("if-no-files-found: error", step)
                 self.assertIn("retention-days: 3", step)
+
+    def test_smart_linux_customization_does_not_require_beijing_runtime(self):
+        workflow = (WORKFLOW_DIR / "generator-linux.yml").read_text(encoding="utf-8")
+        for step_name in (
+            "allow custom_.txt",
+            "Validate customization",
+            "Customize Flatpak manifest",
+        ):
+            with self.subTest(step=step_name):
+                self.assertIn("env.smartMultiRelay == 'true'", named_step(workflow, step_name))
+        beijing_base = named_step(workflow, "Apply Beijing custom Linux base fixes")
+        self.assertIn("env.beijingCustom == 'true'", beijing_base)
+        self.assertNotIn("env.smartMultiRelay", beijing_base)
+        self.assertGreaterEqual(workflow.count("--without-beijing-runtime"), 3)
 
 
 if __name__ == "__main__":

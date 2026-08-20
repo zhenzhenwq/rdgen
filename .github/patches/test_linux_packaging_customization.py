@@ -339,6 +339,64 @@ class LinuxPackagingCustomizationTests(unittest.TestCase):
         target = cleanup.split("rm -rf", 1)[1].split("||", 1)[0].strip()
         self.assertEqual(shlex.split(target), ["/root/.config/customdesk"])
 
+    def test_smart_linux_customization_omits_beijing_runtime(self):
+        native.patch_build_script(
+            self.root / "build.py", self.filename, self.app_name
+        )
+        for name in ("rpm-flutter.spec", "rpm-flutter-suse.spec"):
+            native.patch_rpm(
+                self.root / "res" / name,
+                self.filename,
+                self.app_name,
+                self.company,
+                self.url_link,
+                False,
+            )
+        native.patch_pkgbuild(
+            self.root / "res" / "PKGBUILD",
+            self.filename,
+            self.app_name,
+            self.url_link,
+            False,
+        )
+        native.patch_pacman_install(
+            self.root / "res" / "pacman_install", self.filename, False
+        )
+
+        rpm = (self.root / "res" / "rpm-flutter.spec").read_text(encoding="utf-8")
+        pkgbuild = (self.root / "res" / "PKGBUILD").read_text(encoding="utf-8")
+        pacman = (self.root / "res" / "pacman_install").read_text(encoding="utf-8")
+        self.assertIn(f"/usr/share/{self.filename}/custom_.txt", rpm)
+        self.assertIn(f"/usr/share/{self.filename}/custom_.txt", pkgbuild)
+        for text in (rpm, pkgbuild, pacman):
+            self.assertNotIn(".rdgen-beijing", text)
+            self.assertNotIn("librustdesk_no_sysvipc.so", text)
+            self.assertNotIn(native.UDEV_REFRESH_MARKER, text)
+
+        appimage_path = self.root / "appimage" / "AppImageBuilder-x86_64.yml"
+        for _ in range(2):
+            appimage.customize(
+                appimage_path, self.filename, self.app_name, False
+            )
+        appimage_text = appimage_path.read_text(encoding="utf-8")
+        self.assertIn(f"usr/share/{self.filename}/{self.filename}", appimage_text)
+        self.assertNotIn("librustdesk_no_sysvipc.so", appimage_text)
+
+        manifest_path = self.root / "flatpak" / "rustdesk.json"
+        for _ in range(2):
+            flatpak.customize(
+                manifest_path,
+                self.filename,
+                self.app_name,
+                self.company,
+                self.url_link,
+                False,
+            )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertFalse(
+            any("librustdesk_no_sysvipc.so" in arg for arg in manifest["finish-args"])
+        )
+
     def test_debian_purge_quotes_shell_glob_characters(self):
         directory = self.root / "purge-quote" / "DEBIAN"
         directory.mkdir(parents=True)

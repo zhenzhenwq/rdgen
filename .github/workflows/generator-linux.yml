@@ -257,7 +257,7 @@ jobs:
         shell: bash
 
       - name: icon stuff
-        if: ${{ env.beijingCustom == 'true' && env.iconlink_url != 'false' }}
+        if: ${{ (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.iconlink_url != 'false' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -285,7 +285,7 @@ jobs:
             b64=""
 
       - name: change appname to custom
-        if: env.beijingCustom == 'true' && env.appname != 'rustdesk'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.appname != 'rustdesk'
         shell: bash
         run: |
           sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ env.appname }}"|' ./Cargo.toml
@@ -301,7 +301,7 @@ jobs:
           sed -i -e '/-p tmpdeb\/usr\/lib\/rustdesk/d' ./build.py
 
       - name: change company name
-        if: env.beijingCustom == 'true' && env.compname != 'Purslane Tech Pte. Ltd.'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.compname != 'Purslane Tech Pte. Ltd.'
         shell: bash
         run: |
           sed -i -e 's|Purslane Tech Pte. Ltd.|${{ env.compname }}|' ./flutter/lib/desktop/pages/desktop_setting_page.dart
@@ -316,7 +316,7 @@ jobs:
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
           
       - name: allow custom_.txt
-        if: env.beijingCustom == 'true'
+        if: env.beijingCustom == 'true' || env.smartMultiRelay == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -327,7 +327,7 @@ jobs:
             sed -i -e 's|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|${{ env.key }}|' ./libs/hbb_common/src/config.rs
             wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/allowCustom.py
             python allowCustom.py --linux-uri-filename="${{ env.filename }}"
-            if [ "${{ env.beijingCustom }}" = "true" ] && [ "${{ env.removeSetupServerTip }}" = "true" ]; then
+            if { [ "${{ env.beijingCustom }}" = "true" ] || [ "${{ env.smartMultiRelay }}" = "true" ]; } && [ "${{ env.removeSetupServerTip }}" = "true" ]; then
               wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_setup_server_tip.py
               python remove_setup_server_tip.py
             fi
@@ -336,7 +336,7 @@ jobs:
             sed -i -e 's|https://admin.rustdesk.com|${{ env.apiServer }}|' ./src/common.rs
           
       - name: change url to custom
-        if: env.beijingCustom == 'true' && env.urlLink != 'https://rustdesk.com'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.urlLink != 'https://rustdesk.com'
         shell: bash
         run: |  
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ env.urlLink }}|' ./build.py
@@ -348,7 +348,7 @@ jobs:
           sed -i -e "s|https://rustdesk.com/privacy.html|${{ env.urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
 
       - name: change download link to custom
-        if: env.beijingCustom == 'true' && env.downloadLink != 'https://rustdesk.com/download'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.downloadLink != 'https://rustdesk.com/download'
         shell: bash
         run: |
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./flutter/lib/desktop/pages/desktop_home_page.dart
@@ -356,14 +356,14 @@ jobs:
           sed -i -e 's|https://rustdesk.com/download|${{ env.downloadLink }}|' ./src/ui/index.tis
 
       - name: fix connection delay
-        if: ${{ env.beijingCustom == 'true' && env.delayFix == 'true' }}
+        if: ${{ (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.delayFix == 'true' }}
         shell: bash
         run: |
           wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/delay_fix.py
           python delay_fix.py
 
       - name: add cycle monitors to toolbar
-        if: env.beijingCustom == 'true' && env.cycleMonitor == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.cycleMonitor == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -374,7 +374,7 @@ jobs:
             python cycle_monitor.py
 
       - name: use X for offline display instead of orange circle
-        if: env.beijingCustom == 'true' && env.xOffline == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.xOffline == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -385,7 +385,7 @@ jobs:
             python xoffline.py
 
       - name: hide-cm
-        if: env.beijingCustom == 'true' && env.hidecm == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.hidecm == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -396,7 +396,7 @@ jobs:
             python hidecm.py
 
       - name: hide settings menu
-        if: env.beijingCustom == 'true' && env.hideSettingsMenu == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.hideSettingsMenu == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -407,7 +407,7 @@ jobs:
             python hide_settings_menu.py
 
       - name: hide network setting
-        if: env.beijingCustom == 'true' && env.hideNetworkSetting == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.hideNetworkSetting == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -418,7 +418,7 @@ jobs:
             python hide_network_setting.py
 
       - name: runtime desktop features
-        if: env.beijingCustom == 'true' && (env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true')
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && (env.copyIdPasswordButton == 'true' || env.manualTemporaryPassword == 'true' || env.showStartOnBootCheckbox == 'true')
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -433,7 +433,7 @@ jobs:
             python runtime_features.py "${args[@]}"
 
       - name: remove recent sessions
-        if: env.beijingCustom == 'true' && env.removeRecentSessions == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.removeRecentSessions == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -444,13 +444,13 @@ jobs:
             python remove_recent_sessions.py
         
       - name: removeNewVersionNotif
-        if: env.beijingCustom == 'true' && env.removeNewVersionNotif == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.removeNewVersionNotif == 'true'
         run: | 
           wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/remove_new_version_notif.py
           python remove_new_version_notif.py
 
       - name: force disable file transfer
-        if: env.beijingCustom == 'true' && env.forceDisableFileTransfer == 'true'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.forceDisableFileTransfer == 'true'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -461,7 +461,7 @@ jobs:
             python force_disable_file_transfer.py
 
       - name: incoming-only compact layout
-        if: env.beijingCustom == 'true' && env.incomingCompactMode == 'true' && env.direction == 'incoming'
+        if: (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.incomingCompactMode == 'true' && env.direction == 'incoming'
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -479,7 +479,7 @@ jobs:
           path: ./
 
       - name: Validate customization
-        if: env.beijingCustom == 'true'
+        if: env.beijingCustom == 'true' || env.smartMultiRelay == 'true'
         shell: bash
         run: |
           wget https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/validate_customization.py
@@ -570,7 +570,7 @@ jobs:
             echo $JOBS
 
             # Make the right unit stop when the services is stopped by tray
-            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+            if [[ "${{ env.beijingCustom }}" == "true" || "${{ env.smartMultiRelay }}" == "true" ]]; then
               sed -ie "s|\(systemctl\s\+\S\+\s\){app_name}|\1${{ env.filename }}|g" src/platform/linux.rs
               sed -ie 's|\({home}/{p}/{app_name0}2\?.toml\)|\\"\1\\"|g' src/platform/linux.rs
               sed -ie 's|\(/root/{p}/\)|\\"\1\\"|g' src/platform/linux.rs
@@ -636,10 +636,10 @@ jobs:
             chmod 777 output -R
             export CARGO_INCREMENTAL=0
             export DEB_ARCH=${{ matrix.job.deb_arch }}
-            if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.logolink_url }}" != "false" ]]; then
+            if [[ ("${{ env.beijingCustom }}" == "true" || "${{ env.smartMultiRelay }}" == "true") && "${{ env.logolink_url }}" != "false" ]]; then
               wget --header="Authorization: Bearer ${{ env.token }}" -O ./flutter/assets/logo.png "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
             fi
-            if [[ "${{ env.beijingCustom }}" == "true" && "${{ env.iconlink_url }}" != "false" ]]; then
+            if [[ ("${{ env.beijingCustom }}" == "true" || "${{ env.smartMultiRelay }}" == "true") && "${{ env.iconlink_url }}" != "false" ]]; then
               mv ./flutter/assets/icon.svg ./flutter/assets/icon.svg.bak
               convert ./res/icon.png ./flutter/assets/icon.svg
               convert ./res/128x128.png -resize 200% ./flutter/assets/128x128@2x.png || true
@@ -654,9 +654,15 @@ jobs:
             fi
 
             # Change files names in the output .deb
-            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+            if [[ "${{ env.beijingCustom }}" == "true" || "${{ env.smartMultiRelay }}" == "true" ]]; then
               wget -O /tmp/customize_linux_native_packages.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_linux_native_packages.py
-              python3 /tmp/customize_linux_native_packages.py --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}"
+              native_args=()
+              if [[ "${{ env.beijingCustom }}" != "true" ]]; then
+                native_args+=(--without-beijing-runtime)
+              fi
+              python3 /tmp/customize_linux_native_packages.py --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}" "${native_args[@]}"
+            fi
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
               mkdir -p /tmp/beijing-custom-linux-shim
               wget -O /tmp/beijing-custom-linux-shim/rustdesk_no_sysvipc_shim.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_no_sysvipc_shim.c
               wget -O /tmp/beijing-custom-linux-shim/rustdesk_uinput_input_fallback.c https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/beijing_custom_linux_shim/rustdesk_uinput_input_fallback.c
@@ -812,7 +818,7 @@ jobs:
           mv ${{ env.filename }}-${{ matrix.job.arch }}.deb appimage/rustdesk.deb
 
       - name: icon stuff
-        if: ${{ env.beijingCustom == 'true' && env.iconlink_url != 'false' }}
+        if: ${{ (env.beijingCustom == 'true' || env.smartMultiRelay == 'true') && env.iconlink_url != 'false' }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
@@ -849,13 +855,19 @@ jobs:
       - name: Build appimage package
         shell: bash
         run: |
-          if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+          if [[ "${{ env.beijingCustom }}" == "true" || "${{ env.smartMultiRelay }}" == "true" ]]; then
             if [[ "${{ env.filename }}" != "rustdesk" ]]; then
               mv appimage/rustdesk.deb "appimage/${{ env.filename }}.deb"
             fi
             wget -O /tmp/customize_appimage_recipe.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_appimage_recipe.py
-            python3 /tmp/customize_appimage_recipe.py --recipe="appimage/AppImageBuilder-${{ matrix.job.arch }}.yml" --filename="${{ env.filename }}" --app-name="${{ env.appname }}"
-            grep -F 'LD_PRELOAD: $APPDIR/usr/lib/${{ env.filename }}/librustdesk_no_sysvipc.so' "appimage/AppImageBuilder-${{ matrix.job.arch }}.yml"
+            appimage_args=()
+            if [[ "${{ env.beijingCustom }}" != "true" ]]; then
+              appimage_args+=(--without-beijing-runtime)
+            fi
+            python3 /tmp/customize_appimage_recipe.py --recipe="appimage/AppImageBuilder-${{ matrix.job.arch }}.yml" --filename="${{ env.filename }}" --app-name="${{ env.appname }}" "${appimage_args[@]}"
+            if [[ "${{ env.beijingCustom }}" == "true" ]]; then
+              grep -F 'LD_PRELOAD: $APPDIR/usr/lib/${{ env.filename }}/librustdesk_no_sysvipc.so' "appimage/AppImageBuilder-${{ matrix.job.arch }}.yml"
+            fi
           fi
 
           # install libarchive-tools for bsdtar command used in AppImageBuilder.yml
@@ -966,11 +978,15 @@ jobs:
           mv ${{ env.filename }}-${{ matrix.job.arch }}.deb flatpak/rustdesk.deb
 
       - name: Customize Flatpak manifest
-        if: env.beijingCustom == 'true'
+        if: env.beijingCustom == 'true' || env.smartMultiRelay == 'true'
         shell: bash
         run: |
           wget -O /tmp/customize_flatpak_manifest.py https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/customize_flatpak_manifest.py
-          python3 /tmp/customize_flatpak_manifest.py --manifest=flatpak/rustdesk.json --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}"
+          flatpak_args=()
+          if [[ "${{ env.beijingCustom }}" != "true" ]]; then
+            flatpak_args+=(--without-beijing-runtime)
+          fi
+          python3 /tmp/customize_flatpak_manifest.py --manifest=flatpak/rustdesk.json --filename="${{ env.filename }}" --app-name="${{ env.appname }}" --company="${{ env.compname }}" --url-link="${{ env.urlLink }}" "${flatpak_args[@]}"
           python3 - <<'PY'
           import json
           import os
@@ -983,7 +999,11 @@ jobs:
           assert manifest['command'] == filename
           assert manifest['rename-desktop-file'] == f'{filename}.desktop'
           assert manifest['rename-icon'] == filename
-          assert f'--env=LD_PRELOAD=/app/lib/{filename}/librustdesk_no_sysvipc.so' in manifest['finish-args']
+          preload = f'--env=LD_PRELOAD=/app/lib/{filename}/librustdesk_no_sysvipc.so'
+          if os.environ["beijingCustom"] == "true":
+              assert preload in manifest['finish-args']
+          else:
+              assert preload not in manifest['finish-args']
           assert "--device=all" not in manifest["finish-args"]
           root = ET.parse(f"flatpak/{app_id}.metainfo.xml").getroot()
           assert root.findtext("./id") == app_id

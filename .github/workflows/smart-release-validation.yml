@@ -110,7 +110,7 @@ jobs:
               "downloadLink": api_server,
               "delayFix": false,
               "smartMultiRelay": "true",
-              "beijingCustom": "true",
+              "beijingCustom": false,
               "rdgen": "validation",
               "direction": "both",
               "hideNetworkSetting": false,
