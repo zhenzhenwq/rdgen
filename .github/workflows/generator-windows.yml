@@ -778,6 +778,17 @@ jobs:
         run: |
           mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi"
 
+      - name: Upload validation Windows x64 artifacts
+        if: ${{ env.rdgen == 'validation' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-windows-x64
+          path: |
+            ./SignOutput/${{ env.filename }}.exe
+            ./SignOutput/${{ env.filename }}.msi
+          if-no-files-found: error
+          retention-days: 3
+
       - name: send exe to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3

@@ -783,6 +783,15 @@ jobs:
           done
           unzip -p "$FINAL" assets/flutter_assets/assets/custom_.txt | grep -Fqx '${{ env.custom }}'
 
+      - name: Upload validation universal APK
+        if: ${{ env.rdgen == 'validation' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-android-universal
+          path: ./universal-apk/${{ env.filename }}-universal.apk
+          if-no-files-found: error
+          retention-days: 3
+
       - name: send universal APK to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3

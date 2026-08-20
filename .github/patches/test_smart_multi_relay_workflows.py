@@ -128,6 +128,22 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
                     cleanup_count,
                 )
 
+    def test_release_validation_retains_installable_artifacts(self):
+        expected_steps = {
+            "generator-windows.yml": "Upload validation Windows x64 artifacts",
+            "generator-windows-x86.yml": "Upload validation Windows x86 artifact",
+            "generator-linux.yml": "Upload validation AppImage",
+            "generator-android.yml": "Upload validation universal APK",
+        }
+        for workflow_name, step_name in expected_steps.items():
+            with self.subTest(workflow=workflow_name):
+                workflow = (WORKFLOW_DIR / workflow_name).read_text(encoding="utf-8")
+                step = named_step(workflow, step_name)
+                self.assertIn("env.rdgen == 'validation'", step)
+                self.assertIn("actions/upload-artifact@v4", step)
+                self.assertIn("if-no-files-found: error", step)
+                self.assertIn("retention-days: 3", step)
+
 
 if __name__ == "__main__":
     unittest.main()

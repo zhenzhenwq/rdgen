@@ -522,6 +522,15 @@ jobs:
         run: |
           mv ./SignOutput/rustdesk.exe "./SignOutput/${{ env.filename }}.exe" || echo "rustdesk"
 
+      - name: Upload validation Windows x86 artifact
+        if: ${{ env.rdgen == 'validation' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-windows-x86
+          path: ./SignOutput/${{ env.filename }}.exe
+          if-no-files-found: error
+          retention-days: 3
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         shell: bash
