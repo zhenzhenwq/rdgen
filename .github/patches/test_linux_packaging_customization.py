@@ -462,14 +462,18 @@ class LinuxPackagingCustomizationTests(unittest.TestCase):
         self.assertEqual(native.project_config_name("ΟΣ Α"), "οςα")
         self.assertNotEqual(native.project_config_name("ΟΣ Α"), "οσα")
 
-    def test_flatpak_workflow_declares_runtime_and_guards_same_file_move(self):
+    def test_flatpak_workflow_uses_modern_native_builder_and_guards_same_file_move(self):
         workflow = (PATCH_DIR.parent / "workflows" / "generator-linux.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            "apt-get install -y git flatpak flatpak-builder appstream-compose python3",
-            workflow,
-        )
+        self.assertIn("on: ubuntu-24.04,", workflow)
+        self.assertIn("on: ubuntu-24.04-arm,", workflow)
+        self.assertIn("sudo apt-get install -y git flatpak flatpak-builder python3", workflow)
+        self.assertIn('dpkg --compare-versions "$builder_version" ge 1.3.4', workflow)
+        flatpak_job = workflow.split("\n  build-flatpak:\n", 1)[1].split(
+            "\n  deploy:\n", 1
+        )[0]
+        self.assertNotIn("rustdesk-org/run-on-arch-action@amd64-support", flatpak_job)
         self.assertIn(
             'if [[ "${{ env.filename }}" != "rustdesk" ]]; then', workflow
         )

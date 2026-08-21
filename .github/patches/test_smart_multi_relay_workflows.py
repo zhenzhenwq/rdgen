@@ -152,6 +152,15 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
                 self.assertIn("if-no-files-found: error", step)
                 self.assertIn("retention-days: 3", step)
 
+        linux = (WORKFLOW_DIR / "generator-linux.yml").read_text(encoding="utf-8")
+        for step_name in ("Upload validation DEB", "Upload validation Flatpak"):
+            with self.subTest(workflow="generator-linux.yml", step=step_name):
+                step = named_step(linux, step_name)
+                self.assertIn("env.rdgen == 'validation'", step)
+                self.assertIn("actions/upload-artifact@v4", step)
+                self.assertIn("if-no-files-found: error", step)
+                self.assertIn("retention-days: 3", step)
+
     def test_smart_linux_customization_does_not_require_beijing_runtime(self):
         workflow = (WORKFLOW_DIR / "generator-linux.yml").read_text(encoding="utf-8")
         for step_name in (
@@ -165,10 +174,9 @@ class SmartMultiRelayWorkflowTests(unittest.TestCase):
         self.assertIn("env.beijingCustom == 'true'", beijing_base)
         self.assertNotIn("env.smartMultiRelay", beijing_base)
         self.assertGreaterEqual(workflow.count("--without-beijing-runtime"), 3)
-        self.assertIn(
-            "apt-get install -y git flatpak flatpak-builder appstream-compose python3",
-            workflow,
-        )
+        self.assertIn("Upload validation DEB", workflow)
+        self.assertIn("Upload validation Flatpak", workflow)
+        self.assertIn('dpkg --compare-versions "$builder_version" ge 1.3.4', workflow)
 
 
 if __name__ == "__main__":
